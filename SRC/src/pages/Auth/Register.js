@@ -1,25 +1,50 @@
 import React, { useState } from 'react';
-import { TextField, Button, Typography, Box, Alert, CircularProgress } from '@mui/material';
+import { TextField, Button, Typography, Box, Alert, CircularProgress, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase/config';
+import { auth, db } from '../../firebase/config';
 import { useNavigate, Link } from 'react-router-dom';
+import { collection, setDoc, doc } from 'firebase/firestore';
+import { Roles } from '../../utils/roles';
 // Optionally: import Redux and dispatch setUser if you'd like to store logged in user
 
 const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [groupId, setGroupId] = useState('');
+  const [userGroups, setUserGroups] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Use predefined roles instead of fetching from database
+  useState(() => {
+    setUserGroups(Object.values(Roles));
+  }, []);
+
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (!email || !password || !username || !groupId) {
+      setError('All fields are required');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Create user document in Firestore
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email,
+        username,
+        groupId,
+        createdAt: new Date().toISOString(),
+        status: 'pending' // Admin needs to approve
+      });
+
       setLoading(false);
-      navigate('/'); // Redirect after registration
+      navigate('/login'); // Redirect to login after registration
     } catch (err) {
       setError(err.message);
       setLoading(false);
@@ -48,6 +73,28 @@ const Register = () => {
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
+        <TextField
+          label="Username"
+          fullWidth
+          required
+          margin="normal"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+        />
+        <FormControl fullWidth margin="normal" required>
+          <InputLabel>User Group</InputLabel>
+          <Select
+            value={groupId}
+            label="User Group"
+            onChange={e => setGroupId(e.target.value)}
+          >
+            {Object.values(Roles).map(role => (
+              <MenuItem key={role.groupId} value={role.groupId}>
+                {role.name} ({role.groupId})
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
         <Button
           type="submit"

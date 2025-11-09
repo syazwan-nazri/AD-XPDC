@@ -15,9 +15,13 @@ import PartMaster from './pages/Admin/PartMaster';
 import Login from './pages/Auth/Login';
 import { Roles } from './utils/roles';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './firebase/config';
+import { auth, db } from './firebase/config';
 import { setUser, logout } from './redux/authSlice';
+import { initializeUserGroups } from './utils/initializeGroups';
+import { doc, getDoc } from 'firebase/firestore';
 import CircularProgress from '@mui/material/CircularProgress';
+import UserManagement from './pages/Admin/UserManagement';
+import UserGroupMaster from './pages/Admin/UserGroupMaster';
 
 const drawerWidth = 220;
 const collapsedWidth = 64;
@@ -44,6 +48,18 @@ function AppShell() {
   const [mode, setMode] = useState('light');
   const theme = useMemo(() => createTheme({ palette: { mode } }), [mode]);
   const toggleTheme = () => setMode((m) => (m === 'light' ? 'dark' : 'light'));
+
+  // Initialize user groups
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await initializeUserGroups();
+      } catch (error) {
+        console.error('Failed to initialize user groups:', error);
+      }
+    };
+    init();
+  }, []);
 
   const location = useLocation();
   // Sidebar open/collapse (start CLOSED!)
@@ -157,6 +173,8 @@ function AppShell() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} /> }>
+                <Route path="/admin/user-master" element={<UserManagement />} />
+                <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
                 <Route path="/admin/part-master" element={<PartMaster />} />
                 {/* Other admin protected routes */}
               </Route>
