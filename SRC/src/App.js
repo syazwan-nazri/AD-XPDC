@@ -1,27 +1,34 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { Provider, useDispatch, useSelector } from 'react-redux';
-import Box from '@mui/material/Box';
-import CssBaseline from '@mui/material/CssBaseline';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery';
-import store from './redux/store';
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import ProtectedRoute from './components/ProtectedRoute';
-import Register from './pages/Auth/Register';
-import NotFound from './pages/NotFound';
-import PartMaster from './pages/Admin/PartMaster';
-import Login from './pages/Auth/Login';
-import { Roles } from './utils/roles';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, db } from './firebase/config';
-import { setUser, logout } from './redux/authSlice';
-import { initializeUserGroups } from './utils/initializeGroups';
-import { doc, getDoc } from 'firebase/firestore';
-import CircularProgress from '@mui/material/CircularProgress';
-import UserManagement from './pages/Admin/UserManagement';
-import UserGroupMaster from './pages/Admin/UserGroupMaster';
+import React, { useMemo, useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { Provider, useDispatch, useSelector } from "react-redux";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import store from "./redux/store";
+import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
+import NotFound from "./pages/NotFound";
+import PartMaster from "./pages/Admin/PartMaster";
+import Login from "./pages/Auth/Login";
+import { Roles } from "./utils/roles";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth, db } from "./firebase/config";
+import { setUser, logout } from "./redux/authSlice";
+import { syncUserGroups, syncUserData } from "./utils/userManagement";
+import { doc, getDoc } from "firebase/firestore";
+import CircularProgress from "@mui/material/CircularProgress";
+import UserManagement from "./pages/Admin/UserManagement";
+import UserGroupMaster from "./pages/Admin/UserGroupMaster";
 
 const drawerWidth = 220;
 const collapsedWidth = 64;
@@ -33,11 +40,21 @@ function AuthGuard({ authReady, children }) {
 
   useEffect(() => {
     if (!authReady) return; // do nothing until auth state is checked
-    if (!user && location.pathname !== '/login' && location.pathname !== '/register') {
-      navigate('/login');
+    if (
+      !user &&
+      location.pathname !== "/login" &&
+      location.pathname !== "/forgot-password" &&
+      location.pathname !== "/reset-password"
+    ) {
+      navigate("/login");
     }
-    if (user && (location.pathname === '/login' || location.pathname === '/register')) {
-      navigate('/');
+    if (
+      user &&
+      (location.pathname === "/login" ||
+        location.pathname === "/forgot-password" ||
+        location.pathname === "/reset-password")
+    ) {
+      navigate("/");
     }
   }, [user, location.pathname, navigate, authReady]);
   return children;
@@ -45,17 +62,18 @@ function AuthGuard({ authReady, children }) {
 
 function AppShell() {
   // Theme
-  const [mode, setMode] = useState('light');
+  const [mode, setMode] = useState("light");
   const theme = useMemo(() => createTheme({ palette: { mode } }), [mode]);
-  const toggleTheme = () => setMode((m) => (m === 'light' ? 'dark' : 'light'));
+  const toggleTheme = () => setMode((m) => (m === "light" ? "dark" : "light"));
 
-  // Initialize user groups
+  // Initialize user groups and sync data
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeUserGroups();
+        // Sync user groups first
+        await syncUserGroups();
       } catch (error) {
-        console.error('Failed to initialize user groups:', error);
+        console.error("Failed to sync user groups:", error);
       }
     };
     init();
@@ -64,7 +82,7 @@ function AppShell() {
   const location = useLocation();
   // Sidebar open/collapse (start CLOSED!)
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [sidebarTempOpen, setSidebarTempOpen] = useState(false);
 
   // Redux auth
@@ -79,16 +97,27 @@ function AppShell() {
 
   // Listen to Firebase Auth state & set authReady
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        dispatch(setUser({
-          email: firebaseUser.email,
-          uid: firebaseUser.uid,
-        }));
-      } else {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          // Sync user data whenever they log in
+          await syncUserData(firebaseUser);
+
+          dispatch(
+            setUser({
+              email: firebaseUser.email,
+              uid: firebaseUser.uid,
+            })
+          );
+        } else {
+          dispatch(logout());
+        }
+      } catch (error) {
+        console.error("Error during auth state change:", error);
         dispatch(logout());
+      } finally {
+        setAuthReady(true);
       }
-      setAuthReady(true);
     });
     return unsub;
   }, [dispatch]);
@@ -114,7 +143,14 @@ function AppShell() {
   // Render loader while determining auth
   if (!authReady) {
     return (
-      <Box width="100vw" height="100vh" display="flex" alignItems="center" justifyContent="center" bgcolor={theme.palette.background.default}>
+      <Box
+        width="100vw"
+        height="100vh"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        bgcolor={theme.palette.background.default}
+      >
         <CircularProgress />
       </Box>
     );
@@ -123,17 +159,17 @@ function AppShell() {
   return (
     <ThemeProvider theme={theme}>
       <AuthGuard authReady={authReady}>
-        <Box sx={{ display: 'flex' }}>
+        <Box sx={{ display: "flex" }}>
           <CssBaseline />
           <Box
             sx={{
-              width: '100%',
+              width: "100%",
               zIndex: theme.zIndex.drawer + 1,
-              position: 'fixed',
+              position: "fixed",
               top: 0,
               left: 0,
               marginLeft: getMarginLeft(),
-              transition: 'margin 0.2s',
+              transition: "margin 0.2s",
             }}
           >
             <Navbar
@@ -145,25 +181,30 @@ function AppShell() {
             />
           </Box>
           {/* Sidebar Drawer */}
-          {user && (isMobile ? (
-            <Sidebar open={sideBarActualOpen} onToggle={handleSidebarClose} />
-          ) : (
-            <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} />
-          ))}
+          {user &&
+            (isMobile ? (
+              <Sidebar open={sideBarActualOpen} onToggle={handleSidebarClose} />
+            ) : (
+              <Sidebar
+                open={sidebarOpen}
+                onToggle={() => setSidebarOpen((v) => !v)}
+              />
+            ))}
           {/* Main content flexes to sidebar width on desktop */}
           <Box
             component="main"
-            sx={theme => ({
+            sx={(theme) => ({
               flexGrow: 1,
               p: 3,
-              transition: 'margin 0.2s',
-              width: '100vw',
-              marginLeft: (!user || isMobile)
-                ? 0
-                : sidebarOpen
-                ? `${drawerWidth}px`
-                : `${collapsedWidth}px`,
-              minHeight: '100vh',
+              transition: "margin 0.2s",
+              width: "100vw",
+              marginLeft:
+                !user || isMobile
+                  ? 0
+                  : sidebarOpen
+                  ? `${drawerWidth}px`
+                  : `${collapsedWidth}px`,
+              minHeight: "100vh",
               background: theme.palette.background.default,
             })}
           >
@@ -171,10 +212,14 @@ function AppShell() {
             <Box sx={{ minHeight: 64 }} />
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} /> }>
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
                 <Route path="/admin/user-master" element={<UserManagement />} />
-                <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
+                <Route
+                  path="/admin/user-group-master"
+                  element={<UserGroupMaster />}
+                />
                 <Route path="/admin/part-master" element={<PartMaster />} />
                 {/* Other admin protected routes */}
               </Route>
