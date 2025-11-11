@@ -37,7 +37,37 @@ const Login = () => {
       navigate("/"); // Redirect to homepage/dashboard after login
     } catch (err) {
       setLoading(false);
-      setError(err.message);
+      // Handle specific Firebase authentication errors with user-friendly messages
+      let errorMessage = "An error occurred during login. Please try again.";
+      
+      switch (err.code) {
+        case "auth/invalid-credential":
+        case "auth/wrong-password":
+          errorMessage = "Incorrect password. Please try again or use 'Forgot Password?' to reset it.";
+          break;
+        case "auth/user-not-found":
+          errorMessage = "No account found with this email address.";
+          break;
+        case "auth/invalid-email":
+          errorMessage = "Invalid email address. Please check and try again.";
+          break;
+        case "auth/user-disabled":
+          errorMessage = "This account has been disabled. Please contact support.";
+          break;
+        case "auth/too-many-requests":
+          errorMessage = "Too many failed login attempts. Please try again later.";
+          break;
+        case "auth/network-request-failed":
+          errorMessage = "Network error. Please check your internet connection and try again.";
+          break;
+        default:
+          // For other errors, use a more user-friendly message if available
+          if (err.message) {
+            errorMessage = err.message;
+          }
+      }
+      
+      setError(errorMessage);
     }
   };
 
