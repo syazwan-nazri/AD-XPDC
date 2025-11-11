@@ -29,6 +29,8 @@ import { doc, getDoc } from "firebase/firestore";
 import CircularProgress from "@mui/material/CircularProgress";
 import UserManagement from "./pages/Admin/UserManagement";
 import UserGroupMaster from "./pages/Admin/UserGroupMaster";
+import Home from "./pages/Home";
+import DashboardKPIs from "./pages/Reports/DashboardKPIs";
 
 const drawerWidth = 220;
 const collapsedWidth = 64;
@@ -211,6 +213,8 @@ function AppShell() {
             {/* Offset for fixed AppBar */}
             <Box sx={{ minHeight: 64 }} />
             <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
