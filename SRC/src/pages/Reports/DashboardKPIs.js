@@ -30,7 +30,7 @@ const DashboardKPIs = () => {
           backgroundColor: "primary.main",
           color: "white",
           p: 2,
-          mb: 3,
+          mb: 1,
           ml: -17,
           mr: -1,
           borderRadius: 1,
@@ -79,73 +79,7 @@ const DashboardKPIs = () => {
           </Typography>
         </Box>
       </Box>
-      <Box
-        sx={{
-          display: "flex",
-          gap: 2,
-          ml: -17,
-          mr: -1,
-          mb: 2,
-        }}
-      >
-        <Box
-          sx={{
-            backgroundColor: "primary.main",
-            color: "white",
-            p: 2,
-            borderRadius: 1,
-            flex: 1,
-          }}
-        >
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              color: "white",
-            }}
-          >
-            Header Metrcis
-          </Typography>
-        </Box>
-        <Box
-          sx={{
-            backgroundColor: "primary.main",
-            color: "white",
-            p: 2,
-            borderRadius: 1,
-            flex: 1,
-          }}
-        >
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              color: "white",
-            }}
-          >
-            QUICK ACTIONS
-          </Typography>
-        </Box>
-        <Box
-          sx={{
-            backgroundColor: "primary.main",
-            color: "white",
-            p: 2,
-            borderRadius: 1,
-            flex: 1,
-          }}
-        >
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              color: "white",
-            }}
-          >
-            CRITICAL ALERT PANEL
-          </Typography>
-        </Box>
-      </Box>
+      {/* headers merged into their respective grey cards below */}
       <Box
         sx={{
           display: "flex",
@@ -161,9 +95,108 @@ const DashboardKPIs = () => {
             borderRadius: 1,
             minHeight: 400,
             flex: 1,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Dashboard content box 1 */}
+          <Box
+            sx={{
+              backgroundColor: "primary.main",
+              color: "white",
+              p: 1,
+              borderRadius: 1,
+              mb: 1,
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                color: "white",
+              }}
+            >
+              Header Metrcis
+            </Typography>
+          </Box>
+
+          
+
+          <Box
+            sx={{
+              flex: 1,
+              mt: 0,
+              minHeight: 0,
+            }}
+          >
+            {/* Dashboard content box 1 */}
+          </Box>
+        </Box>
+        <Box
+          sx={{
+            backgroundColor: "grey.300",
+            p: 2,
+            borderRadius: 1,
+            minHeight: 400,
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box
+            sx={{
+              backgroundColor: "primary.main",
+              color: "white",
+              p: 1,
+              borderRadius: 1,
+              mb: 1,
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                color: "white",
+              }}
+            >
+              QUICK ACTIONS
+            </Typography>
+          </Box>
+
+          
+
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              minHeight: 0,
+            }}
+          >
+            <Box
+              sx={{
+                backgroundColor: "white",
+                p: 2,
+                borderRadius: 1,
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              {/* Dashboard content box 2a */}
+            </Box>
+
+            <Box
+              sx={{
+                backgroundColor: "white",
+                p: 2,
+                borderRadius: 1,
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              {/* Dashboard content box 2b (was N/A) */}
+            </Box>
+          </Box>
         </Box>
         <Box
           sx={{
@@ -172,20 +205,41 @@ const DashboardKPIs = () => {
             borderRadius: 1,
             minHeight: 400,
             flex: 1,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Dashboard content box 2 */}
-        </Box>
-        <Box
-          sx={{
-            backgroundColor: "grey.300",
-            p: 3,
-            borderRadius: 1,
-            minHeight: 400,
-            flex: 1,
-          }}
-        >
-          {/* Dashboard content box 3 */}
+          <Box
+            sx={{
+              backgroundColor: "primary.main",
+              color: "white",
+              p: 1,
+              borderRadius: 1,
+              mb: 1,
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                color: "white",
+              }}
+            >
+              CRITICAL ALERT PANEL
+            </Typography>
+          </Box>
+
+          
+
+          <Box
+            sx={{
+              flex: 1,
+              mt: 0,
+              minHeight: 0,
+            }}
+          >
+            {/* Dashboard content box 3 */}
+          </Box>
         </Box>
       </Box>
       <Box

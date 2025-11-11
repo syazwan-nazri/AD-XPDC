@@ -214,10 +214,12 @@ function AppShell() {
             <Box sx={{ minHeight: 64 }} />
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+              </Route>
               <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
                 <Route path="/admin/user-master" element={<UserManagement />} />
                 <Route
