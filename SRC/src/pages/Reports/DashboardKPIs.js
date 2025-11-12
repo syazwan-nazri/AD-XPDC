@@ -115,7 +115,7 @@ const DashboardKPIs = () => {
                 color: "white",
               }}
             >
-              Header Metrcis
+              HEADER METRICS
             </Typography>
           </Box>
 
