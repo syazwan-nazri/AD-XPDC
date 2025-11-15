@@ -1,5 +1,9 @@
 # Ignore node_modules
 node_modules/
+node_modules/**
+.cache/
+SRC/node_modules/
+SRC/node_modules/**
 
 # Ignore build output
 build/
