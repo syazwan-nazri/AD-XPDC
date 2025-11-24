@@ -29,6 +29,9 @@ const PartMaster = () => {
   const [rackLevelError, setRackLevelError] = useState(false);
   const [editRackNumberError, setEditRackNumberError] = useState(false);
   const [editRackLevelError, setEditRackLevelError] = useState(false);
+  const [internalRefError, setInternalRefError] = useState(false);
+  const [nameError, setNameError] = useState(false);
+  const [categoryError, setCategoryError] = useState(false);
 
   // Fetch parts from Firestore
   useEffect(() => {
@@ -67,27 +70,78 @@ const PartMaster = () => {
     return regex.test(value);
   };
   
+  // Validate Internal Ref No (ABC123, AB1234, ABC 123, AB 1234 formats only)
+  const validateInternalRef = (value) => {
+    if (!value) return false;
+    // Exact patterns: ABC123 (3 letters + 3 digits) OR AB1234 (2 letters + 4 digits)
+    // With optional space: ABC 123 OR AB 1234
+    const regex = /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{4})$/i;
+    return regex.test(value);
+  };
+  
   // Add part
   const handleAddPart = async () => {
-    if (!form.sapNumber) {
-      setSapError(true);
-      return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
-    }
-    if (!validateSapNumber(form.sapNumber)) {
-      setSapError(true);
-      return setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' });
-    }
-    if (form.rackNumber && !validateRackNumber(form.rackNumber)) {
-      setRackNumberError(true);
-      return setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' });
-    }
-    if (form.rackLevel && !validateRackLevel(form.rackLevel)) {
-      setRackLevelError(true);
-      return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
-    }
+    // Reset all errors
     setSapError(false);
+    setInternalRefError(false);
+    setNameError(false);
+    setCategoryError(false);
     setRackNumberError(false);
     setRackLevelError(false);
+    
+    // Validate all required fields
+    let hasError = false;
+    
+    if (!form.sapNumber) {
+      setSapError(true);
+      hasError = true;
+    } else if (!validateSapNumber(form.sapNumber)) {
+      setSapError(true);
+      setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' });
+      return;
+    }
+    
+    if (!form.internalRef || form.internalRef.trim() === '') {
+      setInternalRefError(true);
+      hasError = true;
+    } else if (!validateInternalRef(form.internalRef)) {
+      setInternalRefError(true);
+      setSnackbar({ open: true, message: 'Internal Ref No format: ABC123, AB1234, ABC 123, or AB 1234', severity: 'error' });
+      return;
+    }
+    
+    if (!form.name || form.name.trim() === '') {
+      setNameError(true);
+      hasError = true;
+    }
+    
+    if (!form.category || form.category.trim() === '') {
+      setCategoryError(true);
+      hasError = true;
+    }
+    
+    if (!form.rackNumber) {
+      setRackNumberError(true);
+      hasError = true;
+    } else if (!validateRackNumber(form.rackNumber)) {
+      setRackNumberError(true);
+      setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' });
+      return;
+    }
+    
+    if (!form.rackLevel) {
+      setRackLevelError(true);
+      hasError = true;
+    } else if (!validateRackLevel(form.rackLevel)) {
+      setRackLevelError(true);
+      setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
+      return;
+    }
+    
+    if (hasError) {
+      setSnackbar({ open: true, message: 'Please fill in all required fields', severity: 'error' });
+      return;
+    }
     try {
       const docRef = await addDoc(collection(db, 'parts'), form);
       dispatch(addPart({ ...form, id: docRef.id }));
@@ -101,6 +155,9 @@ const PartMaster = () => {
   const handleClear = () => {
     setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
     setSapError(false);
+    setInternalRefError(false);
+    setNameError(false);
+    setCategoryError(false);
     setRackNumberError(false);
     setRackLevelError(false);
   };
@@ -251,9 +308,43 @@ const PartMaster = () => {
             helperText={sapError ? "SAP # must be 7 digits starting with 7 (e.g., 7000001)" : ""}
             required 
           />
-          <TextField label="Internal Ref No" value={form.internalRef} onChange={e => setForm(f => ({ ...f, internalRef: e.target.value }))} />
-          <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          <TextField label="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+          <TextField 
+            label="Internal Ref No" 
+            value={form.internalRef} 
+            onChange={e => {
+              const value = e.target.value.toUpperCase();
+              setForm(f => ({ ...f, internalRef: value }));
+              setInternalRefError(value && (!validateInternalRef(value)));
+            }}
+            error={internalRefError}
+            helperText={internalRefError ? "Format: ABC123, AB1234, ABC 123, or AB 1234" : ""}
+            required
+            inputProps={{ style: { textTransform: 'uppercase' } }}
+          />
+          <TextField 
+            label="Name" 
+            value={form.name} 
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, name: value }));
+              setNameError(!value || value.trim() === '');
+            }}
+            error={nameError}
+            helperText={nameError ? "Name is required" : ""}
+            required
+          />
+          <TextField 
+            label="Category" 
+            value={form.category} 
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, category: value }));
+              setCategoryError(!value || value.trim() === '');
+            }}
+            error={categoryError}
+            helperText={categoryError ? "Category is required" : ""}
+            required
+          />
           <TextField 
             label="Rack Number" 
             value={form.rackNumber} 
@@ -263,7 +354,8 @@ const PartMaster = () => {
               setRackNumberError(value && !validateRackNumber(value));
             }}
             error={rackNumberError}
-            helperText={rackNumberError ? "Rack Number must be exactly 2 digits" : ""}
+            helperText={rackNumberError ? (form.rackNumber ? "Rack Number must be exactly 2 digits" : "Rack Number is required") : ""}
+            required
           />
           <TextField 
             label="Rack Level" 
@@ -274,8 +366,9 @@ const PartMaster = () => {
               setRackLevelError(value && !validateRackLevel(value));
             }}
             error={rackLevelError}
-            helperText={rackLevelError ? "Rack Level must be A, B, C, or D only" : ""}
+            helperText={rackLevelError ? (form.rackLevel ? "Rack Level must be A, B, C, or D only" : "Rack Level is required") : ""}
             inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+            required
           />
         </Box>
         <Box sx={{ mt:2 }}>
