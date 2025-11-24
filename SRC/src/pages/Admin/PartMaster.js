@@ -21,6 +21,14 @@ const PartMaster = () => {
   const [editForm, setEditForm] = useState({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  
+  // Validation states
+  const [sapError, setSapError] = useState(false);
+  const [editSapError, setEditSapError] = useState(false);
+  const [rackNumberError, setRackNumberError] = useState(false);
+  const [rackLevelError, setRackLevelError] = useState(false);
+  const [editRackNumberError, setEditRackNumberError] = useState(false);
+  const [editRackLevelError, setEditRackLevelError] = useState(false);
 
   // Fetch parts from Firestore
   useEffect(() => {
@@ -39,9 +47,47 @@ const PartMaster = () => {
     fetchParts();
   }, [dispatch]);
 
+  // Validate SAP# (7 digits only, must start with 7)
+  const validateSapNumber = (value) => {
+    const regex = /^7\d{6}$/;
+    return regex.test(value);
+  };
+  
+  // Validate Rack Number (2 digits only)
+  const validateRackNumber = (value) => {
+    if (!value) return true; // Allow empty
+    const regex = /^\d{2}$/;
+    return regex.test(value);
+  };
+  
+  // Validate Rack Level (A, B, C, or D only)
+  const validateRackLevel = (value) => {
+    if (!value) return true; // Allow empty
+    const regex = /^[ABCD]$/i;
+    return regex.test(value);
+  };
+  
   // Add part
   const handleAddPart = async () => {
-    if (!form.sapNumber) return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
+    if (!form.sapNumber) {
+      setSapError(true);
+      return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
+    }
+    if (!validateSapNumber(form.sapNumber)) {
+      setSapError(true);
+      return setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' });
+    }
+    if (form.rackNumber && !validateRackNumber(form.rackNumber)) {
+      setRackNumberError(true);
+      return setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' });
+    }
+    if (form.rackLevel && !validateRackLevel(form.rackLevel)) {
+      setRackLevelError(true);
+      return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
+    }
+    setSapError(false);
+    setRackNumberError(false);
+    setRackLevelError(false);
     try {
       const docRef = await addDoc(collection(db, 'parts'), form);
       dispatch(addPart({ ...form, id: docRef.id }));
@@ -54,6 +100,9 @@ const PartMaster = () => {
   
   const handleClear = () => {
     setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
+    setSapError(false);
+    setRackNumberError(false);
+    setRackLevelError(false);
   };
   
   // Edit handlers
@@ -78,7 +127,25 @@ const PartMaster = () => {
   
   const handleSaveChanges = async () => {
     if (!editingId) return;
-    if (!editForm.sapNumber) return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
+    if (!editForm.sapNumber) {
+      setEditSapError(true);
+      return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
+    }
+    if (!validateSapNumber(editForm.sapNumber)) {
+      setEditSapError(true);
+      return setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' });
+    }
+    if (editForm.rackNumber && !validateRackNumber(editForm.rackNumber)) {
+      setEditRackNumberError(true);
+      return setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' });
+    }
+    if (editForm.rackLevel && !validateRackLevel(editForm.rackLevel)) {
+      setEditRackLevelError(true);
+      return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
+    }
+    setEditSapError(false);
+    setEditRackNumberError(false);
+    setEditRackLevelError(false);
     try {
       await updateDoc(doc(db, 'parts', editingId), editForm);
       dispatch(updatePart({ ...editForm, id: editingId }));
@@ -172,12 +239,44 @@ const PartMaster = () => {
       <Paper elevation={1} sx={{ p:2 }}>
         <h3 style={{ marginTop:0 }}>NEW PART ENTRY</h3>
         <Box sx={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:2 }}>
-          <TextField label="SAP #" value={form.sapNumber} onChange={e => setForm(f => ({ ...f, sapNumber: e.target.value }))} required />
+          <TextField 
+            label="SAP #" 
+            value={form.sapNumber} 
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, sapNumber: value }));
+              setSapError(value && !validateSapNumber(value));
+            }}
+            error={sapError}
+            helperText={sapError ? "SAP # must be 7 digits starting with 7 (e.g., 7000001)" : ""}
+            required 
+          />
           <TextField label="Internal Ref No" value={form.internalRef} onChange={e => setForm(f => ({ ...f, internalRef: e.target.value }))} />
           <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           <TextField label="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
-          <TextField label="Rack Number" value={form.rackNumber} onChange={e => setForm(f => ({ ...f, rackNumber: e.target.value }))} />
-          <TextField label="Rack Level" value={form.rackLevel} onChange={e => setForm(f => ({ ...f, rackLevel: e.target.value }))} />
+          <TextField 
+            label="Rack Number" 
+            value={form.rackNumber} 
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, rackNumber: value }));
+              setRackNumberError(value && !validateRackNumber(value));
+            }}
+            error={rackNumberError}
+            helperText={rackNumberError ? "Rack Number must be exactly 2 digits" : ""}
+          />
+          <TextField 
+            label="Rack Level" 
+            value={form.rackLevel} 
+            onChange={e => {
+              const value = e.target.value.toUpperCase();
+              setForm(f => ({ ...f, rackLevel: value }));
+              setRackLevelError(value && !validateRackLevel(value));
+            }}
+            error={rackLevelError}
+            helperText={rackLevelError ? "Rack Level must be A, B, C, or D only" : ""}
+            inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+          />
         </Box>
         <Box sx={{ mt:2 }}>
           <Button variant="contained" onClick={handleAddPart} sx={{ mr:1 }}>ADD PART</Button>
@@ -190,12 +289,42 @@ const PartMaster = () => {
         <DialogTitle>EDIT PART</DialogTitle>
         <DialogContent>
           <Box sx={{ display:'flex', flexDirection:'column', gap:2, mt:1 }}>
-            <TextField label="SAP #" value={editForm.sapNumber} disabled fullWidth />
+            <TextField 
+              label="SAP #" 
+              value={editForm.sapNumber} 
+              disabled 
+              fullWidth 
+              error={editSapError}
+              helperText={editSapError ? "SAP # must be 7 digits starting with 7 (e.g., 7000001)" : ""}
+            />
             <TextField label="Internal Ref No" value={editForm.internalRef} onChange={e => setEditForm(f => ({ ...f, internalRef: e.target.value }))} fullWidth />
             <TextField label="Name" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} fullWidth />
             <TextField label="Category" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} fullWidth />
-            <TextField label="Rack Number" value={editForm.rackNumber} onChange={e => setEditForm(f => ({ ...f, rackNumber: e.target.value }))} fullWidth />
-            <TextField label="Rack Level" value={editForm.rackLevel} onChange={e => setEditForm(f => ({ ...f, rackLevel: e.target.value }))} fullWidth />
+            <TextField 
+              label="Rack Number" 
+              value={editForm.rackNumber} 
+              onChange={e => {
+                const value = e.target.value;
+                setEditForm(f => ({ ...f, rackNumber: value }));
+                setEditRackNumberError(value && !validateRackNumber(value));
+              }}
+              error={editRackNumberError}
+              helperText={editRackNumberError ? "Rack Number must be exactly 2 digits" : ""}
+              fullWidth 
+            />
+            <TextField 
+              label="Rack Level" 
+              value={editForm.rackLevel} 
+              onChange={e => {
+                const value = e.target.value.toUpperCase();
+                setEditForm(f => ({ ...f, rackLevel: value }));
+                setEditRackLevelError(value && !validateRackLevel(value));
+              }}
+              error={editRackLevelError}
+              helperText={editRackLevelError ? "Rack Level must be A, B, C, or D only" : ""}
+              inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+              fullWidth 
+            />
           </Box>
         </DialogContent>
         <DialogActions sx={{ p:2 }}>
