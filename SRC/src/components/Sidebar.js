@@ -23,7 +23,7 @@ import Box from '@mui/material/Box';
 import { NavLink, useLocation } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
 
-const drawerWidth = 220;
+const drawerWidth = 260;
 const collapsedWidth = 64;
 
 const dataInputMasterLinks = [
