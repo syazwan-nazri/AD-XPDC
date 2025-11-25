@@ -210,20 +210,13 @@ function AppShell() {
             component="main"
             sx={(theme) => ({
               flexGrow: 1,
-              pt: 3,
-              pr: 3,
-              pb: 3,
-              pl: 0,
+              p: 3,
               transition: "margin 0.2s",
-              width: "100vw",
-              marginLeft:
-                !user || isMobile
-                  ? 0
-                  : sidebarOpen
-                  ? `${drawerWidth}px`
-                  : `${collapsedWidth}px`,
+              width: "100%",
+              minWidth: 0, // Crucial for flex items to shrink below content size
               minHeight: "100vh",
               background: theme.palette.background.default,
+              overflowX: "hidden",
             })}
           >
             {/* Offset for fixed AppBar */}
