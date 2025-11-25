@@ -38,7 +38,12 @@ const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
         >
           <MenuIcon />
         </IconButton>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+        <Typography 
+          variant="h6" 
+          component="div" 
+          sx={{ flexGrow: 1, cursor: 'pointer' }}
+          onClick={() => navigate('/reports/dashboard-kpis')}
+        >
           SIMS - Store Inventory Management System
         </Typography>
         <IconButton color="inherit" onClick={toggleTheme} size="large">

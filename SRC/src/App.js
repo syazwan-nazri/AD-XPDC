@@ -5,6 +5,7 @@ import {
   Route,
   useLocation,
   useNavigate,
+  Navigate,
 } from "react-router-dom";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import Box from "@mui/material/Box";
@@ -37,6 +38,8 @@ import StockOut from "./pages/Inventory/StockOut";
 import InternalTransfer from "./pages/Inventory/InternalTransfer";
 import MovementLog from "./pages/Inventory/MovementLog";
 import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
+import StockValuationReport from "./pages/Reports/StockValuationReport";
+import TraceabilityReport from "./pages/Reports/TraceabilityReport";
 
 const drawerWidth = 260;
 const collapsedWidth = 64;
@@ -221,13 +224,18 @@ function AppShell() {
           >
             {/* Offset for fixed AppBar */}
             <Box sx={{ minHeight: 64 }} />
+
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route element={<ProtectedRoute />}>
                 <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+                <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
+                <Route path="/reports/traceability-report" element={<TraceabilityReport />} />
+                <Route path="/reports/stock-movement" element={<TraceabilityReport />} /> {/* Reuse Traceability for now */}
+                <Route path="/reports/low-stock" element={<DashboardKPIs />} /> {/* Reuse Dashboard for now as it has Low Stock card */}
               </Route>
               <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
                 <Route path="/admin/user-master" element={<UserManagement />} />
