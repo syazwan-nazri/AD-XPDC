@@ -43,9 +43,11 @@ const ForgotPassword = () => {
       }
 
       // If email exists, send the reset link
+      // Firebase will send an email with a link to their action handler
+      // which will then redirect to our continueUrl after the user clicks the link
       await sendPasswordResetEmail(auth, email, {
-        url: window.location.origin + "/login", // Redirect URL after password reset
-        handleCodeInApp: false, // Use email link instead of handling in the app
+        url: window.location.origin + "/login", // Where to redirect after clicking the email link
+        handleCodeInApp: false, // Let Firebase handle the initial click
       });
       setSuccess(
         "Password reset email sent! Please check your inbox and spam folder."

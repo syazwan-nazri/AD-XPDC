@@ -62,6 +62,7 @@ const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
             ) : (
               [
                 <MenuItem key="email" disabled>{user.email || 'Not logged in'}</MenuItem>,
+                <MenuItem key="change-password" onClick={() => { handleClose(); navigate('/change-password'); }}>Change Password</MenuItem>,
                 <MenuItem key="logout" onClick={handleLogout}>Logout</MenuItem>
               ]
             )}
