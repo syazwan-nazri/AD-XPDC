@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { setParts, addPart, deletePart, updatePart } from '../../redux/partsSlice';
-import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Typography, MenuItem, Select, FormControl, InputLabel, InputAdornment, Chip } from '@mui/material';
+import Barcode from 'react-barcode';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import WarningIcon from '@mui/icons-material/Warning';
+import BarcodeScanner from '../../components/BarcodeScanner';
 
 // Main Part Master Page
 const PartMaster = () => {
@@ -11,16 +18,31 @@ const PartMaster = () => {
   const parts = useSelector((state) => state.parts.parts);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [form, setForm] = useState({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
+  
+  // Search & Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterRackLevel, setFilterRackLevel] = useState('');
+
+  const [form, setForm] = useState({ 
+    sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', 
+    minStockLevel: '', maxStockLevel: '', currentStock: 0 
+  });
+  
   const [pageStart, setPageStart] = useState(0); // index of first item in current page
   const pageSize = 50;
   
   // Modal states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
+  const [barcodeDialogOpen, setBarcodeDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ 
+    sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '',
+    minStockLevel: '', maxStockLevel: '', currentStock: 0
+  });
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [barcodeTarget, setBarcodeTarget] = useState(null);
   
   // Validation states
   const [sapError, setSapError] = useState(false);
@@ -50,6 +72,24 @@ const PartMaster = () => {
     fetchParts();
   }, [dispatch]);
 
+  // Derived state for unique categories (for filter dropdown)
+  const categories = useMemo(() => [...new Set(parts.map(p => p.category).filter(Boolean))], [parts]);
+
+  // Filtered parts
+  const filteredParts = useMemo(() => {
+    return parts.filter(p => {
+      const matchesSearch = 
+        (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (p.sapNumber && p.sapNumber.includes(searchQuery)) ||
+        (p.internalRef && p.internalRef.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCategory = filterCategory ? p.category === filterCategory : true;
+      const matchesRackLevel = filterRackLevel ? p.rackLevel === filterRackLevel : true;
+      
+      return matchesSearch && matchesCategory && matchesRackLevel;
+    });
+  }, [parts, searchQuery, filterCategory, filterRackLevel]);
+
   // Validate SAP# (7 digits only, must start with 7)
   const validateSapNumber = (value) => {
     const regex = /^7\d{6}$/;
@@ -73,8 +113,6 @@ const PartMaster = () => {
   // Validate Internal Ref No (ABC123, AB1234, ABC 123, AB 1234 formats only)
   const validateInternalRef = (value) => {
     if (!value) return false;
-    // Exact patterns: ABC123 (3 letters + 3 digits) OR AB1234 (2 letters + 4 digits)
-    // With optional space: ABC 123 OR AB 1234
     const regex = /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{4})$/i;
     return regex.test(value);
   };
@@ -154,31 +192,27 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Please fill in all required fields', severity: 'error' });
       return;
     }
-    // Uniqueness check for SAP# (running number) against existing parts in state
-    const sapExists = parts.some(p => p.sapNumber === form.sapNumber);
-    if (sapExists) {
-      setSapError(true);
-      setSnackbar({ open: true, message: 'SAP # already exists', severity: 'error' });
-      return;
-    }
+
     try {
-      const docRef = await addDoc(collection(db, 'parts'), form);
-      dispatch(addPart({ ...form, id: docRef.id }));
+      const newPart = {
+        ...form,
+        minStockLevel: Number(form.minStockLevel) || 0,
+        maxStockLevel: Number(form.maxStockLevel) || 0,
+        currentStock: Number(form.currentStock) || 0,
+        createdAt: new Date().toISOString()
+      };
+      const docRef = await addDoc(collection(db, 'parts'), newPart);
+      dispatch(addPart({ ...newPart, id: docRef.id }));
       setSnackbar({ open: true, message: 'Part added', severity: 'success' });
-      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
+      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', minStockLevel: '', maxStockLevel: '', currentStock: 0 });
     } catch (e) {
       setSnackbar({ open: true, message: 'Add failed', severity: 'error' });
     }
   };
   
   const handleClear = () => {
-    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
-    setSapError(false);
-    setInternalRefError(false);
-    setNameError(false);
-    setCategoryError(false);
-    setRackNumberError(false);
-    setRackLevelError(false);
+    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', minStockLevel: '', maxStockLevel: '', currentStock: 0 });
+    setSapError(false); setInternalRefError(false); setNameError(false); setCategoryError(false); setRackNumberError(false); setRackLevelError(false);
   };
   
   // Edit handlers
@@ -190,7 +224,10 @@ const PartMaster = () => {
       name: part.name || '',
       category: part.category || '',
       rackNumber: part.rackNumber || '',
-      rackLevel: part.rackLevel || ''
+      rackLevel: part.rackLevel || '',
+      minStockLevel: part.minStockLevel || '',
+      maxStockLevel: part.maxStockLevel || '',
+      currentStock: part.currentStock || 0
     });
     setEditDialogOpen(true);
   };
@@ -198,11 +235,12 @@ const PartMaster = () => {
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditingId(null);
-    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '' });
+    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', minStockLevel: '', maxStockLevel: '', currentStock: 0 });
   };
   
   const handleSaveChanges = async () => {
     if (!editingId) return;
+    
     if (!editForm.sapNumber) {
       setEditSapError(true);
       return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
@@ -219,12 +257,21 @@ const PartMaster = () => {
       setEditRackLevelError(true);
       return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
     }
+    
     setEditSapError(false);
     setEditRackNumberError(false);
     setEditRackLevelError(false);
+    
     try {
-      await updateDoc(doc(db, 'parts', editingId), editForm);
-      dispatch(updatePart({ ...editForm, id: editingId }));
+      const updatedPart = {
+        ...editForm,
+        minStockLevel: Number(editForm.minStockLevel) || 0,
+        maxStockLevel: Number(editForm.maxStockLevel) || 0,
+        currentStock: Number(editForm.currentStock) || 0,
+        updatedAt: new Date().toISOString()
+      };
+      await updateDoc(doc(db, 'parts', editingId), updatedPart);
+      dispatch(updatePart({ ...updatedPart, id: editingId }));
       setSnackbar({ open: true, message: 'Part updated', severity: 'success' });
       handleEditClose();
     } catch (e) {
@@ -254,21 +301,72 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Delete failed', severity: 'error' });
     }
   };
-  const pageParts = parts.slice(pageStart, pageStart + pageSize);
-  const total = parts.length;
+
+  // Barcode handlers
+  const handleBarcodeClick = (part) => {
+    setBarcodeTarget(part);
+    setBarcodeDialogOpen(true);
+  };
+
+  const handleBarcodeClose = () => {
+    setBarcodeDialogOpen(false);
+    setBarcodeTarget(null);
+  };
+
+  const handleScan = (code) => {
+    setSearchQuery(code);
+    setSnackbar({ open: true, message: `Scanned: ${code}`, severity: 'info' });
+  };
+
+  const pageParts = filteredParts.slice(pageStart, pageStart + pageSize);
+  const total = filteredParts.length;
   const showingEnd = Math.min(pageStart + pageSize, total);
   const handlePrev = () => setPageStart(s => Math.max(0, s - pageSize));
   const handleNext = () => {
     if (pageStart + pageSize < total) setPageStart(s => s + pageSize);
   };
+
   return (
     <Box sx={{ m: 0, p: 0 }}>
       <Paper elevation={2} sx={{ p:2, mb:3 }}>
-        <h2 style={{ margin:0 }}>PART MASTER - ENGINEERING STORE SPARE PART</h2>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <h2 style={{ margin:0 }}>PART MASTER - ENGINEERING STORE SPARE PART</h2>
+          <Box width="300px">
+            <BarcodeScanner onScan={handleScan} label="Scan to Search" autoFocus={false} />
+          </Box>
+        </Box>
       </Paper>
 
       <Paper elevation={1} sx={{ p:2, mb:3 }}>
-        <h3 style={{ marginTop:0 }}>PART LIST ({pageSize} ITEMS)</h3>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
+          <h3 style={{ margin:0 }}>PART LIST ({filteredParts.length} ITEMS)</h3>
+          <Box display="flex" gap={2}>
+            <TextField 
+              size="small" 
+              label="Search" 
+              value={searchQuery} 
+              onChange={e => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
+              }}
+            />
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Category</InputLabel>
+              <Select value={filterCategory} label="Category" onChange={e => setFilterCategory(e.target.value)}>
+                <MenuItem value=""><em>All</em></MenuItem>
+                {categories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Rack Level</InputLabel>
+              <Select value={filterRackLevel} label="Rack Level" onChange={e => setFilterRackLevel(e.target.value)}>
+                <MenuItem value=""><em>All</em></MenuItem>
+                {['A', 'B', 'C', 'D'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+
         {loading ? <div>Loading...</div> : (
           <Table size="small">
             <TableHead>
@@ -279,26 +377,45 @@ const PartMaster = () => {
                 <TableCell>Category</TableCell>
                 <TableCell>Rack No</TableCell>
                 <TableCell>Level</TableCell>
+                <TableCell>Stock</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {pageParts.map(p => (
-                <TableRow key={p.id}>
-                  <TableCell>{p.sapNumber}</TableCell>
-                  <TableCell>{p.internalRef}</TableCell>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell>{p.category}</TableCell>
-                  <TableCell>{p.rackNumber}</TableCell>
-                  <TableCell>{p.rackLevel}</TableCell>
-                  <TableCell>
-                    <Button size="small" onClick={() => handleEditClick(p)}>Edit</Button>
-                    <Button size="small" color="error" onClick={() => handleDeleteClick(p)}>Delete</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pageParts.map(p => {
+                const isLowStock = (p.currentStock || 0) <= (p.minStockLevel || 0);
+                return (
+                  <TableRow key={p.id} sx={{ bgcolor: isLowStock ? '#fff4e5' : 'inherit' }}>
+                    <TableCell>{p.sapNumber}</TableCell>
+                    <TableCell>{p.internalRef}</TableCell>
+                    <TableCell>{p.name}</TableCell>
+                    <TableCell>{p.category}</TableCell>
+                    <TableCell>{p.rackNumber}</TableCell>
+                    <TableCell>{p.rackLevel}</TableCell>
+                    <TableCell>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        {p.currentStock || 0}
+                        {isLowStock && <Tooltip title="Low Stock"><WarningIcon color="warning" fontSize="small" /></Tooltip>}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title="View Barcode">
+                        <IconButton size="small" onClick={() => handleBarcodeClick(p)}>
+                          <QrCodeIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <IconButton size="small" onClick={() => handleEditClick(p)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size="small" color="error" onClick={() => handleDeleteClick(p)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {pageParts.length === 0 && (
-                <TableRow><TableCell colSpan={7}>No parts</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8}>No parts found</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -314,16 +431,15 @@ const PartMaster = () => {
 
       <Paper elevation={1} sx={{ p:2 }}>
         <h3 style={{ marginTop:0 }}>NEW PART ENTRY</h3>
-        <Box sx={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:2 }}>
+        <Box sx={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:2 }}>
           <TextField 
             label="SAP #" 
             value={form.sapNumber} 
             onChange={e => {
               const value = e.target.value;
               setForm(f => ({ ...f, sapNumber: value }));
-              // Check if format is valid
+              
               const isValidFormat = validateSapNumber(value);
-              // Check if SAP# already exists in parts list
               const isDuplicate = value && parts.some(p => p.sapNumber === value);
               setSapError(value && (!isValidFormat || isDuplicate));
             }}
@@ -334,6 +450,7 @@ const PartMaster = () => {
                 : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
             ) : ""}
             required 
+            size="small"
           />
           <TextField 
             label="Internal Ref No" 
@@ -341,9 +458,8 @@ const PartMaster = () => {
             onChange={e => {
               const value = e.target.value.toUpperCase();
               setForm(f => ({ ...f, internalRef: value }));
-              // Check if format is valid
+              
               const isValidFormat = validateInternalRef(value);
-              // Check if Internal Ref No already exists in parts list
               const isDuplicate = value && parts.some(p => p.internalRef === value);
               setInternalRefError(value && (!isValidFormat || isDuplicate));
             }}
@@ -355,6 +471,7 @@ const PartMaster = () => {
             ) : ""}
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
+            size="small"
           />
           <TextField 
             label="Name" 
@@ -362,7 +479,7 @@ const PartMaster = () => {
             onChange={e => {
               const value = e.target.value.toUpperCase();
               setForm(f => ({ ...f, name: value }));
-              // Check if Name already exists in parts list (trim for comparison)
+              
               const trimmedValue = value.trim();
               const isDuplicate = trimmedValue && parts.some(p => p.name && p.name.trim().toLowerCase() === trimmedValue.toLowerCase());
               setNameError((!value || value.trim() === '') || isDuplicate);
@@ -375,6 +492,7 @@ const PartMaster = () => {
             ) : ""}
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
+            size="small"
           />
           <TextField 
             label="Category" 
@@ -385,9 +503,9 @@ const PartMaster = () => {
               setCategoryError(!value || value.trim() === '');
             }}
             error={categoryError}
-            helperText={categoryError ? "Category is required" : ""}
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
+            size="small"
           />
           <TextField 
             label="Rack Number" 
@@ -400,6 +518,7 @@ const PartMaster = () => {
             error={rackNumberError}
             helperText={rackNumberError ? (form.rackNumber ? "Must be exactly 2 digits (e.g., 00, 01, 10)" : "Rack Number is required") : ""}
             required
+            size="small"
           />
           <TextField 
             label="Rack Level" 
@@ -410,9 +529,30 @@ const PartMaster = () => {
               setRackLevelError(value && !validateRackLevel(value));
             }}
             error={rackLevelError}
-            helperText={rackLevelError ? (form.rackLevel ? "Rack Level must be A, B, C, or D only" : "Rack Level is required") : ""}
             inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
             required
+            size="small"
+          />
+          <TextField 
+            label="Min Stock" 
+            type="number"
+            value={form.minStockLevel} 
+            onChange={e => setForm(f => ({ ...f, minStockLevel: e.target.value }))}
+            size="small"
+          />
+          <TextField 
+            label="Max Stock" 
+            type="number"
+            value={form.maxStockLevel} 
+            onChange={e => setForm(f => ({ ...f, maxStockLevel: e.target.value }))}
+            size="small"
+          />
+          <TextField 
+            label="Current Stock" 
+            type="number"
+            value={form.currentStock} 
+            onChange={e => setForm(f => ({ ...f, currentStock: e.target.value }))}
+            size="small"
           />
         </Box>
         <Box sx={{ mt:2 }}>
@@ -422,17 +562,17 @@ const PartMaster = () => {
       </Paper>
 
       {/* Edit Part Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="sm" fullWidth>
+      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="md" fullWidth>
         <DialogTitle>EDIT PART</DialogTitle>
         <DialogContent>
-          <Box sx={{ display:'flex', flexDirection:'column', gap:2, mt:1 }}>
+          <Box sx={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, mt:1 }}>
             <TextField 
               label="SAP #" 
               value={editForm.sapNumber} 
               disabled 
               fullWidth 
               error={editSapError}
-              helperText={editSapError ? "SAP # must be 7 digits starting with 7 (e.g., 7000001)" : ""}
+              helperText={editSapError ? "SAP # must be 7 digits starting with 7" : ""}
             />
             <TextField label="Internal Ref No" value={editForm.internalRef} onChange={e => setEditForm(f => ({ ...f, internalRef: e.target.value }))} fullWidth />
             <TextField 
@@ -470,9 +610,29 @@ const PartMaster = () => {
                 setEditRackLevelError(value && !validateRackLevel(value));
               }}
               error={editRackLevelError}
-              helperText={editRackLevelError ? "Rack Level must be A, B, C, or D only" : ""}
               inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
               fullWidth 
+            />
+            <TextField 
+              label="Min Stock" 
+              type="number"
+              value={editForm.minStockLevel} 
+              onChange={e => setEditForm(f => ({ ...f, minStockLevel: e.target.value }))}
+              fullWidth
+            />
+            <TextField 
+              label="Max Stock" 
+              type="number"
+              value={editForm.maxStockLevel} 
+              onChange={e => setEditForm(f => ({ ...f, maxStockLevel: e.target.value }))}
+              fullWidth
+            />
+            <TextField 
+              label="Current Stock" 
+              type="number"
+              value={editForm.currentStock} 
+              onChange={e => setEditForm(f => ({ ...f, currentStock: e.target.value }))}
+              fullWidth
             />
           </Box>
         </DialogContent>
@@ -498,6 +658,26 @@ const PartMaster = () => {
         <DialogActions sx={{ p:2 }}>
           <Button onClick={handleDeleteClose} variant="outlined">CANCEL</Button>
           <Button onClick={handleConfirmDelete} variant="contained" color="error">CONFIRM DELETE</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Barcode Dialog */}
+      <Dialog open={barcodeDialogOpen} onClose={handleBarcodeClose} maxWidth="sm" fullWidth>
+        <DialogTitle>BARCODE</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+            {barcodeTarget && (
+              <>
+                <Barcode value={barcodeTarget.sapNumber} />
+                <Typography variant="h6" sx={{ mt: 2 }}>{barcodeTarget.name}</Typography>
+                <Typography variant="body1" color="textSecondary">{barcodeTarget.internalRef}</Typography>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleBarcodeClose}>CLOSE</Button>
+          <Button onClick={() => window.print()} variant="contained">PRINT</Button>
         </DialogActions>
       </Dialog>
 
