@@ -262,7 +262,7 @@ const PartMaster = () => {
     if (pageStart + pageSize < total) setPageStart(s => s + pageSize);
   };
   return (
-    <Box>
+    <Box sx={{ m: 0, p: 0 }}>
       <Paper elevation={2} sx={{ p:2, mb:3 }}>
         <h2 style={{ margin:0 }}>PART MASTER - ENGINEERING STORE SPARE PART</h2>
       </Paper>
