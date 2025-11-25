@@ -225,8 +225,7 @@ const UserManagement = () => {
   return (
     <Box
       sx={{
-        maxWidth: 950,
-        mx: "auto",
+        width: "100%",
         mt: 4,
         p: 3,
         bgcolor: "background.paper",
