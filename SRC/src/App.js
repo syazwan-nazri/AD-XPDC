@@ -205,13 +205,8 @@ function AppShell() {
               flexGrow: 1,
               p: 3,
               transition: "margin 0.2s",
-              width: "100vw",
-              marginLeft:
-                !user || isMobile
-                  ? 0
-                  : sidebarOpen
-                  ? `${drawerWidth}px`
-                  : `${collapsedWidth}px`,
+              width: "100%", // Use 100% of remaining space, not viewport width
+              overflowX: "hidden", // Prevent horizontal scroll
               minHeight: "100vh",
               background: theme.palette.background.default,
             })}
