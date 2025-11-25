@@ -213,10 +213,15 @@ function AppShell() {
               pt: 3,
               pr: 3,
               pb: 3,
-              pl: 1,
+              pl: 0,
               transition: "margin 0.2s",
-              width: "100%", // Use 100% of remaining space, not viewport width
-              overflowX: "hidden", // Prevent horizontal scroll
+              width: "100vw",
+              marginLeft:
+                !user || isMobile
+                  ? 0
+                  : sidebarOpen
+                  ? `${drawerWidth}px`
+                  : `${collapsedWidth}px`,
               minHeight: "100vh",
               background: theme.palette.background.default,
             })}
