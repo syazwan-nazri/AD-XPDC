@@ -209,12 +209,7 @@ function AppShell() {
               pl: 0,
               transition: "margin 0.2s",
               width: "100vw",
-              marginLeft:
-                !user || isMobile
-                  ? 0
-                  : sidebarOpen
-                  ? `${drawerWidth}px`
-                  : `${collapsedWidth}px`,
+              marginLeft: 0,
               minHeight: "100vh",
               background: theme.palette.background.default,
             })}
