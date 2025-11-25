@@ -40,6 +40,7 @@ import MovementLog from "./pages/Inventory/MovementLog";
 import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
 import StockValuationReport from "./pages/Reports/StockValuationReport";
 import TraceabilityReport from "./pages/Reports/TraceabilityReport";
+import ChangePassword from "./pages/Auth/ChangePassword";
 
 const drawerWidth = 260;
 const collapsedWidth = 64;
@@ -236,6 +237,7 @@ function AppShell() {
                 <Route path="/reports/traceability-report" element={<TraceabilityReport />} />
                 <Route path="/reports/stock-movement" element={<TraceabilityReport />} /> {/* Reuse Traceability for now */}
                 <Route path="/reports/low-stock" element={<DashboardKPIs />} /> {/* Reuse Dashboard for now as it has Low Stock card */}
+                <Route path="/change-password" element={<ChangePassword />} />
               </Route>
               <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
                 <Route path="/admin/user-master" element={<UserManagement />} />
