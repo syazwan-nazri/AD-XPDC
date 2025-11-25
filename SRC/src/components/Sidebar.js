@@ -25,6 +25,7 @@ import OutboxIcon from '@mui/icons-material/Outbox';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import HistoryIcon from '@mui/icons-material/History';
+import WarningIcon from '@mui/icons-material/Warning';
 import Box from '@mui/material/Box';
 import { NavLink, useLocation } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
@@ -58,10 +59,10 @@ const purchasingLinks = [
 
 const reportLinks = [
   { path: '/reports/dashboard-kpis', text: 'Dashboard', icon: <DashboardIcon />, permission: 'canAccessReports' },
-  { path: '/reports/traceability-report', text: 'Traceability Report', icon: <DashboardIcon />, permission: 'canAccessReports' },
-  { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <DashboardIcon />, permission: 'canAccessReports' },
-  { path: '/reports/stock-movement', text: 'Stock Movement', icon: <DashboardIcon />, permission: 'canAccessReports' },
-  { path: '/reports/low-stock', text: 'Low Stock', icon: <DashboardIcon />, permission: 'canAccessReports' },
+  { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <ReceiptLongIcon />, permission: 'canAccessReports' },
+  { path: '/reports/traceability-report', text: 'Traceability', icon: <HistoryIcon />, permission: 'canAccessReports' },
+  { path: '/reports/stock-movement', text: 'Movement History', icon: <SwapHorizIcon />, permission: 'canAccessReports' },
+  { path: '/reports/low-stock', text: 'Low Stock Alert', icon: <WarningIcon />, permission: 'canAccessReports' },
 ];
 
 const Sidebar = ({ open, onToggle }) => {
