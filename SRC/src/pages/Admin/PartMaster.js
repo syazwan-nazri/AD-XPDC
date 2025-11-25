@@ -130,16 +130,6 @@ const PartMaster = () => {
     // Validate all required fields
     let hasError = false;
     
-<<<<<<< HEAD
-    if (!form.sapNumber) { setSapError(true); hasError = true; } 
-    else if (!validateSapNumber(form.sapNumber)) { setSapError(true); setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' }); return; }
-    
-    if (!form.internalRef || form.internalRef.trim() === '') { setInternalRefError(true); hasError = true; } 
-    else if (!validateInternalRef(form.internalRef)) { setInternalRefError(true); setSnackbar({ open: true, message: 'Internal Ref No format: ABC123, AB1234, ABC 123, or AB 1234', severity: 'error' }); return; }
-    
-    if (!form.name || form.name.trim() === '') { setNameError(true); hasError = true; }
-    if (!form.category || form.category.trim() === '') { setCategoryError(true); hasError = true; }
-=======
     if (!form.sapNumber) {
       setSapError(true);
       hasError = true;
@@ -174,15 +164,12 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Name already exists', severity: 'error' });
       return;
     }
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
     
-    if (!form.rackNumber) { setRackNumberError(true); hasError = true; } 
-    else if (!validateRackNumber(form.rackNumber)) { setRackNumberError(true); setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' }); return; }
+    if (!form.category || form.category.trim() === '') {
+      setCategoryError(true);
+      hasError = true;
+    }
     
-<<<<<<< HEAD
-    if (!form.rackLevel) { setRackLevelError(true); hasError = true; } 
-    else if (!validateRackLevel(form.rackLevel)) { setRackLevelError(true); setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' }); return; }
-=======
     if (!form.rackNumber) {
       setRackNumberError(true);
       hasError = true;
@@ -200,19 +187,12 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
       return;
     }
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
     
     if (hasError) {
       setSnackbar({ open: true, message: 'Please fill in all required fields', severity: 'error' });
       return;
     }
-    // Uniqueness check for SAP# (running number) against existing parts in state
-    const sapExists = parts.some(p => p.sapNumber === form.sapNumber);
-    if (sapExists) {
-      setSapError(true);
-      setSnackbar({ open: true, message: 'SAP # already exists', severity: 'error' });
-      return;
-    }
+
     try {
       const newPart = {
         ...form,
@@ -260,14 +240,7 @@ const PartMaster = () => {
   
   const handleSaveChanges = async () => {
     if (!editingId) return;
-<<<<<<< HEAD
-    if (!editForm.sapNumber) { setEditSapError(true); return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' }); }
-    if (!validateSapNumber(editForm.sapNumber)) { setEditSapError(true); return setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' }); }
-    if (editForm.rackNumber && !validateRackNumber(editForm.rackNumber)) { setEditRackNumberError(true); return setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' }); }
-    if (editForm.rackLevel && !validateRackLevel(editForm.rackLevel)) { setEditRackLevelError(true); return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' }); }
     
-    setEditSapError(false); setEditRackNumberError(false); setEditRackLevelError(false);
-=======
     if (!editForm.sapNumber) {
       setEditSapError(true);
       return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
@@ -284,10 +257,11 @@ const PartMaster = () => {
       setEditRackLevelError(true);
       return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
     }
+    
     setEditSapError(false);
     setEditRackNumberError(false);
     setEditRackLevelError(false);
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
+    
     try {
       const updatedPart = {
         ...editForm,
@@ -464,22 +438,17 @@ const PartMaster = () => {
             onChange={e => {
               const value = e.target.value;
               setForm(f => ({ ...f, sapNumber: value }));
-              // Check if format is valid
+              
               const isValidFormat = validateSapNumber(value);
-              // Check if SAP# already exists in parts list
               const isDuplicate = value && parts.some(p => p.sapNumber === value);
               setSapError(value && (!isValidFormat || isDuplicate));
             }}
             error={sapError}
-<<<<<<< HEAD
-            helperText={sapError ? "SAP # must be 7 digits starting with 7" : ""}
-=======
             helperText={sapError ? (
               parts.some(p => p.sapNumber === form.sapNumber) 
                 ? "SAP # already exists" 
                 : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
             ) : ""}
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
             required 
             size="small"
           />
@@ -489,22 +458,17 @@ const PartMaster = () => {
             onChange={e => {
               const value = e.target.value.toUpperCase();
               setForm(f => ({ ...f, internalRef: value }));
-              // Check if format is valid
+              
               const isValidFormat = validateInternalRef(value);
-              // Check if Internal Ref No already exists in parts list
               const isDuplicate = value && parts.some(p => p.internalRef === value);
               setInternalRefError(value && (!isValidFormat || isDuplicate));
             }}
             error={internalRefError}
-<<<<<<< HEAD
-            helperText={internalRefError ? "Format: ABC123..." : ""}
-=======
             helperText={internalRefError ? (
               parts.some(p => p.internalRef === form.internalRef)
                 ? "Internal Ref No already exists"
                 : "Format: ABC123, AB1234, ABC 123, or AB 1234"
             ) : ""}
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
             size="small"
@@ -515,16 +479,12 @@ const PartMaster = () => {
             onChange={e => {
               const value = e.target.value.toUpperCase();
               setForm(f => ({ ...f, name: value }));
-              // Check if Name already exists in parts list (trim for comparison)
+              
               const trimmedValue = value.trim();
               const isDuplicate = trimmedValue && parts.some(p => p.name && p.name.trim().toLowerCase() === trimmedValue.toLowerCase());
               setNameError((!value || value.trim() === '') || isDuplicate);
             }}
             error={nameError}
-<<<<<<< HEAD
-            required
-            size="small"
-=======
             helperText={nameError ? (
               form.name && form.name.trim() && parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())
                 ? "Name already exists"
@@ -532,7 +492,7 @@ const PartMaster = () => {
             ) : ""}
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
+            size="small"
           />
           <TextField 
             label="Category" 
@@ -544,11 +504,8 @@ const PartMaster = () => {
             }}
             error={categoryError}
             required
-<<<<<<< HEAD
-            size="small"
-=======
             inputProps={{ style: { textTransform: 'uppercase' } }}
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
+            size="small"
           />
           <TextField 
             label="Rack Number" 
@@ -559,10 +516,7 @@ const PartMaster = () => {
               setRackNumberError(value && !validateRackNumber(value));
             }}
             error={rackNumberError}
-<<<<<<< HEAD
-=======
             helperText={rackNumberError ? (form.rackNumber ? "Must be exactly 2 digits (e.g., 00, 01, 10)" : "Rack Number is required") : ""}
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
             required
             size="small"
           />
@@ -644,10 +598,7 @@ const PartMaster = () => {
                 setEditRackNumberError(value && !validateRackNumber(value));
               }}
               error={editRackNumberError}
-<<<<<<< HEAD
-=======
               helperText={editRackNumberError ? "Must be exactly 2 digits (e.g., 00, 01, 10)" : ""}
->>>>>>> de4ce36aec474a3c22382a424f3575d9df63bcf4
               fullWidth 
             />
             <TextField 
