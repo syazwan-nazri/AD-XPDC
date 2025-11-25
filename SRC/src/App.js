@@ -30,6 +30,13 @@ import UserManagement from "./pages/Admin/UserManagement";
 import UserGroupMaster from "./pages/Admin/UserGroupMaster";
 import Home from "./pages/Home";
 import DashboardKPIs from "./pages/Reports/DashboardKPIs";
+import SupplierMaster from "./pages/Admin/SupplierMaster";
+import MachineMaster from "./pages/Admin/MachineMaster";
+import StockIn from "./pages/Inventory/StockIn";
+import StockOut from "./pages/Inventory/StockOut";
+import InternalTransfer from "./pages/Inventory/InternalTransfer";
+import MovementLog from "./pages/Inventory/MovementLog";
+import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
 
 const drawerWidth = 260;
 const collapsedWidth = 64;
@@ -231,8 +238,22 @@ function AppShell() {
                   element={<UserGroupMaster />}
                 />
                 <Route path="/admin/part-master" element={<PartMaster />} />
+                <Route path="/admin/supplier-master" element={<SupplierMaster />} />
+                <Route path="/admin/machine-master" element={<MachineMaster />} />
                 {/* Other admin protected routes */}
               </Route>
+              
+              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
+                 <Route path="/inventory/stock-in" element={<StockIn />} />
+                 <Route path="/inventory/stock-out" element={<StockOut />} />
+                 <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
+                 <Route path="/inventory/movement-logs" element={<MovementLog />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
+                 <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
+              </Route>
+
               {/* Other role-protected routes here */}
               <Route path="*" element={<NotFound />} />
             </Routes>

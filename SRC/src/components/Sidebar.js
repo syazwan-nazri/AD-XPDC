@@ -19,6 +19,12 @@ import StorageIcon from '@mui/icons-material/Storage';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import BuildIcon from '@mui/icons-material/Build';
 import PeopleIcon from '@mui/icons-material/People';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import MoveToInboxIcon from '@mui/icons-material/MoveToInbox';
+import OutboxIcon from '@mui/icons-material/Outbox';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import HistoryIcon from '@mui/icons-material/History';
 import Box from '@mui/material/Box';
 import { NavLink, useLocation } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
@@ -31,13 +37,23 @@ const collapsedWidth = 64;
 // Define links with their required permission key
 const dataInputMasterLinks = [
   { path: '/admin/user-master', text: 'User Master', icon: <PeopleIcon />, permission: 'canAccessUserManagement' },
-  { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' }, // Assuming same permission for now
+  { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' },
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartMaster' },
   { path: '/admin/bin-master', text: 'Bin Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
-  { path: '/admin/customer-master', text: 'Customer Master', icon: <AccountCircleIcon />, permission: 'canAccessSupplierManagement' }, // Using supplier permission as proxy or add new one
   { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, permission: 'canAccessSupplierManagement' },
   { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, permission: 'canAccessAssetRegistry' },
+];
+
+const stockMovementLinks = [
+  { path: '/inventory/stock-in', text: 'Stock In', icon: <MoveToInboxIcon />, permission: 'canAccessInventory' },
+  { path: '/inventory/stock-out', text: 'Stock Out', icon: <OutboxIcon />, permission: 'canAccessInventory' },
+  { path: '/inventory/internal-transfer', text: 'Internal Transfer', icon: <SwapHorizIcon />, permission: 'canAccessInventory' },
+  { path: '/inventory/movement-logs', text: 'Movement Logs', icon: <HistoryIcon />, permission: 'canAccessInventory' },
+];
+
+const purchasingLinks = [
+  { path: '/procurement/purchase-requisition', text: 'Purchase Requisition', icon: <ShoppingCartIcon />, permission: 'canAccessProcurement' },
 ];
 
 const reportLinks = [
@@ -51,21 +67,72 @@ const reportLinks = [
 const Sidebar = ({ open, onToggle }) => {
   const location = useLocation();
   const [dataMasterOpen, setDataMasterOpen] = useState(true);
+  const [stockMovementOpen, setStockMovementOpen] = useState(true);
+  const [purchasingOpen, setPurchasingOpen] = useState(true);
+
   const toggleDataMaster = () => setDataMasterOpen((prev) => !prev);
+  const toggleStockMovement = () => setStockMovementOpen((prev) => !prev);
+  const togglePurchasing = () => setPurchasingOpen((prev) => !prev);
   
   const user = useSelector((state) => state.auth.user);
   const userRole = user ? getRoleByGroupId(user.groupId) : null;
 
   // Filter links
-  const filteredDataMasterLinks = dataInputMasterLinks.filter(link => 
+  const filterLinks = (links) => links.filter(link => 
     !link.permission || (userRole && hasPermission(userRole, link.permission))
   );
 
-  const filteredReportLinks = reportLinks.filter(link => 
-    !link.permission || (userRole && hasPermission(userRole, link.permission))
-  );
+  const filteredDataMasterLinks = filterLinks(dataInputMasterLinks);
+  const filteredStockMovementLinks = filterLinks(stockMovementLinks);
+  const filteredPurchasingLinks = filterLinks(purchasingLinks);
+  const filteredReportLinks = filterLinks(reportLinks);
 
   if (!user) return null;
+
+  const renderSection = (title, icon, links, isOpen, toggleOpen) => {
+    if (links.length === 0) return null;
+    return (
+      <>
+        <List>
+          <ListItem button onClick={toggleOpen} sx={{ justifyContent: open ? 'initial' : 'center', px: open ? 2 : 0 }}>
+            <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+              {icon}
+            </ListItemIcon>
+            {open && (
+              <>
+                <ListItemText primary={title} />
+                <Box sx={{ ml: 'auto', pl: 1, display: 'flex', alignItems: 'center' }}>
+                  {isOpen ? <ExpandLess /> : <ExpandMore />}
+                </Box>
+              </>
+            )}
+          </ListItem>
+          <Collapse in={isOpen && open} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {links.map((item) => (
+                <ListItem
+                  button
+                  key={item.path}
+                  component={NavLink}
+                  to={item.path}
+                  selected={location.pathname === item.path}
+                  sx={{
+                    pl: open ? 6 : 2,
+                    justifyContent: open ? 'initial' : 'center',
+                    minHeight: 40
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
+                  {open && <ListItemText primary={item.text} />}
+                </ListItem>
+              ))}
+            </List>
+          </Collapse>
+        </List>
+        <Divider />
+      </>
+    );
+  };
 
   return (
     <Drawer
@@ -88,47 +155,9 @@ const Sidebar = ({ open, onToggle }) => {
       </List>
       <Divider />
       
-      {/* Data Input Master with expandable menu - Only show if there are visible links */}
-      {filteredDataMasterLinks.length > 0 && (
-        <List>
-          <ListItem button onClick={toggleDataMaster} sx={{ justifyContent: open ? 'initial' : 'center', px: open ? 2 : 0 }}>
-            <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
-              <SettingsIcon />
-            </ListItemIcon>
-            {open && (
-              <>
-                <ListItemText primary="Data Input Master" sx={{}} />
-                <Box sx={{ ml: 'auto', pl: 1, display: 'flex', alignItems: 'center' }}>
-                  {dataMasterOpen ? <ExpandLess /> : <ExpandMore />}
-                </Box>
-              </>
-            )}
-          </ListItem>
-          <Collapse in={dataMasterOpen && open} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {filteredDataMasterLinks.map((item) => (
-                <ListItem
-                  button
-                  key={item.path}
-                  component={NavLink}
-                  to={item.path}
-                  selected={location.pathname === item.path}
-                  sx={{
-                    pl: open ? 6 : 2,
-                    justifyContent: open ? 'initial' : 'center',
-                    minHeight: 40
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
-                  {open && <ListItemText primary={item.text} />}
-                </ListItem>
-              ))}
-            </List>
-          </Collapse>
-        </List>
-      )}
-      
-      {filteredDataMasterLinks.length > 0 && <Divider sx={{ mt: 1 }} />}
+      {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster)}
+      {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, stockMovementOpen, toggleStockMovement)}
+      {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, purchasingOpen, togglePurchasing)}
       
       {/* Reports section */}
       {filteredReportLinks.length > 0 && (
