@@ -206,7 +206,7 @@ function AppShell() {
               pt: 3,
               pr: 3,
               pb: 3,
-              pl: 1,
+              pl: 0,
               transition: "margin 0.2s",
               width: "100vw",
               marginLeft:
