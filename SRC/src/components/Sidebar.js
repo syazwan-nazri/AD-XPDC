@@ -25,7 +25,7 @@ import Collapse from '@mui/material/Collapse';
 import { useSelector } from 'react-redux';
 import { getRoleByGroupId, hasPermission } from '../utils/roles';
 
-const drawerWidth = 220;
+const drawerWidth = 260;
 const collapsedWidth = 64;
 
 // Define links with their required permission key

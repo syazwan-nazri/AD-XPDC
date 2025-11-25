@@ -31,7 +31,7 @@ import UserGroupMaster from "./pages/Admin/UserGroupMaster";
 import Home from "./pages/Home";
 import DashboardKPIs from "./pages/Reports/DashboardKPIs";
 
-const drawerWidth = 220;
+const drawerWidth = 260;
 const collapsedWidth = 64;
 
 function AuthGuard({ authReady, children }) {
@@ -203,7 +203,10 @@ function AppShell() {
             component="main"
             sx={(theme) => ({
               flexGrow: 1,
-              p: 3,
+              pt: 3,
+              pr: 3,
+              pb: 3,
+              pl: 1,
               transition: "margin 0.2s",
               width: "100%", // Use 100% of remaining space, not viewport width
               overflowX: "hidden", // Prevent horizontal scroll
