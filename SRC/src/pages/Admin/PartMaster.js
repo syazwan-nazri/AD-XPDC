@@ -26,7 +26,7 @@ const PartMaster = () => {
 
   const [form, setForm] = useState({ 
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', 
-    minStockLevel: '', maxStockLevel: '', currentStock: 0 
+    safetyLevel: '', maxStockLevel: '', currentStock: 0 
   });
   
   const [pageStart, setPageStart] = useState(0); // index of first item in current page
@@ -38,7 +38,7 @@ const PartMaster = () => {
   const [barcodeDialogOpen, setBarcodeDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ 
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '',
-    minStockLevel: '', maxStockLevel: '', currentStock: 0
+    safetyLevel: '', maxStockLevel: '', currentStock: 0
   });
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -61,7 +61,13 @@ const PartMaster = () => {
       setLoading(true);
       try {
         const querySnapshot = await getDocs(collection(db, 'parts'));
-        const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        const data = querySnapshot.docs.map(doc => {
+          const d = { ...doc.data(), id: doc.id };
+          if (d.safetyLevel === undefined && d.minStockLevel !== undefined) {
+            d.safetyLevel = d.minStockLevel;
+          }
+          return d;
+        });
         dispatch(setParts(data));
       } catch (error) {
         setSnackbar({ open: true, message: 'Fetch error', severity: 'error' });
@@ -196,7 +202,7 @@ const PartMaster = () => {
     try {
       const newPart = {
         ...form,
-        minStockLevel: Number(form.minStockLevel) || 0,
+        safetyLevel: Number(form.safetyLevel) || 0,
         maxStockLevel: Number(form.maxStockLevel) || 0,
         currentStock: Number(form.currentStock) || 0,
         createdAt: new Date().toISOString()
@@ -204,14 +210,14 @@ const PartMaster = () => {
       const docRef = await addDoc(collection(db, 'parts'), newPart);
       dispatch(addPart({ ...newPart, id: docRef.id }));
       setSnackbar({ open: true, message: 'Part added', severity: 'success' });
-      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', minStockLevel: '', maxStockLevel: '', currentStock: 0 });
+      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', maxStockLevel: '', currentStock: 0 });
     } catch (e) {
       setSnackbar({ open: true, message: 'Add failed', severity: 'error' });
     }
   };
   
   const handleClear = () => {
-    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', minStockLevel: '', maxStockLevel: '', currentStock: 0 });
+    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', maxStockLevel: '', currentStock: 0 });
     setSapError(false); setInternalRefError(false); setNameError(false); setCategoryError(false); setRackNumberError(false); setRackLevelError(false);
   };
   
@@ -225,7 +231,7 @@ const PartMaster = () => {
       category: part.category || '',
       rackNumber: part.rackNumber || '',
       rackLevel: part.rackLevel || '',
-      minStockLevel: part.minStockLevel || '',
+      safetyLevel: (part.safetyLevel ?? part.minStockLevel) || '',
       maxStockLevel: part.maxStockLevel || '',
       currentStock: part.currentStock || 0
     });
@@ -235,7 +241,7 @@ const PartMaster = () => {
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditingId(null);
-    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', minStockLevel: '', maxStockLevel: '', currentStock: 0 });
+    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', maxStockLevel: '', currentStock: 0 });
   };
   
   const handleSaveChanges = async () => {
@@ -265,7 +271,7 @@ const PartMaster = () => {
     try {
       const updatedPart = {
         ...editForm,
-        minStockLevel: Number(editForm.minStockLevel) || 0,
+        safetyLevel: Number(editForm.safetyLevel) || 0,
         maxStockLevel: Number(editForm.maxStockLevel) || 0,
         currentStock: Number(editForm.currentStock) || 0,
         updatedAt: new Date().toISOString()
@@ -377,13 +383,15 @@ const PartMaster = () => {
                 <TableCell>Category</TableCell>
                 <TableCell>Rack No</TableCell>
                 <TableCell>Level</TableCell>
-                <TableCell>Stock</TableCell>
+                <TableCell>Safety Level</TableCell>
+                <TableCell>Max Stock</TableCell>
+                <TableCell>Current Stock</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {pageParts.map(p => {
-                const isLowStock = (p.currentStock || 0) <= (p.minStockLevel || 0);
+                const isLowStock = (p.currentStock || 0) <= (p.safetyLevel || p.minStockLevel || 0);
                 return (
                   <TableRow key={p.id} sx={{ bgcolor: isLowStock ? '#fff4e5' : 'inherit' }}>
                     <TableCell>{p.sapNumber}</TableCell>
@@ -392,6 +400,8 @@ const PartMaster = () => {
                     <TableCell>{p.category}</TableCell>
                     <TableCell>{p.rackNumber}</TableCell>
                     <TableCell>{p.rackLevel}</TableCell>
+                    <TableCell>{(p.safetyLevel ?? p.minStockLevel) || 0}</TableCell>
+                    <TableCell>{p.maxStockLevel || 0}</TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={1}>
                         {p.currentStock || 0}
@@ -415,7 +425,7 @@ const PartMaster = () => {
                 );
               })}
               {pageParts.length === 0 && (
-                <TableRow><TableCell colSpan={8}>No parts found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10}>No parts found</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -534,10 +544,10 @@ const PartMaster = () => {
             size="small"
           />
           <TextField 
-            label="Min Stock" 
+            label="Safety Level" 
             type="number"
-            value={form.minStockLevel} 
-            onChange={e => setForm(f => ({ ...f, minStockLevel: e.target.value }))}
+            value={form.safetyLevel} 
+            onChange={e => setForm(f => ({ ...f, safetyLevel: e.target.value }))}
             size="small"
           />
           <TextField 
@@ -614,10 +624,10 @@ const PartMaster = () => {
               fullWidth 
             />
             <TextField 
-              label="Min Stock" 
+              label="Safety Level" 
               type="number"
-              value={editForm.minStockLevel} 
-              onChange={e => setEditForm(f => ({ ...f, minStockLevel: e.target.value }))}
+              value={editForm.safetyLevel} 
+              onChange={e => setEditForm(f => ({ ...f, safetyLevel: e.target.value }))}
               fullWidth
             />
             <TextField 
