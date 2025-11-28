@@ -21,6 +21,7 @@ import ResetPassword from "./pages/Auth/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PartMaster from "./pages/Admin/PartMaster";
 import PartGroupMaster from "./pages/Admin/PartGroupMaster";
+import StorageMaster from "./pages/Admin/StorageMaster";
 import Login from "./pages/Auth/Login";
 import { Roles } from "./utils/roles";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -248,6 +249,7 @@ function AppShell() {
                 />
                 <Route path="/admin/part-master" element={<PartMaster />} />
                 <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
+                <Route path="/admin/bin-master" element={<StorageMaster />} />
                 <Route path="/admin/supplier-master" element={<SupplierMaster />} />
                 <Route path="/admin/machine-master" element={<MachineMaster />} />
                 {/* Other admin protected routes */}
