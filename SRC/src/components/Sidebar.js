@@ -41,7 +41,7 @@ const dataInputMasterLinks = [
   { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' },
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartMaster' },
-  { path: '/admin/bin-master', text: 'Bin Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+  { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
   { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, permission: 'canAccessSupplierManagement' },
   { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, permission: 'canAccessAssetRegistry' },
 ];
