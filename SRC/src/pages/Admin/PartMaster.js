@@ -26,7 +26,7 @@ const PartMaster = () => {
 
   const [form, setForm] = useState({ 
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', 
-    safetyLevel: '', maxStockLevel: '', currentStock: 0 
+    safetyLevel: '', replenishQty: '', currentStock: '' 
   });
   
   const [pageStart, setPageStart] = useState(0); // index of first item in current page
@@ -38,7 +38,7 @@ const PartMaster = () => {
   const [barcodeDialogOpen, setBarcodeDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ 
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '',
-    safetyLevel: '', maxStockLevel: '', currentStock: 0
+    safetyLevel: '', replenishQty: '', currentStock: 0
   });
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -54,6 +54,11 @@ const PartMaster = () => {
   const [internalRefError, setInternalRefError] = useState(false);
   const [nameError, setNameError] = useState(false);
   const [categoryError, setCategoryError] = useState(false);
+  const [safetyLevelError, setSafetyLevelError] = useState(false);
+  const [editSafetyLevelError, setEditSafetyLevelError] = useState(false);
+  const [replenishQtyError, setReplenishQtyError] = useState(false);
+  const [editReplenishQtyError, setEditReplenishQtyError] = useState(false);
+  const [currentStockError, setCurrentStockError] = useState(false);
 
   // Fetch parts from Firestore
   useEffect(() => {
@@ -65,6 +70,10 @@ const PartMaster = () => {
           const d = { ...doc.data(), id: doc.id };
           if (d.safetyLevel === undefined && d.minStockLevel !== undefined) {
             d.safetyLevel = d.minStockLevel;
+          }
+          // Backward compatibility: map legacy maxStockLevel to replenishQty
+          if (d.replenishQty === undefined && d.maxStockLevel !== undefined) {
+            d.replenishQty = d.maxStockLevel;
           }
           return d;
         });
@@ -135,11 +144,25 @@ const PartMaster = () => {
     
     // Validate all required fields
     let hasError = false;
+
+    // Required checks: flag all empty fields at once
+    if (!form.sapNumber || form.sapNumber.trim() === '') { setSapError(true); hasError = true; }
+    if (!form.internalRef || form.internalRef.trim() === '') { setInternalRefError(true); hasError = true; }
+    if (!form.name || form.name.trim() === '') { setNameError(true); hasError = true; }
+    if (!form.category || form.category.trim() === '') { setCategoryError(true); hasError = true; }
+    if (!form.rackNumber || form.rackNumber.trim() === '') { setRackNumberError(true); hasError = true; }
+    if (!form.rackLevel || form.rackLevel.trim() === '') { setRackLevelError(true); hasError = true; }
+    if (form.safetyLevel === '' || form.safetyLevel === null || form.safetyLevel === undefined) { setSafetyLevelError(true); hasError = true; }
+    if (form.replenishQty === '' || form.replenishQty === null || form.replenishQty === undefined) { setReplenishQtyError(true); hasError = true; }
+    if (form.currentStock === '' || form.currentStock === null || form.currentStock === undefined) { setCurrentStockError(true); hasError = true; }
+
+    // If any required field is missing, show generic incomplete form message and stop
+    if (hasError) {
+      setSnackbar({ open: true, message: 'Incomplete Form. Please provide the missing information.', severity: 'error' });
+      return;
+    }
     
-    if (!form.sapNumber) {
-      setSapError(true);
-      hasError = true;
-    } else if (!validateSapNumber(form.sapNumber)) {
+    if (!validateSapNumber(form.sapNumber)) {
       setSapError(true);
       setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' });
       return;
@@ -149,10 +172,7 @@ const PartMaster = () => {
       return;
     }
     
-    if (!form.internalRef || form.internalRef.trim() === '') {
-      setInternalRefError(true);
-      hasError = true;
-    } else if (!validateInternalRef(form.internalRef)) {
+    if (!validateInternalRef(form.internalRef)) {
       setInternalRefError(true);
       setSnackbar({ open: true, message: 'Internal Ref No format: ABC123, AB1234, ABC 123, or AB 1234', severity: 'error' });
       return;
@@ -162,63 +182,78 @@ const PartMaster = () => {
       return;
     }
     
-    if (!form.name || form.name.trim() === '') {
-      setNameError(true);
-      hasError = true;
-    } else if (parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())) {
+    if (parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())) {
       setNameError(true);
       setSnackbar({ open: true, message: 'Name already exists', severity: 'error' });
       return;
     }
     
-    if (!form.category || form.category.trim() === '') {
-      setCategoryError(true);
-      hasError = true;
-    }
-    
-    if (!form.rackNumber) {
-      setRackNumberError(true);
-      hasError = true;
-    } else if (!validateRackNumber(form.rackNumber)) {
+    if (!validateRackNumber(form.rackNumber)) {
       setRackNumberError(true);
       setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits (e.g., 00, 01, 10)', severity: 'error' });
       return;
     }
     
-    if (!form.rackLevel) {
-      setRackLevelError(true);
-      hasError = true;
-    } else if (!validateRackLevel(form.rackLevel)) {
+    if (!validateRackLevel(form.rackLevel)) {
       setRackLevelError(true);
       setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
       return;
     }
-    
-    if (hasError) {
-      setSnackbar({ open: true, message: 'Please fill in all required fields', severity: 'error' });
+
+    // Safety Level required and must be 0 or above
+    if (form.safetyLevel === '' || form.safetyLevel === null || form.safetyLevel === undefined) {
+      setSafetyLevelError(true);
+      setSnackbar({ open: true, message: 'Safety Level is required', severity: 'error' });
       return;
     }
+    if (Number(form.safetyLevel) < 0) {
+      setSafetyLevelError(true);
+      setSnackbar({ open: true, message: 'Safety Level must be 0 or greater', severity: 'error' });
+      return;
+    }
+
+    // Replenish Quantity required and must be 0 or above
+    if (form.replenishQty === '' || form.replenishQty === null || form.replenishQty === undefined) {
+      setReplenishQtyError(true);
+      setSnackbar({ open: true, message: 'Replenish Quantity is required', severity: 'error' });
+      return;
+    }
+    if (Number(form.replenishQty) < 0) {
+      setReplenishQtyError(true);
+      setSnackbar({ open: true, message: 'Replenish Quantity must be 0 or greater', severity: 'error' });
+      return;
+    }
+    
+    // No missing fields at this point; continue
 
     try {
       const newPart = {
         ...form,
         safetyLevel: Number(form.safetyLevel) || 0,
-        maxStockLevel: Number(form.maxStockLevel) || 0,
+        replenishQty: Number(form.replenishQty) || 0,
         currentStock: Number(form.currentStock) || 0,
         createdAt: new Date().toISOString()
       };
       const docRef = await addDoc(collection(db, 'parts'), newPart);
       dispatch(addPart({ ...newPart, id: docRef.id }));
       setSnackbar({ open: true, message: 'Part added', severity: 'success' });
-      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', maxStockLevel: '', currentStock: 0 });
+      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: 0 });
     } catch (e) {
       setSnackbar({ open: true, message: 'Add failed', severity: 'error' });
     }
   };
   
   const handleClear = () => {
-    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', maxStockLevel: '', currentStock: 0 });
-    setSapError(false); setInternalRefError(false); setNameError(false); setCategoryError(false); setRackNumberError(false); setRackLevelError(false);
+    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: '' });
+    setSapError(false);
+    setInternalRefError(false);
+    setNameError(false);
+    setCategoryError(false);
+    setRackNumberError(false);
+    setRackLevelError(false);
+    setSafetyLevelError(false);
+    setReplenishQtyError(false);
+    setCurrentStockError(false);
   };
   
   // Edit handlers
@@ -232,7 +267,7 @@ const PartMaster = () => {
       rackNumber: part.rackNumber || '',
       rackLevel: part.rackLevel || '',
       safetyLevel: (part.safetyLevel ?? part.minStockLevel) || '',
-      maxStockLevel: part.maxStockLevel || '',
+      replenishQty: (part.replenishQty ?? part.maxStockLevel) || '',
       currentStock: part.currentStock || 0
     });
     setEditDialogOpen(true);
@@ -241,7 +276,7 @@ const PartMaster = () => {
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditingId(null);
-    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', maxStockLevel: '', currentStock: 0 });
+    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: 0 });
   };
   
   const handleSaveChanges = async () => {
@@ -263,6 +298,26 @@ const PartMaster = () => {
       setEditRackLevelError(true);
       return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
     }
+
+    // Safety Level required and must be 0 or above on edit
+    if (editForm.safetyLevel === '' || editForm.safetyLevel === null || editForm.safetyLevel === undefined) {
+      setEditSafetyLevelError(true);
+      return setSnackbar({ open: true, message: 'Safety Level is required', severity: 'error' });
+    }
+    if (Number(editForm.safetyLevel) < 0) {
+      setEditSafetyLevelError(true);
+      return setSnackbar({ open: true, message: 'Safety Level must be 0 or greater', severity: 'error' });
+    }
+
+    // Replenish Quantity required and must be 0 or above on edit
+    if (editForm.replenishQty === '' || editForm.replenishQty === null || editForm.replenishQty === undefined) {
+      setEditReplenishQtyError(true);
+      return setSnackbar({ open: true, message: 'Replenish Quantity is required', severity: 'error' });
+    }
+    if (Number(editForm.replenishQty) < 0) {
+      setEditReplenishQtyError(true);
+      return setSnackbar({ open: true, message: 'Replenish Quantity must be 0 or greater', severity: 'error' });
+    }
     
     setEditSapError(false);
     setEditRackNumberError(false);
@@ -272,7 +327,7 @@ const PartMaster = () => {
       const updatedPart = {
         ...editForm,
         safetyLevel: Number(editForm.safetyLevel) || 0,
-        maxStockLevel: Number(editForm.maxStockLevel) || 0,
+        replenishQty: Number(editForm.replenishQty) || 0,
         currentStock: Number(editForm.currentStock) || 0,
         updatedAt: new Date().toISOString()
       };
@@ -384,7 +439,7 @@ const PartMaster = () => {
                 <TableCell>Rack No</TableCell>
                 <TableCell>Level</TableCell>
                 <TableCell>Safety Level</TableCell>
-                <TableCell>Max Stock</TableCell>
+                <TableCell>Replenish Quantity</TableCell>
                 <TableCell>Current Stock</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -401,7 +456,7 @@ const PartMaster = () => {
                     <TableCell>{p.rackNumber}</TableCell>
                     <TableCell>{p.rackLevel}</TableCell>
                     <TableCell>{(p.safetyLevel ?? p.minStockLevel) || 0}</TableCell>
-                    <TableCell>{p.maxStockLevel || 0}</TableCell>
+                    <TableCell>{(p.replenishQty ?? p.maxStockLevel) || 0}</TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={1}>
                         {p.currentStock || 0}
@@ -513,6 +568,7 @@ const PartMaster = () => {
               setCategoryError(!value || value.trim() === '');
             }}
             error={categoryError}
+            helperText={categoryError ? 'Category is required' : ''}
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
             size="small"
@@ -539,6 +595,7 @@ const PartMaster = () => {
               setRackLevelError(value && !validateRackLevel(value));
             }}
             error={rackLevelError}
+            helperText={rackLevelError ? (form.rackLevel ? 'Must be A, B, C, or D' : 'Rack Level is required') : ''}
             inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
             required
             size="small"
@@ -547,22 +604,45 @@ const PartMaster = () => {
             label="Safety Level" 
             type="number"
             value={form.safetyLevel} 
-            onChange={e => setForm(f => ({ ...f, safetyLevel: e.target.value }))}
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, safetyLevel: value }));
+              setSafetyLevelError(value === '' || Number(value) < 0);
+            }}
+            inputProps={{ min: 0 }}
+            error={safetyLevelError}
+            helperText={safetyLevelError ? (form.safetyLevel === '' ? 'Safety Level is required' : 'Must be 0 or greater') : ''}
             size="small"
+            required
           />
           <TextField 
-            label="Max Stock" 
+            label="Replenish Quantity" 
             type="number"
-            value={form.maxStockLevel} 
-            onChange={e => setForm(f => ({ ...f, maxStockLevel: e.target.value }))}
+            value={form.replenishQty} 
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, replenishQty: value }));
+              setReplenishQtyError(value === '' || Number(value) < 0);
+            }}
+            inputProps={{ min: 0 }}
+            error={replenishQtyError}
+            helperText={replenishQtyError ? (form.replenishQty === '' ? 'Replenish Quantity is required' : 'Must be 0 or greater') : ''}
             size="small"
+            required
           />
           <TextField 
             label="Current Stock" 
             type="number"
             value={form.currentStock} 
-            onChange={e => setForm(f => ({ ...f, currentStock: e.target.value }))}
+            onChange={e => {
+              const value = e.target.value;
+              setForm(f => ({ ...f, currentStock: value }));
+              setCurrentStockError(value === '');
+            }}
             size="small"
+            required
+            error={currentStockError}
+            helperText={currentStockError ? 'Current Stock is required' : ''}
           />
         </Box>
         <Box sx={{ mt:2 }}>
@@ -627,15 +707,31 @@ const PartMaster = () => {
               label="Safety Level" 
               type="number"
               value={editForm.safetyLevel} 
-              onChange={e => setEditForm(f => ({ ...f, safetyLevel: e.target.value }))}
+              onChange={e => {
+                const value = e.target.value;
+                setEditForm(f => ({ ...f, safetyLevel: value }));
+                setEditSafetyLevelError(value === '' || Number(value) < 0);
+              }}
+              inputProps={{ min: 0 }}
+              error={editSafetyLevelError}
+              helperText={editSafetyLevelError ? (editForm.safetyLevel === '' ? 'Safety Level is required' : 'Must be 0 or greater') : ''}
               fullWidth
+              required
             />
             <TextField 
-              label="Max Stock" 
+              label="Replenish Quantity" 
               type="number"
-              value={editForm.maxStockLevel} 
-              onChange={e => setEditForm(f => ({ ...f, maxStockLevel: e.target.value }))}
+              value={editForm.replenishQty} 
+              onChange={e => {
+                const value = e.target.value;
+                setEditForm(f => ({ ...f, replenishQty: value }));
+                setEditReplenishQtyError(value === '' || Number(value) < 0);
+              }}
+              inputProps={{ min: 0 }}
+              error={editReplenishQtyError}
+              helperText={editReplenishQtyError ? (editForm.replenishQty === '' ? 'Replenish Quantity is required' : 'Must be 0 or greater') : ''}
               fullWidth
+              required
             />
             <TextField 
               label="Current Stock" 
