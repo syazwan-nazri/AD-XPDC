@@ -28,6 +28,11 @@ const PartMaster = () => {
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', 
     safetyLevel: '', replenishQty: '', currentStock: '' 
   });
+  // Track the current running SAP#
+  const [currentRunningSap, setCurrentRunningSap] = useState('7000001');
+  // Dialog for SAP# mismatch
+  const [sapDialogOpen, setSapDialogOpen] = useState(false);
+  const [pendingAdd, setPendingAdd] = useState(false);
   
   const [pageStart, setPageStart] = useState(0); // index of first item in current page
   const pageSize = 50;
@@ -87,6 +92,26 @@ const PartMaster = () => {
     fetchParts();
   }, [dispatch]);
 
+  // Auto-generate SAP# whenever parts list changes
+  useEffect(() => {
+    if (parts.length > 0) {
+      const sapNumbers = parts
+        .map(p => p.sapNumber)
+        .filter(s => s && /^7\d{6}$/.test(s))
+        .map(s => parseInt(s, 10));
+      let nextSap = '7000001';
+      if (sapNumbers.length > 0) {
+        const maxSap = Math.max(...sapNumbers);
+        nextSap = (maxSap + 1).toString();
+      }
+      setCurrentRunningSap(nextSap);
+      setForm(f => ({ ...f, sapNumber: nextSap }));
+    } else {
+      setCurrentRunningSap('7000001');
+      setForm(f => ({ ...f, sapNumber: '7000001' }));
+    }
+  }, [parts]);
+
   // Derived state for unique categories (for filter dropdown)
   const categories = useMemo(() => [...new Set(parts.map(p => p.category).filter(Boolean))], [parts]);
 
@@ -133,7 +158,7 @@ const PartMaster = () => {
   };
   
   // Add part
-  const handleAddPart = async () => {
+  const handleAddPart = async (force = false) => {
     // Reset all errors
     setSapError(false);
     setInternalRefError(false);
@@ -171,12 +196,18 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'SAP # already exists', severity: 'error' });
       return;
     }
+    // Check if SAP# is not the current running number and not forced
+    if (!force && form.sapNumber !== currentRunningSap) {
+      setSapDialogOpen(true);
+      setPendingAdd(true);
+      return;
+    }
     
     if (!validateInternalRef(form.internalRef)) {
       setInternalRefError(true);
       setSnackbar({ open: true, message: 'Internal Ref No format: ABC123, AB1234, ABC 123, or AB 1234', severity: 'error' });
       return;
-    } else if (parts.some(p => p.internalRef === form.internalRef)) {
+    } else if (parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())) {
       setInternalRefError(true);
       setSnackbar({ open: true, message: 'Internal Ref No already exists', severity: 'error' });
       return;
@@ -237,14 +268,45 @@ const PartMaster = () => {
       const docRef = await addDoc(collection(db, 'parts'), newPart);
       dispatch(addPart({ ...newPart, id: docRef.id }));
       setSnackbar({ open: true, message: 'Part added', severity: 'success' });
-      setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: 0 });
+      // Auto-generate next SAP# after successful add
+      const nextSapNumber = (parseInt(form.sapNumber, 10) + 1).toString();
+      setForm({ sapNumber: nextSapNumber, internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: '' });
+      setCurrentRunningSap(nextSapNumber);
     } catch (e) {
       setSnackbar({ open: true, message: 'Add failed', severity: 'error' });
     }
   };
+
+  // SAP# mismatch dialog handlers
+  const handleSapDialogClose = () => {
+    setSapDialogOpen(false);
+    setPendingAdd(false);
+  };
+
+  const handleSapDialogContinue = () => {
+    setSapDialogOpen(false);
+    setPendingAdd(false);
+    handleAddPart(true); // force add
+  };
+
+  const handleSapDialogEditBack = () => {
+    setForm(f => ({ ...f, sapNumber: currentRunningSap }));
+    setSapDialogOpen(false);
+    setPendingAdd(false);
+  };
   
   const handleClear = () => {
-    setForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: '' });
+    setForm(f => ({
+      ...f,
+      internalRef: '',
+      name: '',
+      category: '',
+      rackNumber: '',
+      rackLevel: '',
+      safetyLevel: '',
+      replenishQty: '',
+      currentStock: ''
+    }));
     setSapError(false);
     setInternalRefError(false);
     setNameError(false);
@@ -363,7 +425,13 @@ const PartMaster = () => {
     }
   };
 
-  // Barcode handlers
+  // Barcode scan handler
+  const handleScan = (code) => {
+    setSearchQuery(code);
+    setSnackbar({ open: true, message: `Scanned: ${code}`, severity: 'info' });
+  };
+
+  // Barcode dialog handlers
   const handleBarcodeClick = (part) => {
     setBarcodeTarget(part);
     setBarcodeDialogOpen(true);
@@ -372,11 +440,6 @@ const PartMaster = () => {
   const handleBarcodeClose = () => {
     setBarcodeDialogOpen(false);
     setBarcodeTarget(null);
-  };
-
-  const handleScan = (code) => {
-    setSearchQuery(code);
-    setSnackbar({ open: true, message: `Scanned: ${code}`, severity: 'info' });
   };
 
   const pageParts = filteredParts.slice(pageStart, pageStart + pageSize);
@@ -513,7 +576,7 @@ const PartMaster = () => {
               parts.some(p => p.sapNumber === form.sapNumber) 
                 ? "SAP # already exists" 
                 : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
-            ) : ""}
+            ) : "Auto-generated (editable)"}
             required 
             size="small"
           />
@@ -525,12 +588,12 @@ const PartMaster = () => {
               setForm(f => ({ ...f, internalRef: value }));
               
               const isValidFormat = validateInternalRef(value);
-              const isDuplicate = value && parts.some(p => p.internalRef === value);
+              const isDuplicate = value && parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === value.replace(/\s+/g, '').toUpperCase());
               setInternalRefError(value && (!isValidFormat || isDuplicate));
             }}
             error={internalRefError}
             helperText={internalRefError ? (
-              parts.some(p => p.internalRef === form.internalRef)
+              parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())
                 ? "Internal Ref No already exists"
                 : "Format: ABC123, AB1234, ABC 123, or AB 1234"
             ) : ""}
@@ -646,9 +709,24 @@ const PartMaster = () => {
           />
         </Box>
         <Box sx={{ mt:2 }}>
-          <Button variant="contained" onClick={handleAddPart} sx={{ mr:1 }}>ADD PART</Button>
+          <Button variant="contained" onClick={() => handleAddPart()} sx={{ mr:1 }}>ADD PART</Button>
           <Button variant="outlined" onClick={handleClear}>CLEAR</Button>
         </Box>
+        {/* SAP# mismatch dialog */}
+        <Dialog open={sapDialogOpen} onClose={handleSapDialogClose}>
+          <DialogTitle>Warning: SAP # Not Current Running Number</DialogTitle>
+          <DialogContent>
+            <Typography gutterBottom>
+              The SAP # you entered (<b>{form.sapNumber}</b>) is not the current running number.<br/>
+              The current running SAP # should be: <b>{currentRunningSap}</b>.<br/>
+              Do you want to continue with your entered SAP #, or edit it back to the running number?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleSapDialogContinue} color="warning">Continue Anyway</Button>
+            <Button onClick={handleSapDialogEditBack} color="primary" autoFocus>Edit Back</Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
 
       {/* Edit Part Dialog */}
@@ -750,7 +828,7 @@ const PartMaster = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteClose} maxWidth="xs" fullWidth>
-        <DialogTitle>DELETE CONFIRMATION PROMPT</DialogTitle>
+        <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
         <DialogContent>
           <Box sx={{ py:2 }}>
             <p style={{ marginTop:0 }}>Are you sure you want to delete this part?</p>
