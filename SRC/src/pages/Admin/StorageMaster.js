@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Box, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Typography, Paper, MenuItem, Alert } from '@mui/material';
@@ -8,6 +9,7 @@ import SearchIcon from '@mui/icons-material/Search';
 
 // Main Storage Master Page
 const StorageMaster = () => {
+  const parts = useSelector(state => state.parts.parts || []);
   const [storageLocations, setStorageLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -75,6 +77,9 @@ const StorageMaster = () => {
   const [editMaterialGroupError, setEditMaterialGroupError] = useState(false);
   const [editRackNumberError, setEditRackNumberError] = useState(false);
   const [editRackLevelError, setEditRackLevelError] = useState(false);
+
+  // Pagination states for parts list
+  const [pageStartWith, setPageStartWith] = useState(0);
 
   // Fetch data from Firestore
   useEffect(() => {
@@ -333,6 +338,10 @@ const StorageMaster = () => {
   const locationPageEnd = Math.min(pageStartLocations + pageSize, filteredLocations.length);
   const locationsPaginated = filteredLocations.slice(pageStartLocations, locationPageEnd);
 
+  // Pagination for parts - show all parts
+  const pageEndWith = Math.min(pageStartWith + pageSize, parts.length);
+  const partsPaginatedWith = parts.slice(pageStartWith, pageEndWith);
+
   if (loading) {
     return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
   }
@@ -342,6 +351,81 @@ const StorageMaster = () => {
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <h2 style={{ margin: 0 }}>STORAGE MASTER - ENGINEERING STORE SPARE PART</h2>
+        </Box>
+      </Paper>
+
+      {/* Part List */}
+      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+          PART LIST ({parts.length} ITEMS)
+        </Typography>
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table size="small">
+            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Int. Ref#</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Part Name</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Category</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Part Rack#</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>Part Level</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Group ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Location</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {partsPaginatedWith.length > 0 ? (
+                partsPaginatedWith.map((part) => {
+                  const location = storageLocations.find(l => l.id === part.storageLocationId);
+                  return (
+                    <TableRow key={part.id} hover>
+                      <TableCell>{part.sapNumber}</TableCell>
+                      <TableCell>{part.internalRef}</TableCell>
+                      <TableCell>{part.name}</TableCell>
+                      <TableCell>{part.category}</TableCell>
+                      <TableCell>{part.rackNumber || '-'}</TableCell>
+                      <TableCell>{part.rackLevel || '-'}</TableCell>
+                      <TableCell>{location?.binId || '-'}</TableCell>
+                      <TableCell>{location ? `${location.rackNumber}-${location.rackLevel}` : '-'}</TableCell>
+                      <TableCell>{part.currentStock}</TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={9} align="center" sx={{ py: 3, color: '#999' }}>
+                    No parts found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </Box>
+        {/* Pagination for Parts */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+          <Box>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={pageStartWith === 0}
+              onClick={() => setPageStartWith(Math.max(0, pageStartWith - pageSize))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={pageEndWith >= parts.length}
+              onClick={() => setPageStartWith(pageStartWith + pageSize)}
+              sx={{ ml: 1 }}
+            >
+              Next
+            </Button>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            Showing {parts.length > 0 ? pageStartWith + 1 : 0}-{pageEndWith} of {parts.length} items
+          </Typography>
         </Box>
       </Paper>
 
