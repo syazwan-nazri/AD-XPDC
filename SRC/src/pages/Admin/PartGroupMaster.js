@@ -115,13 +115,20 @@ const PartGroupMaster = () => {
 
   // Filtered parts pending verification (parts without material group assigned)
   const filteredPartsPending = useMemo(() => {
-    return parts.filter(p => {
+    const filtered = parts.filter(p => {
       if (p.materialGroupId) return false; // Only show parts without material group
       const matchesSearch =
         (p.name && p.name.toLowerCase().includes(searchQueryParts.toLowerCase())) ||
         (p.sapNumber && p.sapNumber.includes(searchQueryParts)) ||
         (p.internalRef && p.internalRef.toLowerCase().includes(searchQueryParts.toLowerCase()));
       return matchesSearch;
+    });
+    
+    // Sort by SAP# descending (higher numbers at top, lower numbers at bottom)
+    return filtered.sort((a, b) => {
+      const sapA = parseInt(a.sapNumber || '0') || 0;
+      const sapB = parseInt(b.sapNumber || '0') || 0;
+      return sapB - sapA; // Descending order
     });
   }, [parts, searchQueryParts]);
 
