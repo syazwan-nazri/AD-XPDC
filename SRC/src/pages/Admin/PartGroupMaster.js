@@ -14,6 +14,29 @@ const PartGroupMaster = () => {
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // Material Group dropdown options
+  const materialGroupOptions = [
+    'SP-BEARING',
+    'SP-BELT',
+    'SP-CALIBRATION',
+    'SP-CAN STERILIZER',
+    'SP-CASE PACKER',
+    'SP-ELECTRICAL',
+    'SP-FILLER',
+    'SP-HOMOGENIZER',
+    'SP-I-DRYER',
+    'SP-LABELLER',
+    'SP-M&R',
+    'SP-MISCELLANEOUS',
+    'SP-O&G',
+    'SP-OR&OS',
+    'SP-PHE',
+    'SP-PUMP',
+    'SP-SEAMER',
+    'SP-STERILIZER',
+    'SP-VALVE'
+  ];
+
   // Part List states
   const [searchQueryParts, setSearchQueryParts] = useState('');
   const [pageStartParts, setPageStartParts] = useState(0);
@@ -30,6 +53,10 @@ const PartGroupMaster = () => {
     materialGroup: '',
     description: ''
   });
+
+  // State to track if "Other" is selected for Material Group
+  const [groupFormShowOther, setGroupFormShowOther] = useState(false);
+  const [editGroupFormShowOther, setEditGroupFormShowOther] = useState(false);
 
   // Dialog states
   const [editGroupDialogOpen, setEditGroupDialogOpen] = useState(false);
@@ -121,10 +148,10 @@ const PartGroupMaster = () => {
     });
   }, [materialGroups, searchQueryGroups]);
 
-  // Validate Group ID (alphanumeric, required)
+  // Validate Group ID (exactly 4 alphabets only, required)
   const validateGroupId = (value) => {
     if (!value) return false;
-    return /^[A-Za-z0-9_-]+$/.test(value);
+    return /^[A-Z]{4}$/.test(value);
   };
 
   // Validate Material Group name (required)
@@ -140,7 +167,7 @@ const PartGroupMaster = () => {
 
     if (!validateGroupId(groupForm.groupId)) {
       setGroupIdError(true);
-      setSnackbar({ open: true, message: 'Group ID is required and must be alphanumeric', severity: 'error' });
+      setSnackbar({ open: true, message: 'Group ID must be exactly 4 alphabets only', severity: 'error' });
       return;
     }
 
@@ -194,6 +221,7 @@ const PartGroupMaster = () => {
     setGroupIdError(false);
     setMaterialGroupError(false);
     setDescriptionError(false);
+    setGroupFormShowOther(false);
   };
 
   // Handle edit group
@@ -204,6 +232,9 @@ const PartGroupMaster = () => {
       materialGroup: group.materialGroup,
       description: group.description || ''
     });
+    // Check if material group is in predefined list
+    const isOther = !materialGroupOptions.includes(group.materialGroup);
+    setEditGroupFormShowOther(isOther);
     setEditGroupDialogOpen(true);
   };
 
@@ -215,7 +246,7 @@ const PartGroupMaster = () => {
 
     if (!validateGroupId(editGroupForm.groupId)) {
       setEditGroupIdError(true);
-      setSnackbar({ open: true, message: 'Group ID is required and must be alphanumeric', severity: 'error' });
+      setSnackbar({ open: true, message: 'Group ID must be exactly 4 alphabets only', severity: 'error' });
       return;
     }
 
@@ -274,6 +305,17 @@ const PartGroupMaster = () => {
   // Handle confirm delete group
   const handleConfirmDeleteGroup = async () => {
     try {
+      // Find all parts assigned to this material group
+      const partsToUnassign = parts.filter(p => p.materialGroupId === deleteGroupTarget.id);
+
+      // Unassign all parts from this material group
+      for (const part of partsToUnassign) {
+        await updateDoc(doc(db, 'parts', part.id), {
+          materialGroupId: ''
+        });
+      }
+
+      // Delete the material group
       await deleteDoc(doc(db, 'materialGroups', deleteGroupTarget.id));
 
       // Refresh material groups list
@@ -281,9 +323,18 @@ const PartGroupMaster = () => {
       const groupsData = groupsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setMaterialGroups(groupsData);
 
+      // Refresh parts list
+      const partsSnapshot = await getDocs(collection(db, 'parts'));
+      const partsData = partsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setParts(partsData);
+
       setDeleteGroupDialogOpen(false);
       setDeleteGroupTarget(null);
-      setSnackbar({ open: true, message: 'Material Group deleted successfully', severity: 'success' });
+      const unassignedCount = partsToUnassign.length;
+      const message = unassignedCount > 0 
+        ? `Material Group deleted successfully. ${unassignedCount} part(s) unassigned and moved to Part List without Material Group`
+        : 'Material Group deleted successfully';
+      setSnackbar({ open: true, message, severity: 'success' });
     } catch (error) {
       console.error('Error deleting material group:', error);
       setSnackbar({ open: true, message: 'Error deleting material group', severity: 'error' });
@@ -697,33 +748,73 @@ const PartGroupMaster = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
                 label="Group ID"
-                placeholder="Enter Group ID"
+                placeholder="Enter Group ID (4 alphabets)"
                 value={groupForm.groupId}
                 onChange={(e) => {
-                  setGroupForm({ ...groupForm, groupId: e.target.value });
+                  const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+                  setGroupForm({ ...groupForm, groupId: value });
                   setGroupIdError(false);
                 }}
                 error={groupIdError}
-                helperText={groupIdError ? 'Required, alphanumeric only' : ''}
+                helperText={groupIdError ? 'Must be exactly 4 alphabets only' : `${groupForm.groupId.length}/4`}
                 fullWidth
                 required
                 size="small"
+                inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
               />
 
-              <TextField
-                label="Material Group"
-                placeholder="Enter Material Group Name"
-                value={groupForm.materialGroup}
-                onChange={(e) => {
-                  setGroupForm({ ...groupForm, materialGroup: e.target.value });
-                  setMaterialGroupError(false);
-                }}
-                error={materialGroupError}
-                helperText={materialGroupError ? 'Required' : ''}
-                fullWidth
-                required
-                size="small"
-              />
+              {!groupFormShowOther ? (
+                <TextField
+                  select
+                  label="Material Group"
+                  value={groupForm.materialGroup}
+                  onChange={(e) => {
+                    if (e.target.value === 'OTHER') {
+                      setGroupFormShowOther(true);
+                      setGroupForm({ ...groupForm, materialGroup: '' });
+                    } else {
+                      setGroupForm({ ...groupForm, materialGroup: e.target.value });
+                    }
+                    setMaterialGroupError(false);
+                  }}
+                  error={materialGroupError}
+                  helperText={materialGroupError ? 'Required' : ''}
+                  fullWidth
+                  required
+                  size="small"
+                >
+                  <MenuItem value="">-- Select Material Group --</MenuItem>
+                  {materialGroupOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                  <MenuItem value="OTHER">Other (Please specify)</MenuItem>
+                </TextField>
+              ) : (
+                <TextField
+                  label="Material Group"
+                  placeholder="Enter custom material group name"
+                  value={groupForm.materialGroup}
+                  onChange={(e) => {
+                    setGroupForm({ ...groupForm, materialGroup: e.target.value });
+                    setMaterialGroupError(false);
+                  }}
+                  onBlur={() => {
+                    // Allow user to go back to dropdown if they clear the field
+                    if (!groupForm.materialGroup.trim()) {
+                      setGroupFormShowOther(false);
+                      setGroupForm({ ...groupForm, materialGroup: '' });
+                    }
+                  }}
+                  error={materialGroupError}
+                  helperText={materialGroupError ? 'Required or click back to select from list' : 'Type custom value or clear to go back'}
+                  fullWidth
+                  required
+                  size="small"
+                  autoFocus
+                />
+              )}
 
               <TextField
                 label="Description"
@@ -762,28 +853,68 @@ const PartGroupMaster = () => {
               label="Group ID"
               value={editGroupForm.groupId}
               onChange={(e) => {
-                setEditGroupForm({ ...editGroupForm, groupId: e.target.value });
+                const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+                setEditGroupForm({ ...editGroupForm, groupId: value });
                 setEditGroupIdError(false);
               }}
               error={editGroupIdError}
-              helperText={editGroupIdError ? 'Required, alphanumeric only' : ''}
+              helperText={editGroupIdError ? 'Must be exactly 4 alphabets only' : `${editGroupForm.groupId.length}/4`}
               fullWidth
               disabled
               size="small"
+              inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
             />
 
-            <TextField
-              label="Material Group"
-              value={editGroupForm.materialGroup}
-              onChange={(e) => {
-                setEditGroupForm({ ...editGroupForm, materialGroup: e.target.value });
-                setEditMaterialGroupError(false);
-              }}
-              error={editMaterialGroupError}
-              helperText={editMaterialGroupError ? 'Required' : ''}
-              fullWidth
-              size="small"
-            />
+            {!editGroupFormShowOther ? (
+              <TextField
+                select
+                label="Material Group"
+                value={editGroupForm.materialGroup}
+                onChange={(e) => {
+                  if (e.target.value === 'OTHER') {
+                    setEditGroupFormShowOther(true);
+                    setEditGroupForm({ ...editGroupForm, materialGroup: '' });
+                  } else {
+                    setEditGroupForm({ ...editGroupForm, materialGroup: e.target.value });
+                  }
+                  setEditMaterialGroupError(false);
+                }}
+                error={editMaterialGroupError}
+                helperText={editMaterialGroupError ? 'Required' : ''}
+                fullWidth
+                size="small"
+              >
+                <MenuItem value="">-- Select Material Group --</MenuItem>
+                {materialGroupOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+                <MenuItem value="OTHER">Other (Please specify)</MenuItem>
+              </TextField>
+            ) : (
+              <TextField
+                label="Material Group"
+                placeholder="Enter custom material group name"
+                value={editGroupForm.materialGroup}
+                onChange={(e) => {
+                  setEditGroupForm({ ...editGroupForm, materialGroup: e.target.value });
+                  setEditMaterialGroupError(false);
+                }}
+                onBlur={() => {
+                  // Allow user to go back to dropdown if they clear the field
+                  if (!editGroupForm.materialGroup.trim()) {
+                    setEditGroupFormShowOther(false);
+                    setEditGroupForm({ ...editGroupForm, materialGroup: '' });
+                  }
+                }}
+                error={editMaterialGroupError}
+                helperText={editMaterialGroupError ? 'Required or click back to select from list' : 'Type custom value or clear to go back'}
+                fullWidth
+                size="small"
+                autoFocus
+              />
+            )}
 
             <TextField
               label="Description"
