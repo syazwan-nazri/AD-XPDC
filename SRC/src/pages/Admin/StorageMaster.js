@@ -12,6 +12,29 @@ const StorageMaster = () => {
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // Material Group dropdown options
+  const materialGroupOptions = [
+    'SP-BEARING',
+    'SP-BELT',
+    'SP-CALIBRATION',
+    'SP-CAN STERILIZER',
+    'SP-CASE PACKER',
+    'SP-ELECTRICAL',
+    'SP-FILLER',
+    'SP-HOMOGENIZER',
+    'SP-I-DRYER',
+    'SP-LABELLER',
+    'SP-M&R',
+    'SP-MISCELLANEOUS',
+    'SP-O&G',
+    'SP-OR&OS',
+    'SP-PHE',
+    'SP-PUMP',
+    'SP-SEAMER',
+    'SP-STERILIZER',
+    'SP-VALVE'
+  ];
+
   // Storage Location List states
   const [searchQueryLocations, setSearchQueryLocations] = useState('');
   const [pageStartLocations, setPageStartLocations] = useState(0);
@@ -20,11 +43,15 @@ const StorageMaster = () => {
   // Storage Location form states
   const [locationForm, setLocationForm] = useState({
     binId: '',
-    binName: '',
-    binType: '',
-    capacity: '',
+    materialGroup: '',
+    rackNumber: '',
+    rackLevel: '',
     description: ''
   });
+
+  // State to track if "Other" is selected for Material Group
+  const [locationFormShowOther, setLocationFormShowOther] = useState(false);
+  const [editLocationFormShowOther, setEditLocationFormShowOther] = useState(false);
 
   // Dialog states
   const [editLocationDialogOpen, setEditLocationDialogOpen] = useState(false);
@@ -32,22 +59,22 @@ const StorageMaster = () => {
   const [editLocationForm, setEditLocationForm] = useState({
     id: '',
     binId: '',
-    binName: '',
-    binType: '',
-    capacity: '',
+    materialGroup: '',
+    rackNumber: '',
+    rackLevel: '',
     description: ''
   });
   const [deleteLocationTarget, setDeleteLocationTarget] = useState(null);
 
   // Validation states
   const [binIdError, setBinIdError] = useState(false);
-  const [binNameError, setBinNameError] = useState(false);
-  const [binTypeError, setBinTypeError] = useState(false);
-  const [capacityError, setCapacityError] = useState(false);
+  const [materialGroupError, setMaterialGroupError] = useState(false);
+  const [rackNumberError, setRackNumberError] = useState(false);
+  const [rackLevelError, setRackLevelError] = useState(false);
   const [editBinIdError, setEditBinIdError] = useState(false);
-  const [editBinNameError, setEditBinNameError] = useState(false);
-  const [editBinTypeError, setEditBinTypeError] = useState(false);
-  const [editCapacityError, setEditCapacityError] = useState(false);
+  const [editMaterialGroupError, setEditMaterialGroupError] = useState(false);
+  const [editRackNumberError, setEditRackNumberError] = useState(false);
+  const [editRackLevelError, setEditRackLevelError] = useState(false);
 
   // Fetch data from Firestore
   useEffect(() => {
@@ -85,75 +112,83 @@ const StorageMaster = () => {
     return /^[A-Za-z0-9_-]+$/.test(value);
   };
 
-  // Validate Bin Name (required)
-  const validateBinName = (value) => {
-    return value && value.trim().length > 0;
+  // Validate Rack Number (2 digits only)
+  const validateRackNumber = (value) => {
+    if (!value) return true; // Allow empty
+    const regex = /^\d{2}$/;
+    return regex.test(value);
   };
 
-  // Validate Bin Type (required)
-  const validateBinType = (value) => {
-    return value && value.trim().length > 0;
-  };
-
-  // Validate Capacity (positive number)
-  const validateCapacity = (value) => {
-    if (!value) return false;
-    return !isNaN(value) && parseFloat(value) > 0;
+  // Validate Rack Level (A, B, C, or D only)
+  const validateRackLevel = (value) => {
+    if (!value) return true; // Allow empty
+    const regex = /^[ABCD]$/i;
+    return regex.test(value);
   };
 
   // Handle add storage location
   const handleAddLocation = async () => {
     setBinIdError(false);
-    setBinNameError(false);
-    setBinTypeError(false);
-    setCapacityError(false);
+    setMaterialGroupError(false);
+    setRackNumberError(false);
+    setRackLevelError(false);
 
+    let hasErrors = false;
+    const errors = [];
+
+    // Validate Group ID
     if (!validateBinId(locationForm.binId)) {
       setBinIdError(true);
-      setSnackbar({ open: true, message: 'Bin ID is required and must be alphanumeric', severity: 'error' });
+      hasErrors = true;
+      errors.push('Group ID');
+    }
+
+    // Validate Material Group
+    if (!locationForm.materialGroup || locationForm.materialGroup.trim() === '') {
+      setMaterialGroupError(true);
+      hasErrors = true;
+      errors.push('Material Group');
+    }
+
+    // Validate Rack Number
+    if (!validateRackNumber(locationForm.rackNumber)) {
+      setRackNumberError(true);
+      hasErrors = true;
+      errors.push('Rack Number');
+    }
+
+    // Validate Rack Level
+    if (!validateRackLevel(locationForm.rackLevel)) {
+      setRackLevelError(true);
+      hasErrors = true;
+      errors.push('Rack Level');
+    }
+
+    // If there are errors, show them
+    if (hasErrors) {
+      setSnackbar({ 
+        open: true, 
+        message: `${errors.join(', ')} ${errors.length === 1 ? 'is' : 'are'} required`, 
+        severity: 'error' 
+      });
       return;
     }
 
-    if (!validateBinName(locationForm.binName)) {
-      setBinNameError(true);
-      setSnackbar({ open: true, message: 'Bin Name is required', severity: 'error' });
-      return;
-    }
-
-    if (!validateBinType(locationForm.binType)) {
-      setBinTypeError(true);
-      setSnackbar({ open: true, message: 'Bin Type is required', severity: 'error' });
-      return;
-    }
-
-    if (!validateCapacity(locationForm.capacity)) {
-      setCapacityError(true);
-      setSnackbar({ open: true, message: 'Capacity must be a positive number', severity: 'error' });
-      return;
-    }
-
-    // Check for duplicate Bin ID or Bin Name (case-insensitive)
+    // Check for duplicate Group ID (case-insensitive)
     const binIdExists = storageLocations.some(l => l.binId.toLowerCase() === locationForm.binId.toLowerCase());
-    const binNameExists = storageLocations.some(l => l.binName.toLowerCase() === locationForm.binName.toLowerCase());
 
     if (binIdExists) {
       setBinIdError(true);
-      setSnackbar({ open: true, message: 'Bin ID already exists', severity: 'error' });
-      return;
-    }
-
-    if (binNameExists) {
-      setBinNameError(true);
-      setSnackbar({ open: true, message: 'Bin Name already exists', severity: 'error' });
+      setSnackbar({ open: true, message: 'Group ID already exists', severity: 'error' });
       return;
     }
 
     try {
       await addDoc(collection(db, 'storageLocations'), {
         binId: locationForm.binId,
-        binName: locationForm.binName,
-        binType: locationForm.binType,
-        capacity: parseFloat(locationForm.capacity),
+        materialGroup: locationForm.materialGroup,
+        rackNumber: locationForm.rackNumber,
+        rackLevel: locationForm.rackLevel,
         description: locationForm.description || '',
         createdAt: new Date()
       });
@@ -164,7 +199,8 @@ const StorageMaster = () => {
       setStorageLocations(locationsData);
 
       // Clear form
-      setLocationForm({ binId: '', binName: '', binType: '', capacity: '', description: '' });
+      setLocationForm({ binId: '', materialGroup: '', rackNumber: '', rackLevel: '', description: '' });
+      setLocationFormShowOther(false);
       setSnackbar({ open: true, message: 'Storage Location added successfully', severity: 'success' });
     } catch (error) {
       console.error('Error adding storage location:', error);
@@ -174,83 +210,77 @@ const StorageMaster = () => {
 
   // Handle clear location form
   const handleClearLocationForm = () => {
-    setLocationForm({ binId: '', binName: '', binType: '', capacity: '', description: '' });
+    setLocationForm({ binId: '', materialGroup: '', rackNumber: '', rackLevel: '', description: '' });
     setBinIdError(false);
-    setBinNameError(false);
-    setBinTypeError(false);
-    setCapacityError(false);
+    setMaterialGroupError(false);
+    setRackNumberError(false);
+    setRackLevelError(false);
+    setLocationFormShowOther(false);
   };
 
   // Handle edit location
   const handleEditLocation = (location) => {
+    const isMaterialGroupCustom = !materialGroupOptions.includes(location.materialGroup);
     setEditLocationForm({
       id: location.id,
       binId: location.binId,
-      binName: location.binName,
-      binType: location.binType,
-      capacity: location.capacity || '',
+      materialGroup: location.materialGroup || '',
+      rackNumber: location.rackNumber || '',
+      rackLevel: location.rackLevel || '',
       description: location.description || ''
     });
+    setEditLocationFormShowOther(isMaterialGroupCustom);
     setEditLocationDialogOpen(true);
   };
 
   // Handle save location changes
   const handleSaveLocationChanges = async () => {
     setEditBinIdError(false);
-    setEditBinNameError(false);
-    setEditBinTypeError(false);
-    setEditCapacityError(false);
+    setEditMaterialGroupError(false);
+    setEditRackNumberError(false);
+    setEditRackLevelError(false);
 
     if (!validateBinId(editLocationForm.binId)) {
       setEditBinIdError(true);
-      setSnackbar({ open: true, message: 'Bin ID is required and must be alphanumeric', severity: 'error' });
+      setSnackbar({ open: true, message: 'Group ID is required and must be alphanumeric', severity: 'error' });
       return;
     }
 
-    if (!validateBinName(editLocationForm.binName)) {
-      setEditBinNameError(true);
-      setSnackbar({ open: true, message: 'Bin Name is required', severity: 'error' });
+    if (!editLocationForm.materialGroup || !editLocationForm.materialGroup.trim()) {
+      setEditMaterialGroupError(true);
+      setSnackbar({ open: true, message: 'Material Group is required', severity: 'error' });
       return;
     }
 
-    if (!validateBinType(editLocationForm.binType)) {
-      setEditBinTypeError(true);
-      setSnackbar({ open: true, message: 'Bin Type is required', severity: 'error' });
+    if (!validateRackNumber(editLocationForm.rackNumber)) {
+      setEditRackNumberError(true);
+      setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits', severity: 'error' });
       return;
     }
 
-    if (!validateCapacity(editLocationForm.capacity)) {
-      setEditCapacityError(true);
-      setSnackbar({ open: true, message: 'Capacity must be a positive number', severity: 'error' });
+    if (!validateRackLevel(editLocationForm.rackLevel)) {
+      setEditRackLevelError(true);
+      setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D', severity: 'error' });
       return;
     }
 
-    // Check for duplicate Bin ID or Bin Name (excluding current location)
+    // Check for duplicate Group ID (excluding current location)
     const binIdExists = storageLocations.some(l => 
       l.id !== editLocationForm.id && l.binId.toLowerCase() === editLocationForm.binId.toLowerCase()
-    );
-    const binNameExists = storageLocations.some(l => 
-      l.id !== editLocationForm.id && l.binName.toLowerCase() === editLocationForm.binName.toLowerCase()
     );
 
     if (binIdExists) {
       setEditBinIdError(true);
-      setSnackbar({ open: true, message: 'Bin ID already exists', severity: 'error' });
-      return;
-    }
-
-    if (binNameExists) {
-      setEditBinNameError(true);
-      setSnackbar({ open: true, message: 'Bin Name already exists', severity: 'error' });
+      setSnackbar({ open: true, message: 'Group ID already exists', severity: 'error' });
       return;
     }
 
     try {
       await updateDoc(doc(db, 'storageLocations', editLocationForm.id), {
         binId: editLocationForm.binId,
-        binName: editLocationForm.binName,
-        binType: editLocationForm.binType,
-        capacity: parseFloat(editLocationForm.capacity),
+        materialGroup: editLocationForm.materialGroup,
+        rackNumber: editLocationForm.rackNumber,
+        rackLevel: editLocationForm.rackLevel.toUpperCase(),
         description: editLocationForm.description
       });
 
@@ -260,6 +290,7 @@ const StorageMaster = () => {
       setStorageLocations(locationsData);
 
       setEditLocationDialogOpen(false);
+      setEditLocationFormShowOther(false);
       setSnackbar({ open: true, message: 'Storage Location updated successfully', severity: 'success' });
     } catch (error) {
       console.error('Error updating storage location:', error);
@@ -322,7 +353,7 @@ const StorageMaster = () => {
         {/* Search Box */}
         <Box sx={{ mb: 2 }}>
           <TextField
-            label="Search (Bin ID, Bin Name, Type, Description)"
+            label="Search (Group ID, Material Group, Rack Number, Rack Level, Description)"
             placeholder="Search..."
             value={searchQueryLocations}
             onChange={(e) => {
@@ -342,11 +373,11 @@ const StorageMaster = () => {
           <Table size="small">
             <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Bin ID</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Bin Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Bin Type</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Capacity</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '28%' }}>Description</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Group ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Material Group</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Rack Number</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Rack Level</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '34%' }}>Description</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -355,9 +386,9 @@ const StorageMaster = () => {
                 locationsPaginated.map((location) => (
                   <TableRow key={location.id} hover>
                     <TableCell>{location.binId}</TableCell>
-                    <TableCell>{location.binName}</TableCell>
-                    <TableCell>{location.binType}</TableCell>
-                    <TableCell>{location.capacity}</TableCell>
+                    <TableCell>{location.materialGroup}</TableCell>
+                    <TableCell>{location.rackNumber}</TableCell>
+                    <TableCell>{location.rackLevel}</TableCell>
                     <TableCell>{location.description}</TableCell>
                     <TableCell>
                       <Tooltip title="Edit">
@@ -423,8 +454,8 @@ const StorageMaster = () => {
         <h3 style={{ marginTop: 0 }}>NEW STORAGE LOCATION ENTRY</h3>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
-            label="Bin ID"
-            placeholder="Enter Bin ID"
+            label="Group ID"
+            placeholder="Enter Group ID"
             value={locationForm.binId}
             onChange={(e) => {
               setLocationForm({ ...locationForm, binId: e.target.value });
@@ -437,51 +468,89 @@ const StorageMaster = () => {
             size="small"
           />
 
+          {!locationFormShowOther ? (
+            <TextField
+              select
+              label="Material Group"
+              value={locationForm.materialGroup}
+              onChange={(e) => {
+                if (e.target.value === 'OTHER') {
+                  setLocationFormShowOther(true);
+                  setLocationForm({ ...locationForm, materialGroup: '' });
+                } else {
+                  setLocationForm({ ...locationForm, materialGroup: e.target.value });
+                }
+                setMaterialGroupError(false);
+              }}
+              error={materialGroupError}
+              helperText={materialGroupError ? 'Required' : ''}
+              fullWidth
+              required
+              size="small"
+            >
+              <MenuItem value="">-- Select Material Group --</MenuItem>
+              {materialGroupOptions.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+              <MenuItem value="OTHER">Other (Please specify)</MenuItem>
+            </TextField>
+          ) : (
+            <TextField
+              label="Material Group"
+              placeholder="Enter custom material group name"
+              value={locationForm.materialGroup}
+              onChange={(e) => {
+                setLocationForm({ ...locationForm, materialGroup: e.target.value });
+                setMaterialGroupError(false);
+              }}
+              onBlur={() => {
+                if (!locationForm.materialGroup.trim()) {
+                  setLocationFormShowOther(false);
+                  setLocationForm({ ...locationForm, materialGroup: '' });
+                }
+              }}
+              error={materialGroupError}
+              helperText={materialGroupError ? 'Required or click back to select from list' : 'Type custom value or clear to go back'}
+              fullWidth
+              required
+              size="small"
+              autoFocus
+            />
+          )}
+
           <TextField
-            label="Bin Name"
-            placeholder="Enter Bin Name"
-            value={locationForm.binName}
+            label="Rack Number"
+            placeholder="Enter Rack Number"
+            value={locationForm.rackNumber}
             onChange={(e) => {
-              setLocationForm({ ...locationForm, binName: e.target.value });
-              setBinNameError(false);
+              const value = e.target.value;
+              setLocationForm({ ...locationForm, rackNumber: value });
+              setRackNumberError(false);
             }}
-            error={binNameError}
-            helperText={binNameError ? 'Required' : ''}
+            error={rackNumberError}
+            helperText={rackNumberError ? 'Must be exactly 2 digits (e.g., 00, 01, 10)' : ''}
             fullWidth
             required
             size="small"
           />
 
           <TextField
-            label="Bin Type"
-            placeholder="Enter Bin Type"
-            value={locationForm.binType}
+            label="Rack Level"
+            placeholder="Enter Rack Level"
+            value={locationForm.rackLevel}
             onChange={(e) => {
-              setLocationForm({ ...locationForm, binType: e.target.value });
-              setBinTypeError(false);
+              const value = e.target.value.toUpperCase();
+              setLocationForm({ ...locationForm, rackLevel: value });
+              setRackLevelError(false);
             }}
-            error={binTypeError}
-            helperText={binTypeError ? 'Required' : ''}
+            error={rackLevelError}
+            helperText={rackLevelError ? 'Must be A, B, C, or D' : ''}
+            inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
             fullWidth
             required
             size="small"
-          />
-
-          <TextField
-            label="Capacity"
-            placeholder="Enter Capacity"
-            type="number"
-            value={locationForm.capacity}
-            onChange={(e) => {
-              setLocationForm({ ...locationForm, capacity: e.target.value });
-              setCapacityError(false);
-            }}
-            error={capacityError}
-            helperText={capacityError ? 'Must be a positive number' : ''}
-            fullWidth
-            required
-            size="small"
-            inputProps={{ step: 'any', min: 0 }}
           />
 
           <TextField
@@ -518,7 +587,7 @@ const StorageMaster = () => {
         <DialogContent sx={{ py: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Bin ID"
+              label="Group ID"
               value={editLocationForm.binId}
               onChange={(e) => {
                 setEditLocationForm({ ...editLocationForm, binId: e.target.value });
@@ -531,48 +600,87 @@ const StorageMaster = () => {
               size="small"
             />
 
+            {!editLocationFormShowOther ? (
+              <TextField
+                select
+                label="Material Group"
+                value={editLocationForm.materialGroup}
+                onChange={(e) => {
+                  if (e.target.value === 'OTHER') {
+                    setEditLocationFormShowOther(true);
+                    setEditLocationForm({ ...editLocationForm, materialGroup: '' });
+                  } else {
+                    setEditLocationForm({ ...editLocationForm, materialGroup: e.target.value });
+                  }
+                  setEditMaterialGroupError(false);
+                }}
+                error={editMaterialGroupError}
+                helperText={editMaterialGroupError ? 'Required' : ''}
+                fullWidth
+                required
+                size="small"
+              >
+                <MenuItem value="">-- Select Material Group --</MenuItem>
+                {materialGroupOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+                <MenuItem value="OTHER">Other (Please specify)</MenuItem>
+              </TextField>
+            ) : (
+              <TextField
+                label="Material Group"
+                placeholder="Enter custom material group name"
+                value={editLocationForm.materialGroup}
+                onChange={(e) => {
+                  setEditLocationForm({ ...editLocationForm, materialGroup: e.target.value });
+                  setEditMaterialGroupError(false);
+                }}
+                onBlur={() => {
+                  if (!editLocationForm.materialGroup.trim()) {
+                    setEditLocationFormShowOther(false);
+                    setEditLocationForm({ ...editLocationForm, materialGroup: '' });
+                  }
+                }}
+                error={editMaterialGroupError}
+                helperText={editMaterialGroupError ? 'Required or click back to select from list' : 'Type custom value or clear to go back'}
+                fullWidth
+                required
+                size="small"
+                autoFocus
+              />
+            )}
+
             <TextField
-              label="Bin Name"
-              value={editLocationForm.binName}
+              label="Rack Number"
+              value={editLocationForm.rackNumber}
               onChange={(e) => {
-                setEditLocationForm({ ...editLocationForm, binName: e.target.value });
-                setEditBinNameError(false);
+                const value = e.target.value;
+                setEditLocationForm({ ...editLocationForm, rackNumber: value });
+                setEditRackNumberError(false);
               }}
-              error={editBinNameError}
-              helperText={editBinNameError ? 'Required' : ''}
+              error={editRackNumberError}
+              helperText={editRackNumberError ? 'Must be exactly 2 digits (e.g., 00, 01, 10)' : ''}
               fullWidth
               required
               size="small"
             />
 
             <TextField
-              label="Bin Type"
-              value={editLocationForm.binType}
+              label="Rack Level"
+              value={editLocationForm.rackLevel}
               onChange={(e) => {
-                setEditLocationForm({ ...editLocationForm, binType: e.target.value });
-                setEditBinTypeError(false);
+                const value = e.target.value.toUpperCase();
+                setEditLocationForm({ ...editLocationForm, rackLevel: value });
+                setEditRackLevelError(false);
               }}
-              error={editBinTypeError}
-              helperText={editBinTypeError ? 'Required' : ''}
+              error={editRackLevelError}
+              helperText={editRackLevelError ? 'Must be A, B, C, or D' : ''}
+              inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
               fullWidth
               required
               size="small"
-            />
-
-            <TextField
-              label="Capacity"
-              type="number"
-              value={editLocationForm.capacity}
-              onChange={(e) => {
-                setEditLocationForm({ ...editLocationForm, capacity: e.target.value });
-                setEditCapacityError(false);
-              }}
-              error={editCapacityError}
-              helperText={editCapacityError ? 'Must be a positive number' : ''}
-              fullWidth
-              required
-              size="small"
-              inputProps={{ step: 'any', min: 0 }}
             />
 
             <TextField
@@ -598,14 +706,15 @@ const StorageMaster = () => {
 
       {/* Delete Storage Location Confirmation Dialog */}
       <Dialog open={deleteLocationDialogOpen} onClose={handleDeleteLocationClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete {deleteLocationTarget?.binName}?</DialogTitle>
+        <DialogTitle>Delete {deleteLocationTarget?.binId}?</DialogTitle>
         <DialogContent>
           <Box sx={{ py: 2 }}>
             <p style={{ marginTop: 0 }}>Are you sure you want to delete this storage location?</p>
             <Box sx={{ my: 2 }}>
-              <p><strong>Bin ID:</strong> {deleteLocationTarget?.binId}</p>
-              <p><strong>Bin Name:</strong> {deleteLocationTarget?.binName}</p>
-              <p><strong>Bin Type:</strong> {deleteLocationTarget?.binType}</p>
+              <p><strong>Group ID:</strong> {deleteLocationTarget?.binId}</p>
+              <p><strong>Material Group:</strong> {deleteLocationTarget?.materialGroup}</p>
+              <p><strong>Rack Number:</strong> {deleteLocationTarget?.rackNumber}</p>
+              <p><strong>Rack Level:</strong> {deleteLocationTarget?.rackLevel}</p>
             </Box>
             <Alert severity="warning" sx={{ mt: 2 }}>
               This action cannot be undone.
