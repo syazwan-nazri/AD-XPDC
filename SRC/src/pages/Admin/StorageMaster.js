@@ -11,6 +11,7 @@ import SearchIcon from '@mui/icons-material/Search';
 const StorageMaster = () => {
   const parts = useSelector(state => state.parts.parts || []);
   const [storageLocations, setStorageLocations] = useState([]);
+  const [materialGroups, setMaterialGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -58,6 +59,8 @@ const StorageMaster = () => {
   // Dialog states
   const [editLocationDialogOpen, setEditLocationDialogOpen] = useState(false);
   const [deleteLocationDialogOpen, setDeleteLocationDialogOpen] = useState(false);
+  const [editPartDialogOpen, setEditPartDialogOpen] = useState(false);
+  const [deletePartDialogOpen, setDeletePartDialogOpen] = useState(false);
   const [editLocationForm, setEditLocationForm] = useState({
     id: '',
     binId: '',
@@ -66,7 +69,19 @@ const StorageMaster = () => {
     rackLevel: '',
     description: ''
   });
+  const [editPartForm, setEditPartForm] = useState({
+    id: '',
+    sapNumber: '',
+    internalRef: '',
+    name: '',
+    category: '',
+    rackNumber: '',
+    rackLevel: '',
+    materialGroupId: '',
+    currentStock: ''
+  });
   const [deleteLocationTarget, setDeleteLocationTarget] = useState(null);
+  const [deletePartTarget, setDeletePartTarget] = useState(null);
 
   // Validation states
   const [binIdError, setBinIdError] = useState(false);
@@ -77,6 +92,8 @@ const StorageMaster = () => {
   const [editMaterialGroupError, setEditMaterialGroupError] = useState(false);
   const [editRackNumberError, setEditRackNumberError] = useState(false);
   const [editRackLevelError, setEditRackLevelError] = useState(false);
+  const [editPartRackNumberError, setEditPartRackNumberError] = useState(false);
+  const [editPartRackLevelError, setEditPartRackLevelError] = useState(false);
 
   // Pagination states for parts list
   const [pageStartWith, setPageStartWith] = useState(0);
@@ -89,6 +106,10 @@ const StorageMaster = () => {
         const locationsSnapshot = await getDocs(collection(db, 'storageLocations'));
         const locationsData = locationsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         setStorageLocations(locationsData);
+
+        const groupsSnapshot = await getDocs(collection(db, 'materialGroups'));
+        const groupsData = groupsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setMaterialGroups(groupsData);
       } catch (error) {
         console.error('Error fetching data:', error);
         setSnackbar({ open: true, message: 'Error fetching data', severity: 'error' });
@@ -335,6 +356,92 @@ const StorageMaster = () => {
     setDeleteLocationTarget(null);
   };
 
+  // Handle edit part
+  const handleEditPart = (part) => {
+    setEditPartForm({
+      id: part.id,
+      sapNumber: part.sapNumber || '',
+      internalRef: part.internalRef || '',
+      name: part.name || '',
+      category: part.category || '',
+      rackNumber: part.rackNumber || '',
+      rackLevel: part.rackLevel || '',
+      materialGroupId: part.materialGroupId || '',
+      currentStock: part.currentStock || ''
+    });
+    setEditPartRackNumberError(false);
+    setEditPartRackLevelError(false);
+    setEditPartDialogOpen(true);
+  };
+
+  // Handle save part changes (only Rack Number and Rack Level)
+  const handleSavePartChanges = async () => {
+    setEditPartRackNumberError(false);
+    setEditPartRackLevelError(false);
+
+    let hasErrors = false;
+
+    // Validate Rack Number
+    if (!validateRackNumber(editPartForm.rackNumber)) {
+      setEditPartRackNumberError(true);
+      hasErrors = true;
+    }
+
+    // Validate Rack Level
+    if (!validateRackLevel(editPartForm.rackLevel)) {
+      setEditPartRackLevelError(true);
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      setSnackbar({ open: true, message: 'Please fix the errors', severity: 'error' });
+      return;
+    }
+
+    try {
+      const { db: firebaseDb } = await import('../../firebase/config');
+      await updateDoc(doc(firebaseDb, 'parts', editPartForm.id), {
+        rackNumber: editPartForm.rackNumber,
+        rackLevel: editPartForm.rackLevel
+      });
+
+      setEditPartDialogOpen(false);
+      setSnackbar({ open: true, message: 'Part updated successfully', severity: 'success' });
+      
+      // Refresh parts data (parts are from Redux, so they will update automatically)
+    } catch (error) {
+      console.error('Error updating part:', error);
+      setSnackbar({ open: true, message: 'Error updating part', severity: 'error' });
+    }
+  };
+
+  // Handle delete part
+  const handleDeletePart = (part) => {
+    setDeletePartTarget(part);
+    setDeletePartDialogOpen(true);
+  };
+
+  // Handle confirm delete part
+  const handleConfirmDeletePart = async () => {
+    try {
+      const { db: firebaseDb } = await import('../../firebase/config');
+      await deleteDoc(doc(firebaseDb, 'parts', deletePartTarget.id));
+
+      setDeletePartDialogOpen(false);
+      setDeletePartTarget(null);
+      setSnackbar({ open: true, message: 'Part deleted successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error deleting part:', error);
+      setSnackbar({ open: true, message: 'Error deleting part', severity: 'error' });
+    }
+  };
+
+  // Handle delete part close
+  const handleDeletePartClose = () => {
+    setDeletePartDialogOpen(false);
+    setDeletePartTarget(null);
+  };
+
   // Pagination for locations
   const locationPageEnd = Math.min(pageStartLocations + pageSize, filteredLocations.length);
   const locationsPaginated = filteredLocations.slice(pageStartLocations, locationPageEnd);
@@ -379,21 +486,21 @@ const StorageMaster = () => {
       {/* Part List */}
       <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          PART LIST ({sortedParts.length} ITEMS)
+          STORAGE PART LIST ({sortedParts.length} ITEMS)
         </Typography>
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
             <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Int. Ref#</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Internal Ref No</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Part Name</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Category</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Rack Number</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>Rack Level</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Group ID</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Location</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Material Group</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Current Stock</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -408,9 +515,30 @@ const StorageMaster = () => {
                       <TableCell>{part.category}</TableCell>
                       <TableCell>{part.rackNumber || '-'}</TableCell>
                       <TableCell>{part.rackLevel || '-'}</TableCell>
-                      <TableCell>{location?.binId || '-'}</TableCell>
-                      <TableCell>{location ? `${location.rackNumber}-${location.rackLevel}` : '-'}</TableCell>
+                      <TableCell>
+                        {materialGroups.find(g => g.id === part.materialGroupId)?.materialGroup || '-'}
+                      </TableCell>
                       <TableCell>{part.currentStock}</TableCell>
+                      <TableCell>
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditPart(part)}
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeletePart(part)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -832,6 +960,126 @@ const StorageMaster = () => {
             CANCEL
           </Button>
           <Button onClick={handleConfirmDeleteLocation} variant="contained" color="error">
+            CONFIRM DELETE
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Part Dialog */}
+      <Dialog open={editPartDialogOpen} onClose={() => setEditPartDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Part Details</DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="SAP#"
+              value={editPartForm.sapNumber}
+              fullWidth
+              disabled
+              size="small"
+            />
+
+            <TextField
+              label="Internal Ref No"
+              value={editPartForm.internalRef}
+              fullWidth
+              disabled
+              size="small"
+            />
+
+            <TextField
+              label="Part Name"
+              value={editPartForm.name}
+              fullWidth
+              disabled
+              size="small"
+            />
+
+            <TextField
+              label="Category"
+              value={editPartForm.category}
+              fullWidth
+              disabled
+              size="small"
+            />
+
+            <TextField
+              label="Material Group"
+              value={materialGroups.find(g => g.id === editPartForm.materialGroupId)?.materialGroup || '-'}
+              fullWidth
+              disabled
+              size="small"
+            />
+
+            <TextField
+              label="Current Stock"
+              value={editPartForm.currentStock}
+              fullWidth
+              disabled
+              size="small"
+            />
+
+            <TextField
+              label="Rack Number"
+              placeholder="Enter Rack Number (2 digits)"
+              value={editPartForm.rackNumber}
+              onChange={(e) => {
+                setEditPartForm({ ...editPartForm, rackNumber: e.target.value });
+                setEditPartRackNumberError(false);
+              }}
+              error={editPartRackNumberError}
+              helperText={editPartRackNumberError ? 'Must be exactly 2 digits only' : ''}
+              fullWidth
+              size="small"
+              inputProps={{ maxLength: 2 }}
+            />
+
+            <TextField
+              label="Rack Level"
+              placeholder="Enter Rack Level (A, B, C, or D)"
+              value={editPartForm.rackLevel}
+              onChange={(e) => {
+                setEditPartForm({ ...editPartForm, rackLevel: e.target.value.toUpperCase() });
+                setEditPartRackLevelError(false);
+              }}
+              error={editPartRackLevelError}
+              helperText={editPartRackLevelError ? 'Must be A, B, C, or D only' : ''}
+              fullWidth
+              size="small"
+              inputProps={{ maxLength: 1 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setEditPartDialogOpen(false)} variant="outlined">
+            CANCEL
+          </Button>
+          <Button onClick={handleSavePartChanges} variant="contained">
+            SAVE CHANGES
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Part Confirmation Dialog */}
+      <Dialog open={deletePartDialogOpen} onClose={handleDeletePartClose} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete {deletePartTarget?.name}?</DialogTitle>
+        <DialogContent>
+          <Box sx={{ py: 2 }}>
+            <p style={{ marginTop: 0 }}>Are you sure you want to delete this part?</p>
+            <Box sx={{ my: 2 }}>
+              <p><strong>SAP#:</strong> {deletePartTarget?.sapNumber}</p>
+              <p><strong>Internal Ref No:</strong> {deletePartTarget?.internalRef}</p>
+              <p><strong>Part Name:</strong> {deletePartTarget?.name}</p>
+            </Box>
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This action cannot be undone.
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleDeletePartClose} variant="outlined">
+            CANCEL
+          </Button>
+          <Button onClick={handleConfirmDeletePart} variant="contained" color="error">
             CONFIRM DELETE
           </Button>
         </DialogActions>
