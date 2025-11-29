@@ -117,7 +117,7 @@ const PartMaster = () => {
 
   // Filtered parts
   const filteredParts = useMemo(() => {
-    return parts.filter(p => {
+    const filtered = parts.filter(p => {
       const matchesSearch = 
         (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (p.sapNumber && p.sapNumber.includes(searchQuery)) ||
@@ -127,6 +127,24 @@ const PartMaster = () => {
       const matchesRackLevel = filterRackLevel ? p.rackLevel === filterRackLevel : true;
       
       return matchesSearch && matchesCategory && matchesRackLevel;
+    });
+
+    // Sort: low stock items at top, then by SAP# numerically
+    return filtered.sort((a, b) => {
+      // Parse SAP# for numeric comparison
+      const sapA = parseInt(a.sapNumber || '0') || 0;
+      const sapB = parseInt(b.sapNumber || '0') || 0;
+      
+      // Determine if each is low stock (currentStock < safetyLevel)
+      const aIsLowStock = (a.currentStock || 0) < (a.safetyLevel || 0);
+      const bIsLowStock = (b.currentStock || 0) < (b.safetyLevel || 0);
+      
+      // Low stock items come first
+      if (aIsLowStock && !bIsLowStock) return -1;
+      if (!aIsLowStock && bIsLowStock) return 1;
+      
+      // If both are low stock or both are not, sort by SAP# (descending - higher numbers at top)
+      return sapB - sapA;
     });
   }, [parts, searchQuery, filterCategory, filterRackLevel]);
 

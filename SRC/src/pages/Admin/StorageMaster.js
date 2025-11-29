@@ -339,9 +339,30 @@ const StorageMaster = () => {
   const locationPageEnd = Math.min(pageStartLocations + pageSize, filteredLocations.length);
   const locationsPaginated = filteredLocations.slice(pageStartLocations, locationPageEnd);
 
+  // Sort parts: low stock items at top, then by SAP# sequence
+  const sortedParts = useMemo(() => {
+    const sorted = [...parts].sort((a, b) => {
+      // Parse SAP# for numeric comparison (extract numeric part)
+      const sapA = parseInt(a.sapNumber || '0') || 0;
+      const sapB = parseInt(b.sapNumber || '0') || 0;
+      
+      // Determine if each is low stock (currentStock < safetyLevel)
+      const aIsLowStock = (a.currentStock || 0) < (a.safetyLevel || 0);
+      const bIsLowStock = (b.currentStock || 0) < (b.safetyLevel || 0);
+      
+      // Low stock items come first
+      if (aIsLowStock && !bIsLowStock) return -1;
+      if (!aIsLowStock && bIsLowStock) return 1;
+      
+      // If both are low stock or both are not, sort by SAP# (descending - higher numbers at top)
+      return sapB - sapA;
+    });
+    return sorted;
+  }, [parts]);
+
   // Pagination for parts - show all parts
-  const pageEndWith = Math.min(pageStartWith + pageSize, parts.length);
-  const partsPaginatedWith = parts.slice(pageStartWith, pageEndWith);
+  const pageEndWith = Math.min(pageStartWith + pageSize, sortedParts.length);
+  const partsPaginatedWith = sortedParts.slice(pageStartWith, pageEndWith);
 
   if (loading) {
     return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
@@ -358,7 +379,7 @@ const StorageMaster = () => {
       {/* Part List */}
       <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          PART LIST ({parts.length} ITEMS)
+          PART LIST ({sortedParts.length} ITEMS)
         </Typography>
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
@@ -417,7 +438,7 @@ const StorageMaster = () => {
             <Button
               variant="outlined"
               size="small"
-              disabled={pageEndWith >= parts.length}
+              disabled={pageEndWith >= sortedParts.length}
               onClick={() => setPageStartWith(pageStartWith + pageSize)}
               sx={{ ml: 1 }}
             >
@@ -425,7 +446,7 @@ const StorageMaster = () => {
             </Button>
           </Box>
           <Typography variant="body2" sx={{ color: '#666' }}>
-            Showing {parts.length > 0 ? pageStartWith + 1 : 0}-{pageEndWith} of {parts.length} items
+            Showing {sortedParts.length > 0 ? pageStartWith + 1 : 0}-{pageEndWith} of {sortedParts.length} items
           </Typography>
         </Box>
       </Paper>
