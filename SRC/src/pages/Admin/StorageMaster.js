@@ -114,7 +114,8 @@ const StorageMaster = () => {
   // Validate Bin ID (alphanumeric, required)
   const validateBinId = (value) => {
     if (!value) return false;
-    return /^[A-Za-z0-9_-]+$/.test(value);
+    // Exactly 4 alphabets only (no numbers, no special characters)
+    return /^[A-Za-z]{4}$/.test(value);
   };
 
   // Validate Rack Number (2 digits only)
@@ -247,7 +248,7 @@ const StorageMaster = () => {
 
     if (!validateBinId(editLocationForm.binId)) {
       setEditBinIdError(true);
-      setSnackbar({ open: true, message: 'Group ID is required and must be alphanumeric', severity: 'error' });
+      setSnackbar({ open: true, message: 'Group ID must be exactly 4 alphabets only', severity: 'error' });
       return;
     }
 
@@ -367,8 +368,8 @@ const StorageMaster = () => {
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Int. Ref#</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Part Name</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Category</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Part Rack#</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>Part Level</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Rack Number</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>Rack Level</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Group ID</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock</TableCell>
@@ -546,7 +547,7 @@ const StorageMaster = () => {
               setBinIdError(false);
             }}
             error={binIdError}
-            helperText={binIdError ? 'Required, alphanumeric only' : ''}
+            helperText={binIdError ? 'Must be exactly 4 alphabets only' : ''}
             fullWidth
             required
             size="small"
@@ -678,7 +679,7 @@ const StorageMaster = () => {
                 setEditBinIdError(false);
               }}
               error={editBinIdError}
-              helperText={editBinIdError ? 'Required, alphanumeric only' : ''}
+              helperText={editBinIdError ? 'Must be exactly 4 alphabets only' : ''}
               fullWidth
               required
               size="small"
