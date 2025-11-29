@@ -17,6 +17,7 @@ const PartGroupMaster = () => {
   // Part List states
   const [searchQueryParts, setSearchQueryParts] = useState('');
   const [pageStartParts, setPageStartParts] = useState(0);
+  const [pageStartPartsWithGroup, setPageStartPartsWithGroup] = useState(0);
   const pageSize = 50;
 
   // Material Group List states
@@ -88,6 +89,19 @@ const PartGroupMaster = () => {
   // Filtered parts pending verification (parts without material group assigned)
   const filteredPartsPending = useMemo(() => {
     return parts.filter(p => {
+      if (p.materialGroupId) return false; // Only show parts without material group
+      const matchesSearch =
+        (p.name && p.name.toLowerCase().includes(searchQueryParts.toLowerCase())) ||
+        (p.sapNumber && p.sapNumber.includes(searchQueryParts)) ||
+        (p.internalRef && p.internalRef.toLowerCase().includes(searchQueryParts.toLowerCase()));
+      return matchesSearch;
+    });
+  }, [parts, searchQueryParts]);
+
+  // Filtered parts with material group assigned
+  const filteredPartsWithGroup = useMemo(() => {
+    return parts.filter(p => {
+      if (!p.materialGroupId) return false; // Only show parts with material group
       const matchesSearch =
         (p.name && p.name.toLowerCase().includes(searchQueryParts.toLowerCase())) ||
         (p.sapNumber && p.sapNumber.includes(searchQueryParts)) ||
@@ -350,6 +364,10 @@ const PartGroupMaster = () => {
   const partPageEnd = Math.min(pageStartParts + pageSize, filteredPartsPending.length);
   const partsPaginated = filteredPartsPending.slice(pageStartParts, partPageEnd);
 
+  // Pagination for parts with group
+  const partWithGroupPageEnd = Math.min(pageStartPartsWithGroup + pageSize, filteredPartsWithGroup.length);
+  const partsWithGroupPaginated = filteredPartsWithGroup.slice(pageStartPartsWithGroup, partWithGroupPageEnd);
+
   // Pagination for groups
   const groupPageEnd = Math.min(pageStartGroups + pageSize, filteredGroups.length);
   const groupsPaginated = filteredGroups.slice(pageStartGroups, groupPageEnd);
@@ -366,10 +384,10 @@ const PartGroupMaster = () => {
         </Box>
       </Paper>
 
-      {/* Part List Pending Verify */}
+      {/* Part List Without Material Group */}
       <Paper elevation={1} sx={{ p: 2, mb: 3, mx: 0 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          PART LIST PENDING VERIFY ({filteredPartsPending.length} ITEMS)
+          PART LIST WITHOUT MATERIAL GROUP ({filteredPartsPending.length} ITEMS)
         </Typography>
 
         {/* Search Box */}
@@ -476,6 +494,96 @@ const PartGroupMaster = () => {
           </Box>
           <Typography variant="body2" sx={{ color: '#666' }}>
             Showing {filteredPartsPending.length > 0 ? pageStartParts + 1 : 0}-{partPageEnd} of {filteredPartsPending.length} items
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* Part List with Material Group */}
+      <Paper elevation={1} sx={{ p: 2, mb: 3, mx: 0 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+          PART LIST WITH MATERIAL GROUP ({filteredPartsWithGroup.length} ITEMS)
+        </Typography>
+
+        {/* Parts Table */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table size="small">
+            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Int.Ref</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Category</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Material Group</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '13%' }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {partsWithGroupPaginated.length > 0 ? (
+                partsWithGroupPaginated.map((part) => (
+                  <TableRow key={part.id} hover>
+                    <TableCell>{part.sapNumber}</TableCell>
+                    <TableCell>{part.internalRef}</TableCell>
+                    <TableCell>{part.name}</TableCell>
+                    <TableCell>{part.category}</TableCell>
+                    <TableCell>
+                      {materialGroups.find(g => g.id === part.materialGroupId)?.materialGroup || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title="Edit Material Group">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditPart(part)}
+                          sx={{ mr: 1 }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeletePart(part)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#999' }}>
+                    No parts found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </Box>
+
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+          <Box>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setPageStartPartsWithGroup(Math.max(0, pageStartPartsWithGroup - pageSize))}
+              disabled={pageStartPartsWithGroup === 0}
+              sx={{ mr: 1 }}
+            >
+              &lt;&lt; Previous
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setPageStartPartsWithGroup(pageStartPartsWithGroup + pageSize)}
+              disabled={partWithGroupPageEnd >= filteredPartsWithGroup.length}
+            >
+              Next &gt;&gt;
+            </Button>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            Showing {filteredPartsWithGroup.length > 0 ? pageStartPartsWithGroup + 1 : 0}-{partWithGroupPageEnd} of {filteredPartsWithGroup.length} items
           </Typography>
         </Box>
       </Paper>
