@@ -10,11 +10,20 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
+<<<<<<< HEAD
 import { useNavigate } from 'react-router-dom';
+=======
+import { useNavigate, useLocation } from 'react-router-dom';
+>>>>>>> refs/remotes/origin/main
 
 const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const navigate = useNavigate();
+<<<<<<< HEAD
+=======
+  const location = useLocation();
+
+>>>>>>> refs/remotes/origin/main
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
   };
@@ -38,12 +47,22 @@ const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
         >
           <MenuIcon />
         </IconButton>
+<<<<<<< HEAD
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+=======
+        <Typography 
+          variant="h6" 
+          component="div" 
+          sx={{ flexGrow: 1, cursor: 'pointer' }}
+          onClick={() => navigate('/reports/dashboard-kpis')}
+        >
+>>>>>>> refs/remotes/origin/main
           SIMS - Store Inventory Management System
         </Typography>
         <IconButton color="inherit" onClick={toggleTheme} size="large">
           {theme === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
         </IconButton>
+<<<<<<< HEAD
         <Box sx={{ ml: 2 }}>
           <IconButton color="inherit" size="large" onClick={handleMenu}>
             <AccountCircle />
@@ -62,6 +81,30 @@ const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
             )}
           </Menu>
         </Box>
+=======
+        {location.pathname !== '/login' && (
+          <Box sx={{ ml: 2 }}>
+            <IconButton color="inherit" size="large" onClick={handleMenu}>
+              <AccountCircle />
+            </IconButton>
+            <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={handleClose}>
+              {!user ? (
+                [
+                  <MenuItem key="login" onClick={() => { handleClose(); navigate('/login'); }}>Login</MenuItem>,
+                  // Register option removed as there is no public registration
+                  // <MenuItem key="register" onClick={() => { handleClose(); navigate('/register'); }}>Register</MenuItem>
+                ]
+              ) : (
+                [
+                  <MenuItem key="email" disabled>{user.email || 'Not logged in'}</MenuItem>,
+                  <MenuItem key="change-password" onClick={() => { handleClose(); navigate('/change-password'); }}>Change Password</MenuItem>,
+                  <MenuItem key="logout" onClick={handleLogout}>Logout</MenuItem>
+                ]
+              )}
+            </Menu>
+          </Box>
+        )}
+>>>>>>> refs/remotes/origin/main
       </Toolbar>
     </AppBar>
   );

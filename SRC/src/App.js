@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useMemo, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Provider, useDispatch, useSelector } from 'react-redux';
@@ -25,6 +26,57 @@ import UserManagement from './pages/Admin/UserManagement';
 import UserGroupMaster from './pages/Admin/UserGroupMaster';
 
 const drawerWidth = 220;
+=======
+import React, { useMemo, useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+  Navigate,
+} from "react-router-dom";
+import { Provider, useDispatch, useSelector } from "react-redux";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import store from "./redux/store";
+import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
+import NotFound from "./pages/NotFound";
+import PartMaster from "./pages/Admin/PartMaster";
+import PartGroupMaster from "./pages/Admin/PartGroupMaster";
+import StorageMaster from "./pages/Admin/StorageMaster";
+import Login from "./pages/Auth/Login";
+import { Roles } from "./utils/roles";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "./firebase/config";
+import { setUser, logout } from "./redux/authSlice";
+import { syncUserGroups, syncUserData, getUserDocByUid } from "./utils/userManagement";
+import CircularProgress from "@mui/material/CircularProgress";
+import UserManagement from "./pages/Admin/UserManagement";
+import UserGroupMaster from "./pages/Admin/UserGroupMaster";
+import Home from "./pages/Home";
+import DashboardKPIs from "./pages/Reports/DashboardKPIs";
+import SupplierMaster from "./pages/Admin/SupplierMaster";
+import MachineMaster from "./pages/Admin/MachineMaster";
+import StockIn from "./pages/Inventory/StockIn";
+import StockOut from "./pages/Inventory/StockOut";
+import InternalTransfer from "./pages/Inventory/InternalTransfer";
+import MovementLog from "./pages/Inventory/MovementLog";
+import MRF from "./pages/Inventory/MRF";
+import StockTake from "./pages/Inventory/StockTake";
+import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
+import StockValuationReport from "./pages/Reports/StockValuationReport";
+import TraceabilityReport from "./pages/Reports/TraceabilityReport";
+import ChangePassword from "./pages/Auth/ChangePassword";
+
+const drawerWidth = 260;
+>>>>>>> refs/remotes/origin/main
 const collapsedWidth = 64;
 
 function AuthGuard({ authReady, children }) {
@@ -34,6 +86,11 @@ function AuthGuard({ authReady, children }) {
 
   useEffect(() => {
     if (!authReady) return; // do nothing until auth state is checked
+<<<<<<< HEAD
+=======
+
+    // 1. Not logged in -> Redirect to login
+>>>>>>> refs/remotes/origin/main
     if (
       !user &&
       location.pathname !== "/login" &&
@@ -41,14 +98,35 @@ function AuthGuard({ authReady, children }) {
       location.pathname !== "/reset-password"
     ) {
       navigate("/login");
+<<<<<<< HEAD
     }
+=======
+      return;
+    }
+
+    // 2. Logged in but MUST change password -> Redirect to change-password
+    if (user && user.mustChangePassword && location.pathname !== "/change-password") {
+      navigate("/change-password");
+      return;
+    }
+
+    // 3. Logged in and on auth pages -> Redirect to home (or change-password if needed)
+>>>>>>> refs/remotes/origin/main
     if (
       user &&
       (location.pathname === "/login" ||
         location.pathname === "/forgot-password" ||
         location.pathname === "/reset-password")
     ) {
+<<<<<<< HEAD
       navigate("/");
+=======
+      if (user.mustChangePassword) {
+        navigate("/change-password");
+      } else {
+        navigate("/");
+      }
+>>>>>>> refs/remotes/origin/main
     }
   }, [user, location.pathname, navigate, authReady]);
   return children;
@@ -73,6 +151,7 @@ function AppShell() {
     init();
   }, []);
 
+<<<<<<< HEAD
   // Initialize user groups
   useEffect(() => {
     const init = async () => {
@@ -85,6 +164,8 @@ function AppShell() {
     init();
   }, []);
 
+=======
+>>>>>>> refs/remotes/origin/main
   const location = useLocation();
   // Sidebar open/collapse (start CLOSED!)
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -120,6 +201,10 @@ function AppShell() {
               groupId: userData.groupId || null,
               username: userData.username || null,
               department: userData.department || null,
+<<<<<<< HEAD
+=======
+              mustChangePassword: userData.mustChangePassword || false,
+>>>>>>> refs/remotes/origin/main
             })
           );
         } else {
@@ -210,6 +295,7 @@ function AppShell() {
               flexGrow: 1,
               p: 3,
               transition: "margin 0.2s",
+<<<<<<< HEAD
               width: "100vw",
               marginLeft:
                 !user || isMobile
@@ -219,10 +305,18 @@ function AppShell() {
                   : `${collapsedWidth}px`,
               minHeight: "100vh",
               background: theme.palette.background.default,
+=======
+              width: "100%",
+              minWidth: 0, // Crucial for flex items to shrink below content size
+              minHeight: "100vh",
+              background: theme.palette.background.default,
+              overflowX: "hidden",
+>>>>>>> refs/remotes/origin/main
             })}
           >
             {/* Offset for fixed AppBar */}
             <Box sx={{ minHeight: 64 }} />
+<<<<<<< HEAD
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
@@ -233,6 +327,49 @@ function AppShell() {
                 <Route path="/admin/part-master" element={<PartMaster />} />
                 {/* Other admin protected routes */}
               </Route>
+=======
+
+            <Routes>
+              <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+                <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
+                <Route path="/reports/traceability-report" element={<TraceabilityReport />} />
+                <Route path="/reports/stock-movement" element={<TraceabilityReport />} /> {/* Reuse Traceability for now */}
+                <Route path="/reports/low-stock" element={<DashboardKPIs />} /> {/* Reuse Dashboard for now as it has Low Stock card */}
+                <Route path="/change-password" element={<ChangePassword />} />
+              </Route>
+              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
+                <Route path="/admin/user-master" element={<UserManagement />} />
+                <Route
+                  path="/admin/user-group-master"
+                  element={<UserGroupMaster />}
+                />
+                <Route path="/admin/part-master" element={<PartMaster />} />
+                <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
+                <Route path="/admin/bin-master" element={<StorageMaster />} />
+                <Route path="/admin/supplier-master" element={<SupplierMaster />} />
+                <Route path="/admin/machine-master" element={<MachineMaster />} />
+                {/* Other admin protected routes */}
+              </Route>
+              
+              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
+                 <Route path="/inventory/stock-in" element={<StockIn />} />
+                 <Route path="/inventory/stock-out" element={<StockOut />} />
+                 <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
+                 <Route path="/inventory/movement-logs" element={<MovementLog />} />
+                 <Route path="/inventory/mrf" element={<MRF />} />
+                 <Route path="/inventory/stock-take" element={<StockTake />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
+                 <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
+              </Route>
+
+>>>>>>> refs/remotes/origin/main
               {/* Other role-protected routes here */}
               <Route path="*" element={<NotFound />} />
             </Routes>
