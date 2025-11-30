@@ -734,12 +734,10 @@ const PartMaster = () => {
         </Box>
         {/* SAP# mismatch dialog */}
         <Dialog open={sapDialogOpen} onClose={handleSapDialogClose}>
-          <DialogTitle>Warning: SAP # Not Current Running Number</DialogTitle>
+          <DialogTitle>SAP # Sequence Mismatch</DialogTitle>
           <DialogContent>
             <Typography gutterBottom>
-              The SAP # you entered (<b>{form.sapNumber}</b>) is not the current running number.<br/>
-              The current running SAP # should be: <b>{currentRunningSap}</b>.<br/>
-              Do you want to continue with your entered SAP #, or edit it back to the running number?
+              The entered SAP # (<b>{form.sapNumber}</b>) does not match the current system sequence. The correct number to use is <b>{currentRunningSap}</b>. Please revise your entry.
             </Typography>
           </DialogContent>
           <DialogActions>
