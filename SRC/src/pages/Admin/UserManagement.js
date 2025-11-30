@@ -236,29 +236,12 @@ const UserManagement = () => {
     );
 
   return (
-    <Box
-      sx={{
-        maxWidth: 950,
-        mx: "auto",
-        mt: 4,
-        p: 3,
-        bgcolor: "background.paper",
-        borderRadius: 2,
-        boxShadow: 2,
-      }}
-    >
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        mb={2}
-      >
-        <Typography variant="h5">User Master</Typography>
-        {isAdmin && (
-          <Button variant="contained" onClick={openAdd}>
-            Add User
-          </Button>
-        )}
+    <Box p={2}>
+      <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+        <Typography variant="h6">User Management</Typography>
+        <Button variant="contained" color="primary" onClick={openAdd}>
+          Add User
+        </Button>
       </Box>
 
       {/* DataGrid Table */}
