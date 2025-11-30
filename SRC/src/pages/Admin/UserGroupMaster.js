@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
-<<<<<<< HEAD
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
-=======
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where } from 'firebase/firestore';
->>>>>>> refs/remotes/origin/main
 import { Roles } from '../../utils/roles';
 import { DataGrid } from '@mui/x-data-grid';
 import Button from '@mui/material/Button';
@@ -110,9 +106,6 @@ const UserGroupMaster = () => {
   const handleSave = async () => {
     const { groupId, groupName, description, department, id } = modal.data;
     if (!groupId || !groupName) return setSnackbar({ open: true, msg: 'Group ID and Name required!', severity: 'error' });
-<<<<<<< HEAD
-    try {
-=======
 
     try {
       // Check for duplicate Group ID (only for new groups)
@@ -133,7 +126,6 @@ const UserGroupMaster = () => {
          return setSnackbar({ open: true, msg: 'Group Name already exists!', severity: 'error' });
       }
 
->>>>>>> refs/remotes/origin/main
       if (modal.edit) {
         // Use groupId as document ID for consistency
         await setDoc(doc(db, 'groups', id), { 

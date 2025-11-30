@@ -1,32 +1,3 @@
-<<<<<<< HEAD
-import React, { useMemo, useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { Provider, useDispatch, useSelector } from 'react-redux';
-import Box from '@mui/material/Box';
-import CssBaseline from '@mui/material/CssBaseline';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery';
-import store from './redux/store';
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import ProtectedRoute from './components/ProtectedRoute';
-import Register from './pages/Auth/Register';
-import NotFound from './pages/NotFound';
-import PartMaster from './pages/Admin/PartMaster';
-import Login from './pages/Auth/Login';
-import { Roles } from './utils/roles';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, db } from './firebase/config';
-import { setUser, logout } from './redux/authSlice';
-import { initializeUserGroups } from './utils/initializeGroups';
-import { syncUserGroups, syncUserData, getUserDocByUid } from './utils/userManagement';
-import { doc, getDoc } from 'firebase/firestore';
-import CircularProgress from '@mui/material/CircularProgress';
-import UserManagement from './pages/Admin/UserManagement';
-import UserGroupMaster from './pages/Admin/UserGroupMaster';
-
-const drawerWidth = 220;
-=======
 import React, { useMemo, useState, useEffect } from "react";
 import {
   BrowserRouter as Router,
@@ -76,7 +47,6 @@ import TraceabilityReport from "./pages/Reports/TraceabilityReport";
 import ChangePassword from "./pages/Auth/ChangePassword";
 
 const drawerWidth = 260;
->>>>>>> refs/remotes/origin/main
 const collapsedWidth = 64;
 
 function AuthGuard({ authReady, children }) {
@@ -86,11 +56,8 @@ function AuthGuard({ authReady, children }) {
 
   useEffect(() => {
     if (!authReady) return; // do nothing until auth state is checked
-<<<<<<< HEAD
-=======
 
     // 1. Not logged in -> Redirect to login
->>>>>>> refs/remotes/origin/main
     if (
       !user &&
       location.pathname !== "/login" &&
@@ -98,9 +65,6 @@ function AuthGuard({ authReady, children }) {
       location.pathname !== "/reset-password"
     ) {
       navigate("/login");
-<<<<<<< HEAD
-    }
-=======
       return;
     }
 
@@ -111,22 +75,17 @@ function AuthGuard({ authReady, children }) {
     }
 
     // 3. Logged in and on auth pages -> Redirect to home (or change-password if needed)
->>>>>>> refs/remotes/origin/main
     if (
       user &&
       (location.pathname === "/login" ||
         location.pathname === "/forgot-password" ||
         location.pathname === "/reset-password")
     ) {
-<<<<<<< HEAD
-      navigate("/");
-=======
       if (user.mustChangePassword) {
         navigate("/change-password");
       } else {
         navigate("/");
       }
->>>>>>> refs/remotes/origin/main
     }
   }, [user, location.pathname, navigate, authReady]);
   return children;
@@ -151,21 +110,6 @@ function AppShell() {
     init();
   }, []);
 
-<<<<<<< HEAD
-  // Initialize user groups
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await initializeUserGroups();
-      } catch (error) {
-        console.error('Failed to initialize user groups:', error);
-      }
-    };
-    init();
-  }, []);
-
-=======
->>>>>>> refs/remotes/origin/main
   const location = useLocation();
   // Sidebar open/collapse (start CLOSED!)
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -201,10 +145,7 @@ function AppShell() {
               groupId: userData.groupId || null,
               username: userData.username || null,
               department: userData.department || null,
-<<<<<<< HEAD
-=======
               mustChangePassword: userData.mustChangePassword || false,
->>>>>>> refs/remotes/origin/main
             })
           );
         } else {
@@ -295,39 +236,15 @@ function AppShell() {
               flexGrow: 1,
               p: 3,
               transition: "margin 0.2s",
-<<<<<<< HEAD
-              width: "100vw",
-              marginLeft:
-                !user || isMobile
-                  ? 0
-                  : sidebarOpen
-                  ? `${drawerWidth}px`
-                  : `${collapsedWidth}px`,
-              minHeight: "100vh",
-              background: theme.palette.background.default,
-=======
               width: "100%",
               minWidth: 0, // Crucial for flex items to shrink below content size
               minHeight: "100vh",
               background: theme.palette.background.default,
               overflowX: "hidden",
->>>>>>> refs/remotes/origin/main
             })}
           >
             {/* Offset for fixed AppBar */}
             <Box sx={{ minHeight: 64 }} />
-<<<<<<< HEAD
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} /> }>
-                <Route path="/admin/user-master" element={<UserManagement />} />
-                <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
-                <Route path="/admin/part-master" element={<PartMaster />} />
-                {/* Other admin protected routes */}
-              </Route>
-=======
 
             <Routes>
               <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
@@ -369,7 +286,6 @@ function AppShell() {
                  <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
               </Route>
 
->>>>>>> refs/remotes/origin/main
               {/* Other role-protected routes here */}
               <Route path="*" element={<NotFound />} />
             </Routes>

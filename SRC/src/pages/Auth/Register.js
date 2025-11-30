@@ -6,7 +6,6 @@ import {
   Box,
   Alert,
   CircularProgress,
-<<<<<<< HEAD
   Select,
   MenuItem,
   FormControl,
@@ -74,49 +73,13 @@ const Register = () => {
       navigate("/login"); // Redirect to login after registration
     } catch (err) {
       setError(err.message);
-=======
-} from "@mui/material";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "../../firebase/config";
-import { useNavigate, Link } from "react-router-dom";
-
-const ForgotPassword = () => {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
-    if (!email) {
-      setError("Email is required");
-      return;
-    }
-    setError("");
-    setSuccess("");
-    setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccess("Password reset email sent! Please check your inbox.");
-      setTimeout(() => {
-        navigate("/login");
-      }, 3000);
-    } catch (err) {
-      setError(err.message);
-    } finally {
->>>>>>> refs/remotes/origin/main
       setLoading(false);
     }
   };
 
   return (
     <Box
-<<<<<<< HEAD
       maxWidth={400}
-=======
-      maxWidth={360}
->>>>>>> refs/remotes/origin/main
       mx="auto"
       my={8}
       p={4}
@@ -125,19 +88,9 @@ const ForgotPassword = () => {
       bgcolor="background.paper"
     >
       <Typography variant="h5" mb={2}>
-<<<<<<< HEAD
         Register
       </Typography>
       <form onSubmit={handleRegister}>
-=======
-        Forgot Password
-      </Typography>
-      <Typography variant="body2" mb={3} color="text.secondary">
-        Enter your email address and we'll send you a link to reset your
-        password.
-      </Typography>
-      <form onSubmit={handleForgotPassword}>
->>>>>>> refs/remotes/origin/main
         <TextField
           label="Email"
           type="email"
@@ -147,7 +100,6 @@ const ForgotPassword = () => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-<<<<<<< HEAD
         <TextField
           label="Username"
           fullWidth
@@ -193,18 +145,6 @@ const ForgotPassword = () => {
             {error}
           </Alert>
         )}
-=======
-        {error && (
-          <Alert severity="error" sx={{ mt: 1 }}>
-            {error}
-          </Alert>
-        )}
-        {success && (
-          <Alert severity="success" sx={{ mt: 1 }}>
-            {success}
-          </Alert>
-        )}
->>>>>>> refs/remotes/origin/main
         <Button
           type="submit"
           variant="contained"
