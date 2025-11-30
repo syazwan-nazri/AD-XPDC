@@ -39,6 +39,8 @@ import StockIn from "./pages/Inventory/StockIn";
 import StockOut from "./pages/Inventory/StockOut";
 import InternalTransfer from "./pages/Inventory/InternalTransfer";
 import MovementLog from "./pages/Inventory/MovementLog";
+import MRF from "./pages/Inventory/MRF";
+import StockTake from "./pages/Inventory/StockTake";
 import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
 import StockValuationReport from "./pages/Reports/StockValuationReport";
 import TraceabilityReport from "./pages/Reports/TraceabilityReport";
@@ -260,6 +262,8 @@ function AppShell() {
                  <Route path="/inventory/stock-out" element={<StockOut />} />
                  <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
                  <Route path="/inventory/movement-logs" element={<MovementLog />} />
+                 <Route path="/inventory/mrf" element={<MRF />} />
+                 <Route path="/inventory/stock-take" element={<StockTake />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
