@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBjOXPlypNVC6cDqDA8azZ_7HsGMt7Pb-4",
   authDomain: "sims-e02dc.firebaseapp.com",
   projectId: "sims-e02dc",

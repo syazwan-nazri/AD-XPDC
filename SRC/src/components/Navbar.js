@@ -10,11 +10,13 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
   };
@@ -49,25 +51,28 @@ const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
         <IconButton color="inherit" onClick={toggleTheme} size="large">
           {theme === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
         </IconButton>
-        <Box sx={{ ml: 2 }}>
-          <IconButton color="inherit" size="large" onClick={handleMenu}>
-            <AccountCircle />
-          </IconButton>
-          <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={handleClose}>
-            {!user ? (
-              [
-                <MenuItem key="login" onClick={() => { handleClose(); navigate('/login'); }}>Login</MenuItem>,
-                <MenuItem key="register" onClick={() => { handleClose(); navigate('/register'); }}>Register</MenuItem>
-              ]
-            ) : (
-              [
-                <MenuItem key="email" disabled>{user.email || 'Not logged in'}</MenuItem>,
-                <MenuItem key="change-password" onClick={() => { handleClose(); navigate('/change-password'); }}>Change Password</MenuItem>,
-                <MenuItem key="logout" onClick={handleLogout}>Logout</MenuItem>
-              ]
-            )}
-          </Menu>
-        </Box>
+        {location.pathname !== '/login' && (
+          <Box sx={{ ml: 2 }}>
+            <IconButton color="inherit" size="large" onClick={handleMenu}>
+              <AccountCircle />
+            </IconButton>
+            <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={handleClose}>
+              {!user ? (
+                [
+                  <MenuItem key="login" onClick={() => { handleClose(); navigate('/login'); }}>Login</MenuItem>,
+                  // Register option removed as there is no public registration
+                  // <MenuItem key="register" onClick={() => { handleClose(); navigate('/register'); }}>Register</MenuItem>
+                ]
+              ) : (
+                [
+                  <MenuItem key="email" disabled>{user.email || 'Not logged in'}</MenuItem>,
+                  <MenuItem key="change-password" onClick={() => { handleClose(); navigate('/change-password'); }}>Change Password</MenuItem>,
+                  <MenuItem key="logout" onClick={handleLogout}>Logout</MenuItem>
+                ]
+              )}
+            </Menu>
+          </Box>
+        )}
       </Toolbar>
     </AppBar>
   );

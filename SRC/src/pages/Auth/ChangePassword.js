@@ -17,8 +17,9 @@ import {
 import { collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 import bcrypt from "bcryptjs";
 import { auth, db } from "../../firebase/config";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { setUser } from "../../redux/authSlice";
 
 const PASSWORD_HISTORY_FIELDS = ["lastPasswords", "passwordHistory"];
 
@@ -31,6 +32,7 @@ const ChangePassword = () => {
   const [loading, setLoading] = useState(false);
   const user = useSelector((state) => state.auth.user);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const validatePassword = (password) => {
     if (password.length < 6) return "Password must be at least 6 characters.";
@@ -112,10 +114,14 @@ const ChangePassword = () => {
         await updateDoc(userDocRef, {
           lastPasswords: updatedHistory,
           lastUpdated: new Date().toISOString(),
+          mustChangePassword: false, // Reset the flag
         });
       }
 
       setSuccess("Password changed successfully!");
+      
+      // Update Redux state immediately
+      dispatch(setUser({ ...user, mustChangePassword: false }));
       
       // Clear form
       setOldPassword("");

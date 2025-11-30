@@ -7,13 +7,28 @@ import {
   deleteDoc,
   doc,
   setDoc,
+  query,
+  where,
 } from "firebase/firestore";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, getAuth } from "firebase/auth";
+import { initializeApp, deleteApp } from "firebase/app";
+// import { firebaseConfig } from "../../firebase/config"; 
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBjOXPlypNVC6cDqDA8azZ_7HsGMt7Pb-4",
+  authDomain: "sims-e02dc.firebaseapp.com",
+  projectId: "sims-e02dc",
+  storageBucket: "sims-e02dc.firebasestorage.app",
+  messagingSenderId: "782175512315",
+  appId: "1:782175512315:web:be2fb5883bd3191d32325e",
+  measurementId: "G-NTWRQF93YV"
+};
 import { DataGrid } from "@mui/x-data-grid";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -52,6 +67,13 @@ const UserManagement = () => {
     open: false,
     msg: "",
     severity: "success",
+  });
+
+  // State for showing generated password
+  const [createdUserDialog, setCreatedUserDialog] = useState({
+    open: false,
+    email: "",
+    password: "",
   });
 
   const fetchUsers = async () => {
@@ -109,17 +131,26 @@ const UserManagement = () => {
       },
     });
   };
-  const closeModal = () =>
-    setModal({ open: false, edit: false, data: defaultForm });
+
+  // Helper to generate random password
+  const generatePassword = (length = 8) => {
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+    let retVal = "";
+    for (let i = 0, n = charset.length; i < length; ++i) {
+      retVal += charset.charAt(Math.floor(Math.random() * n));
+    }
+    return retVal;
+  };
 
   // Add/Edit user doc
   const handleSave = async () => {
-    const { email, username, password, department, groupId, id } = modal.data;
+    const { email, username, department, groupId, id } = modal.data;
     console.log("Save user - groupId:", groupId, "isAdmin:", isAdmin);
+    
     if (!email || !username || !department || !groupId) {
       setSnackbar({
         open: true,
-        msg: "Fill all fields except password (which is only for create)",
+        msg: "Fill all fields",
         severity: "error",
       });
       return;
@@ -132,7 +163,24 @@ const UserManagement = () => {
       });
       return;
     }
+
     try {
+      // Check for username uniqueness (if adding new user or changing username)
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("username", "==", username));
+      const querySnapshot = await getDocs(q);
+      
+      const isDuplicateUsername = querySnapshot.docs.some(doc => doc.id !== id); // Exclude current user if editing
+      
+      if (isDuplicateUsername) {
+        setSnackbar({
+          open: true,
+          msg: "Username already exists. Please choose another.",
+          severity: "error",
+        });
+        return;
+      }
+
       if (modal.edit) {
         await setDoc(doc(db, "users", id), {
           email,
@@ -140,41 +188,72 @@ const UserManagement = () => {
           department,
           groupId,
           status: modal.data.status || "active",
-        });
+        }, { merge: true });
         setSnackbar({ open: true, msg: "User updated.", severity: "success" });
       } else {
-        // On create: create user in Firebase Auth, then add document
-        if (!password)
-          return setSnackbar({
-            open: true,
-            msg: "Password is required for new user",
-            severity: "error",
-          });
-        const cred = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-        await setDoc(doc(db, "users", cred.user.uid), {
-          email,
-          username,
-          department,
-          groupId,
-          uid: cred.user.uid,
-          status: "active",
-          createdAt: new Date().toISOString(),
-        });
-        setSnackbar({ open: true, msg: "User added.", severity: "success" });
+        // On create: generate password, create user in Firebase Auth using SECONDARY APP
+        const generatedPassword = generatePassword(10);
+        
+        // Initialize a secondary app to create user without logging out the admin
+        const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+        const secondaryAuth = getAuth(secondaryApp);
+        
+        try {
+            const cred = await createUserWithEmailAndPassword(
+              secondaryAuth,
+              email,
+              generatedPassword
+            );
+            
+            await setDoc(doc(db, "users", cred.user.uid), {
+              email,
+              username,
+              department,
+              groupId,
+              uid: cred.user.uid,
+              status: "active",
+              mustChangePassword: true, // Force password change
+              createdAt: new Date().toISOString(),
+            });
+            
+            // Show the generated password to the admin
+            setCreatedUserDialog({
+              open: true,
+              email: email,
+              password: generatedPassword,
+            });
+            
+            setSnackbar({ open: true, msg: "User added.", severity: "success" });
+        } finally {
+            // Clean up the secondary app
+            if (secondaryApp) {
+              await deleteApp(secondaryApp);
+            }
+        }
       }
       closeModal();
       fetchUsers();
     } catch (err) {
+      let errorMsg = "Save failed: " + err.message;
+      if (err.code === 'auth/email-already-in-use') {
+        errorMsg = "Email is already in use by another account.";
+      }
       setSnackbar({
         open: true,
-        msg: "Save failed: " + err.message,
+        msg: errorMsg,
         severity: "error",
       });
     }
+  };
+
+  const closeModal = () =>
+    setModal({ open: false, edit: false, data: defaultForm });
+
+  const handleSendInvitation = () => {
+    const subject = "Invitation to SIMS";
+    const loginLink = `${window.location.origin}/login`;
+    const body = `Hello,\n\nYou have been invited to the Stock Inventory Management System.\n\nUsername: ${createdUserDialog.email}\nPassword: ${createdUserDialog.password}\n\nPlease login at: ${loginLink}\n\nIMPORTANT: You will be required to change your password immediately upon your first login.\n\nRegards,\nAdmin`;
+    window.location.href = `mailto:${createdUserDialog.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   const handleDelete = async (id) => {
@@ -308,21 +387,7 @@ const UserManagement = () => {
             }
             fullWidth
           />
-          {!modal.edit && (
-            <TextField
-              margin="normal"
-              label="Password"
-              type="password"
-              value={modal.data.password}
-              onChange={(e) =>
-                setModal((m) => ({
-                  ...m,
-                  data: { ...m.data, password: e.target.value },
-                }))
-              }
-              fullWidth
-            />
-          )}
+          {/* Password field removed - auto-generated now */}
           <FormControl margin="normal" fullWidth sx={{ mt: 2 }}>
             <InputLabel id="group-select-label">User Group</InputLabel>
             <Select
@@ -362,6 +427,53 @@ const UserManagement = () => {
             disabled={!isAdmin}
           >
             {modal.edit ? "Save" : "Add"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Created User Password Dialog */}
+      <Dialog 
+        open={createdUserDialog.open} 
+        onClose={() => setCreatedUserDialog({ ...createdUserDialog, open: false })}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>User Created Successfully</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            The user has been created. Please share the following password with them. They will be required to change it upon first login.
+          </Typography>
+          <Box 
+            sx={{ 
+              bgcolor: 'action.hover', 
+              p: 2, 
+              borderRadius: 1, 
+              mt: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <Typography variant="h6" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+              {createdUserDialog.password}
+            </Typography>
+            <IconButton onClick={() => {
+              navigator.clipboard.writeText(createdUserDialog.password);
+              setSnackbar({ open: true, msg: "Password copied to clipboard", severity: "success" });
+            }} size="small">
+              <ContentCopyIcon />
+            </IconButton>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Email: {createdUserDialog.email}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleSendInvitation} color="primary">
+            Send Invitation
+          </Button>
+          <Button onClick={() => setCreatedUserDialog({ ...createdUserDialog, open: false })} variant="contained">
+            Done
           </Button>
         </DialogActions>
       </Dialog>

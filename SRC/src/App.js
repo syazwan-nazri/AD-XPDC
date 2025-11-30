@@ -56,6 +56,8 @@ function AuthGuard({ authReady, children }) {
 
   useEffect(() => {
     if (!authReady) return; // do nothing until auth state is checked
+
+    // 1. Not logged in -> Redirect to login
     if (
       !user &&
       location.pathname !== "/login" &&
@@ -63,14 +65,27 @@ function AuthGuard({ authReady, children }) {
       location.pathname !== "/reset-password"
     ) {
       navigate("/login");
+      return;
     }
+
+    // 2. Logged in but MUST change password -> Redirect to change-password
+    if (user && user.mustChangePassword && location.pathname !== "/change-password") {
+      navigate("/change-password");
+      return;
+    }
+
+    // 3. Logged in and on auth pages -> Redirect to home (or change-password if needed)
     if (
       user &&
       (location.pathname === "/login" ||
         location.pathname === "/forgot-password" ||
         location.pathname === "/reset-password")
     ) {
-      navigate("/");
+      if (user.mustChangePassword) {
+        navigate("/change-password");
+      } else {
+        navigate("/");
+      }
     }
   }, [user, location.pathname, navigate, authReady]);
   return children;
@@ -130,6 +145,7 @@ function AppShell() {
               groupId: userData.groupId || null,
               username: userData.username || null,
               department: userData.department || null,
+              mustChangePassword: userData.mustChangePassword || false,
             })
           );
         } else {
