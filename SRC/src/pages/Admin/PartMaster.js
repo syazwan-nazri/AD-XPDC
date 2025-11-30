@@ -483,7 +483,7 @@ const PartMaster = () => {
 
       <Paper elevation={1} sx={{ p:2, mb:3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-          <h3 style={{ margin:0 }}>PART LIST ({filteredParts.length} ITEMS)</h3>
+          <h3 style={{ margin:0 }}>PART MASTER LIST ({filteredParts.length} ITEMS)</h3>
           <Box display="flex" gap={2}>
             <TextField 
               size="small" 
