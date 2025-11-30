@@ -301,12 +301,6 @@ const PartMaster = () => {
     setPendingAdd(false);
   };
 
-  const handleSapDialogContinue = () => {
-    setSapDialogOpen(false);
-    setPendingAdd(false);
-    handleAddPart(true); // force add
-  };
-
   const handleSapDialogEditBack = () => {
     setForm(f => ({ ...f, sapNumber: currentRunningSap }));
     setSapDialogOpen(false);
@@ -377,6 +371,14 @@ const PartMaster = () => {
     if (editForm.rackLevel && !validateRackLevel(editForm.rackLevel)) {
       setEditRackLevelError(true);
       return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
+    }
+
+    // Check for duplicate part name (excluding current part)
+    const duplicateName = parts.some(p => 
+      p.id !== editingId && p.name.toLowerCase() === editForm.name.toLowerCase()
+    );
+    if (duplicateName) {
+      return setSnackbar({ open: true, message: 'Part name already exists', severity: 'error' });
     }
 
     // Safety Level required and must be 0 or above on edit
@@ -741,7 +743,6 @@ const PartMaster = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleSapDialogContinue} color="warning">Continue Anyway</Button>
             <Button onClick={handleSapDialogEditBack} color="primary" autoFocus>Edit Back</Button>
           </DialogActions>
         </Dialog>
