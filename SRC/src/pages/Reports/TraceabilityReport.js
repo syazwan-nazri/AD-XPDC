@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+import React from 'react';
+const TraceabilityReport = () => <div>Traceability Report (Stub)</div>;
+=======
 import React, { useEffect, useState } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
@@ -144,4 +148,5 @@ const TraceabilityReport = () => {
   );
 };
 
+>>>>>>> refs/remotes/origin/main
 export default TraceabilityReport;

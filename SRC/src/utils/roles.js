@@ -15,8 +15,11 @@ export const Roles = {
       canAccessStorageLocations: true,
       canAccessSupplierManagement: true,
       canAccessReports: true,
+<<<<<<< HEAD
+=======
       canAccessInventory: true,
       canAccessProcurement: true,
+>>>>>>> refs/remotes/origin/main
     }
   },
   STOREKEEPER: {
@@ -34,8 +37,11 @@ export const Roles = {
       canAccessStorageLocations: true,
       canAccessSupplierManagement: false,
       canAccessReports: true,
+<<<<<<< HEAD
+=======
       canAccessInventory: true,
       canAccessProcurement: false,
+>>>>>>> refs/remotes/origin/main
     }
   },
   PROCUREMENT: {
@@ -53,8 +59,11 @@ export const Roles = {
       canAccessStorageLocations: false,
       canAccessSupplierManagement: true,
       canAccessReports: true,
+<<<<<<< HEAD
+=======
       canAccessInventory: false,
       canAccessProcurement: true,
+>>>>>>> refs/remotes/origin/main
     }
   },
   MAINTENANCE: {
@@ -72,8 +81,11 @@ export const Roles = {
       canAccessStorageLocations: false,
       canAccessSupplierManagement: false,
       canAccessReports: true,
+<<<<<<< HEAD
+=======
       canAccessInventory: true, // Can request stock out
       canAccessProcurement: false,
+>>>>>>> refs/remotes/origin/main
     }
   }
 };
