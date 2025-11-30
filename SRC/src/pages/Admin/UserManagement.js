@@ -256,14 +256,25 @@ const UserManagement = () => {
     window.location.href = `mailto:${createdUserDialog.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete user?")) return;
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const handleDeleteClick = (row) => {
+    setDeleteTarget(row);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteDoc(doc(db, "users", id));
-      setUsers((users) => users.filter((u) => u.id !== id));
+      await deleteDoc(doc(db, "users", deleteTarget.id));
+      setUsers((users) => users.filter((u) => u.id !== deleteTarget.id));
       setSnackbar({ open: true, msg: "User deleted.", severity: "success" });
     } catch {
       setSnackbar({ open: true, msg: "Delete failed", severity: "error" });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -291,7 +302,7 @@ const UserManagement = () => {
           <IconButton
             size="small"
             color="error"
-            onClick={() => handleDelete(row.id)}
+            onClick={() => handleDeleteClick(row)}
           >
             <DeleteIcon />
           </IconButton>
@@ -474,6 +485,25 @@ const UserManagement = () => {
           </Button>
           <Button onClick={() => setCreatedUserDialog({ ...createdUserDialog, open: false })} variant="contained">
             Done
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete user {deleteTarget?.username}?
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

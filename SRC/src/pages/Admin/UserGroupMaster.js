@@ -157,14 +157,42 @@ const UserGroupMaster = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete group?')) return;
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const handleDeleteClick = (row) => {
+    setDeleteTarget(row);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteDoc(doc(db, 'groups', id));
-      setGroups(groups => groups.filter(g => g.id !== id));
+      // Check if any users are assigned to this group
+      const groupToDelete = groups.find(g => g.id === deleteTarget.id);
+      if (!groupToDelete) return; 
+
+      const usersQuery = query(collection(db, 'users'), where('groupId', '==', groupToDelete.groupId));
+      const usersSnapshot = await getDocs(usersQuery);
+
+      if (!usersSnapshot.empty) {
+        setSnackbar({ 
+          open: true, 
+          msg: `Cannot delete group. There are ${usersSnapshot.size} user(s) assigned to this group.`, 
+          severity: 'error' 
+        });
+        return;
+      }
+
+      await deleteDoc(doc(db, 'groups', deleteTarget.id));
+      setGroups(groups => groups.filter(g => g.id !== deleteTarget.id));
       setSnackbar({ open: true, msg: 'Group deleted.', severity: 'success' });
-    } catch {
-      setSnackbar({ open: true, msg: 'Delete failed', severity: 'error' });
+    } catch (err) {
+      console.error("Delete error:", err);
+      setSnackbar({ open: true, msg: 'Delete failed: ' + err.message, severity: 'error' });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -180,7 +208,7 @@ const UserGroupMaster = () => {
       renderCell: ({ row }) => (
         <>
           <IconButton size="small" onClick={() => openEdit(row)}><EditIcon /></IconButton>
-          <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}><DeleteIcon /></IconButton>
+          <IconButton size="small" color="error" onClick={() => handleDeleteClick(row)}><DeleteIcon /></IconButton>
         </>
       ),
       sortable: false
@@ -208,7 +236,6 @@ const UserGroupMaster = () => {
           />
         )}
       </div>
-      {/* Add/Edit Modal */}
       <Dialog open={modal.open} onClose={closeModal}>
         <DialogTitle>{modal.edit ? 'Edit Group' : 'Add Group'}</DialogTitle>
         <DialogContent>
@@ -246,6 +273,26 @@ const UserGroupMaster = () => {
         <DialogActions>
           <Button onClick={closeModal}>Cancel</Button>
           <Button variant="contained" onClick={handleSave}>{modal.edit ? 'Update' : 'Add'}</Button>
+        </DialogActions>
+      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete group {deleteTarget?.groupName}?
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
       <Snackbar
