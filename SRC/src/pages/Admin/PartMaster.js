@@ -64,8 +64,12 @@ const PartMaster = () => {
   const [replenishQtyError, setReplenishQtyError] = useState(false);
   const [editReplenishQtyError, setEditReplenishQtyError] = useState(false);
   const [currentStockError, setCurrentStockError] = useState(false);
-
-  // Fetch parts from Firestore
+  const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvPreview, setCsvPreview] = useState([]);
+  const [csvErrors, setCsvErrors] = useState([]);
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [duplicatesFound, setDuplicatesFound] = useState([]);
   useEffect(() => {
     const fetchParts = async () => {
       setLoading(true);
@@ -168,10 +172,10 @@ const PartMaster = () => {
     return regex.test(value);
   };
   
-  // Validate Internal Ref No (ABC123, AB1234, ABC 123, AB 1234 formats only)
+  // Validate Internal Ref No (ABCD123, ABC123, AB123, AB1234, with optional spaces)
   const validateInternalRef = (value) => {
     if (!value) return false;
-    const regex = /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{4})$/i;
+    const regex = /^([A-Z]{4}\s?\d{3}|[A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}|[A-Z]{2}\s?\d{4})$/i;
     return regex.test(value);
   };
   
@@ -223,7 +227,7 @@ const PartMaster = () => {
     
     if (!validateInternalRef(form.internalRef)) {
       setInternalRefError(true);
-      setSnackbar({ open: true, message: 'Internal Ref No format: ABC123, AB1234, ABC 123, or AB 1234', severity: 'error' });
+      setSnackbar({ open: true, message: 'Internal Ref No format: ABCD123, ABC123, AB123, AB1234 (with or without space)', severity: 'error' });
       return;
     } else if (parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())) {
       setInternalRefError(true);
@@ -445,6 +449,188 @@ const PartMaster = () => {
     }
   };
 
+  // CSV Import handler
+  const handleCsvFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const csv = event.target.result;
+        const lines = csv.split('\n').filter(line => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        // Required columns: sapNumber, internalRef, name, category, safetyLevel, replenishQty
+        const requiredColumns = ['sapnumber', 'internalref', 'name', 'category', 'safetylevel', 'replenishqty'];
+        const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+        
+        if (missingColumns.length > 0) {
+          setCsvErrors([`Missing required columns: ${missingColumns.join(', ')}`]);
+          setCsvPreview([]);
+          return;
+        }
+        
+        const rows = [];
+        const errors = [];
+        const seenSapNumbers = new Set();
+        const seenInternalRefs = new Set();
+        const seenNames = new Set();
+        
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim());
+          const row = {};
+          headers.forEach((h, idx) => {
+            row[h] = values[idx] || '';
+          });
+          
+          // Validate row
+          const rowErrors = [];
+          if (!row.sapnumber) rowErrors.push(`Row ${i}: SAP # is required`);
+          else if (!/^7\d{6}$/.test(row.sapnumber)) rowErrors.push(`Row ${i}: SAP # must be 7 digits starting with 7`);
+          else if (parts.some(p => p.sapNumber === row.sapnumber)) rowErrors.push(`Row ${i}: SAP # already exists in database`);
+          else if (seenSapNumbers.has(row.sapnumber)) rowErrors.push(`Row ${i}: Duplicate SAP # within this file`);
+          else seenSapNumbers.add(row.sapnumber);
+          
+          if (!row.internalref) rowErrors.push(`Row ${i}: Internal Ref No is required`);
+          else if (!/^[A-Z]{2,4}\s?\d{3,4}$/.test(row.internalref.toUpperCase())) rowErrors.push(`Row ${i}: Invalid Internal Ref No format`);
+          else {
+            const normalizedRef = row.internalref.replace(/\s+/g, '').toUpperCase();
+            if (parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === normalizedRef)) rowErrors.push(`Row ${i}: Internal Ref No already exists in database`);
+            else if (seenInternalRefs.has(normalizedRef)) rowErrors.push(`Row ${i}: Duplicate Internal Ref within this file`);
+            else seenInternalRefs.add(normalizedRef);
+          }
+          
+          if (!row.name) rowErrors.push(`Row ${i}: Part Name is required`);
+          else {
+            const normalizedName = row.name.toLowerCase();
+            if (parts.some(p => p.name.toLowerCase() === normalizedName)) rowErrors.push(`Row ${i}: Part Name already exists in database`);
+            else if (seenNames.has(normalizedName)) rowErrors.push(`Row ${i}: Duplicate Part Name within this file`);
+            else seenNames.add(normalizedName);
+          }
+          
+          if (!row.category) rowErrors.push(`Row ${i}: Category is required`);
+          if (!row.safetylevel || Number(row.safetylevel) < 0) rowErrors.push(`Row ${i}: Safety Level must be 0 or greater`);
+          if (!row.replenishqty || Number(row.replenishqty) < 0) rowErrors.push(`Row ${i}: Replenish Quantity must be 0 or greater`);
+          
+          if (rowErrors.length > 0) {
+            errors.push(...rowErrors);
+          } else {
+            rows.push({
+              sapNumber: row.sapnumber,
+              internalRef: row.internalref.toUpperCase(),
+              name: row.name,
+              category: row.category,
+              rackNumber: '',
+              rackLevel: '',
+              safetyLevel: Number(row.safetylevel),
+              replenishQty: Number(row.replenishqty),
+              currentStock: Number(row.currentstock) || 0
+            });
+          }
+        }
+        
+        setCsvPreview(rows);
+        setCsvErrors(errors);
+        setCsvFile(file);
+      } catch (error) {
+        setCsvErrors(['Error parsing CSV: ' + error.message]);
+        setCsvPreview([]);
+      }
+    };
+    reader.readAsText(file);
+  };
+  
+  const handleBulkImport = async () => {
+    if (csvErrors.length > 0) {
+      setSnackbar({ open: true, message: 'Please fix errors before importing', severity: 'error' });
+      return;
+    }
+    if (csvPreview.length === 0) {
+      setSnackbar({ open: true, message: 'No valid rows to import', severity: 'error' });
+      return;
+    }
+    
+    try {
+      const newParts = [];
+      for (const row of csvPreview) {
+        const docRef = await addDoc(collection(db, 'parts'), {
+          ...row,
+          createdAt: new Date().toISOString()
+        });
+        newParts.push({ ...row, id: docRef.id });
+      }
+      
+      dispatch(setParts([...parts, ...newParts]));
+      setSnackbar({ open: true, message: `Successfully imported ${newParts.length} parts`, severity: 'success' });
+      setCsvImportDialogOpen(false);
+      setCsvFile(null);
+      setCsvPreview([]);
+      setCsvErrors([]);
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Import failed: ' + error.message, severity: 'error' });
+    }
+  };
+
+  // Detect duplicates by SAP#
+  const handleDetectDuplicates = () => {
+    const sapMap = new Map();
+    const dups = [];
+
+    parts.forEach(part => {
+      if (sapMap.has(part.sapNumber)) {
+        if (!dups.find(d => d.sapNumber === part.sapNumber)) {
+          dups.push({
+            sapNumber: part.sapNumber,
+            name: part.name,
+            count: 2,
+            ids: [sapMap.get(part.sapNumber), part.id]
+          });
+        } else {
+          const existing = dups.find(d => d.sapNumber === part.sapNumber);
+          existing.count += 1;
+          existing.ids.push(part.id);
+        }
+      } else {
+        sapMap.set(part.sapNumber, part.id);
+      }
+    });
+
+    setDuplicatesFound(dups);
+    setCleanupDialogOpen(true);
+
+    if (dups.length === 0) {
+      setSnackbar({ open: true, message: 'No duplicates found!', severity: 'success' });
+    }
+  };
+
+  // Remove duplicate entries (keep first, delete others)
+  const handleRemoveDuplicates = async () => {
+    try {
+      let deletedCount = 0;
+      
+      for (const duplicate of duplicatesFound) {
+        // Keep the first ID, delete the rest
+        for (let i = 1; i < duplicate.ids.length; i++) {
+          await deleteDoc(doc(db, 'parts', duplicate.ids[i]));
+          dispatch(deletePart(duplicate.ids[i]));
+          deletedCount++;
+        }
+      }
+
+      setSnackbar({ open: true, message: `Deleted ${deletedCount} duplicate entries`, severity: 'success' });
+      setCleanupDialogOpen(false);
+      setDuplicatesFound([]);
+
+      // Refresh the parts list
+      const querySnapshot = await getDocs(collection(db, 'parts'));
+      const data = querySnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+      dispatch(setParts(data));
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Error removing duplicates: ' + error.message, severity: 'error' });
+    }
+  };
+
   // Barcode scan handler
   const handleScan = (code) => {
     setSearchQuery(code);
@@ -484,7 +670,23 @@ const PartMaster = () => {
       <Paper elevation={1} sx={{ p:2, mb:3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
           <h3 style={{ margin:0 }}>PART MASTER LIST ({filteredParts.length} ITEMS)</h3>
-          <Box display="flex" gap={2}>
+          <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+            <Button 
+              variant="contained" 
+              color="success"
+              onClick={() => setCsvImportDialogOpen(true)}
+              size="small"
+            >
+              IMPORT CSV
+            </Button>
+            <Button 
+              variant="contained" 
+              color="warning"
+              onClick={handleDetectDuplicates}
+              size="small"
+            >
+              CLEANUP DUPLICATES
+            </Button>
             <TextField 
               size="small" 
               label="Search" 
@@ -615,7 +817,7 @@ const PartMaster = () => {
             helperText={internalRefError ? (
               parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())
                 ? "Internal Ref No already exists"
-                : "Format: ABC123, AB1234, ABC 123, or AB 1234"
+                : "Format: ABCD123, ABC123, AB123, AB1234 (with or without space)"
             ) : ""}
             required
             inputProps={{ style: { textTransform: 'uppercase' } }}
@@ -879,6 +1081,170 @@ const PartMaster = () => {
         <DialogActions>
           <Button onClick={handleBarcodeClose}>CLOSE</Button>
           <Button onClick={() => window.print()} variant="contained">PRINT</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Duplicate Cleanup Dialog */}
+      <Dialog open={cleanupDialogOpen} onClose={() => setCleanupDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>CLEANUP DUPLICATE PARTS</DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {duplicatesFound.length === 0 ? (
+              <Typography variant="body2" color="textSecondary">
+                Checking for duplicates...
+              </Typography>
+            ) : (
+              <>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
+                  Found {duplicatesFound.length} duplicate SAP# entries
+                </Typography>
+                <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>SAP #</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Part Name</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Occurrences</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>To Delete</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {duplicatesFound.map((dup, idx) => (
+                        <TableRow key={idx} sx={{ backgroundColor: '#fff3e0' }}>
+                          <TableCell>{dup.sapNumber}</TableCell>
+                          <TableCell>{dup.name}</TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f', fontWeight: 'bold' }}>
+                            {dup.count}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f', fontWeight: 'bold' }}>
+                            {dup.count - 1}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+                <Typography variant="body2" color="error">
+                  ⚠️ This will keep the first entry and delete {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)} duplicate record(s).
+                </Typography>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => setCleanupDialogOpen(false)} 
+            variant="outlined"
+          >
+            CANCEL
+          </Button>
+          {duplicatesFound.length > 0 && (
+            <Button 
+              onClick={handleRemoveDuplicates} 
+              variant="contained"
+              color="error"
+            >
+              DELETE {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)} DUPLICATES
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={csvImportDialogOpen} onClose={() => setCsvImportDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>IMPORT PARTS FROM CSV</DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {csvPreview.length === 0 && csvErrors.length === 0 && (
+              <>
+                <Typography variant="body2" color="textSecondary">
+                  CSV format should include columns: SAP Number, Internal Ref, Name, Category, Safety Level, Replenish Qty
+                </Typography>
+                <Box sx={{ border: '2px dashed #ccc', p: 3, textAlign: 'center', borderRadius: 1, cursor: 'pointer', '&:hover': { backgroundColor: '#f5f5f5' } }}>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCsvFileSelect}
+                    style={{ display: 'none' }}
+                    id="csv-input"
+                  />
+                  <label htmlFor="csv-input" style={{ cursor: 'pointer', display: 'block' }}>
+                    <Typography variant="h6">Click to select CSV file</Typography>
+                    <Typography variant="body2" color="textSecondary">or drag and drop</Typography>
+                  </label>
+                </Box>
+              </>
+            )}
+
+            {csvErrors.length > 0 && (
+              <Box sx={{ backgroundColor: '#ffebee', p: 2, borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#d32f2f', mb: 1 }}>
+                  Errors found:
+                </Typography>
+                {csvErrors.map((error, idx) => (
+                  <Typography key={idx} variant="body2" color="error">
+                    • {error}
+                  </Typography>
+                ))}
+              </Box>
+            )}
+
+            {csvPreview.length > 0 && (
+              <>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                  Preview: {csvPreview.length} parts ready to import
+                </Typography>
+                <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell>SAP #</TableCell>
+                        <TableCell>Internal Ref</TableCell>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Category</TableCell>
+                        <TableCell>Safety Level</TableCell>
+                        <TableCell>Replenish Qty</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {csvPreview.map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{row.sapNumber}</TableCell>
+                          <TableCell>{row.internalRef}</TableCell>
+                          <TableCell>{row.name}</TableCell>
+                          <TableCell>{row.category}</TableCell>
+                          <TableCell>{row.safetyLevel}</TableCell>
+                          <TableCell>{row.replenishQty}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => {
+              setCsvImportDialogOpen(false);
+              setCsvFile(null);
+              setCsvPreview([]);
+              setCsvErrors([]);
+            }} 
+            variant="outlined"
+          >
+            CLOSE
+          </Button>
+          {csvPreview.length > 0 && (
+            <Button 
+              onClick={handleBulkImport} 
+              variant="contained"
+              color="success"
+            >
+              IMPORT {csvPreview.length} PARTS
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
