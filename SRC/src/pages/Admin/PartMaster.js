@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { db } from '../../firebase/config';
-import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { setParts, addPart, deletePart, updatePart } from '../../redux/partsSlice';
-import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Typography, MenuItem, Select, FormControl, InputLabel, InputAdornment, Chip } from '@mui/material';
+import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Typography, MenuItem, Select, FormControl, InputLabel, InputAdornment, Chip, LinearProgress } from '@mui/material';
 import Barcode from 'react-barcode';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import EditIcon from '@mui/icons-material/Edit';
@@ -70,6 +70,8 @@ const PartMaster = () => {
   const [csvErrors, setCsvErrors] = useState([]);
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
   const [duplicatesFound, setDuplicatesFound] = useState([]);
+  const [cleanupInProgress, setCleanupInProgress] = useState(false);
+  const [cleanupProgress, setCleanupProgress] = useState(0);
   useEffect(() => {
     const fetchParts = async () => {
       setLoading(true);
@@ -134,14 +136,17 @@ const PartMaster = () => {
     });
 
     // Sort: low stock items at top, then by SAP# numerically
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       // Parse SAP# for numeric comparison
       const sapA = parseInt(a.sapNumber || '0') || 0;
       const sapB = parseInt(b.sapNumber || '0') || 0;
       
       // Determine if each is low stock (currentStock < safetyLevel)
-      const aIsLowStock = (a.currentStock || 0) < (a.safetyLevel || 0);
-      const bIsLowStock = (b.currentStock || 0) < (b.safetyLevel || 0);
+      // Only consider low stock if safetyLevel > 0 (0 means safety level not set)
+      const aHasValidSafety = (a.safetyLevel || 0) > 0;
+      const bHasValidSafety = (b.safetyLevel || 0) > 0;
+      const aIsLowStock = aHasValidSafety && (a.currentStock || 0) < (a.safetyLevel || 0);
+      const bIsLowStock = bHasValidSafety && (b.currentStock || 0) < (b.safetyLevel || 0);
       
       // Low stock items come first
       if (aIsLowStock && !bIsLowStock) return -1;
@@ -150,6 +155,13 @@ const PartMaster = () => {
       // If both are low stock or both are not, sort by SAP# (descending - higher numbers at top)
       return sapB - sapA;
     });
+    
+    // Debug: log first 10 SAP numbers to verify sort order
+    if (sorted.length > 0) {
+      console.log('Filtered parts sort order (first 10):', sorted.slice(0, 10).map(p => ({ sap: p.sapNumber, stock: p.currentStock, safety: p.safetyLevel })));
+    }
+    
+    return sorted;
   }, [parts, searchQuery, filterCategory, filterRackLevel]);
 
   // Validate SAP# (7 digits only, must start with 7)
@@ -604,23 +616,51 @@ const PartMaster = () => {
     }
   };
 
-  // Remove duplicate entries (keep first, delete others)
+  // Remove duplicate entries (keep first, delete others) - OPTIMIZED with batch operations
   const handleRemoveDuplicates = async () => {
     try {
-      let deletedCount = 0;
+      setCleanupInProgress(true);
+      setCleanupProgress(0);
       
-      for (const duplicate of duplicatesFound) {
-        // Keep the first ID, delete the rest
+      // Collect all IDs to delete
+      const allIdsToDelete = [];
+      duplicatesFound.forEach(duplicate => {
         for (let i = 1; i < duplicate.ids.length; i++) {
-          await deleteDoc(doc(db, 'parts', duplicate.ids[i]));
-          dispatch(deletePart(duplicate.ids[i]));
-          deletedCount++;
+          allIdsToDelete.push(duplicate.ids[i]);
         }
+      });
+
+      const totalToDelete = allIdsToDelete.length;
+      let deletedCount = 0;
+
+      // Firestore batch operations have a max of 500 operations per batch
+      // So we'll create multiple batches if needed
+      const batchSize = 100; // Conservative batch size for safety
+      
+      for (let i = 0; i < allIdsToDelete.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchIds = allIdsToDelete.slice(i, Math.min(i + batchSize, allIdsToDelete.length));
+        
+        batchIds.forEach(id => {
+          batch.delete(doc(db, 'parts', id));
+        });
+        
+        // Commit batch
+        await batch.commit();
+        
+        deletedCount += batchIds.length;
+        setCleanupProgress(Math.round((deletedCount / totalToDelete) * 100));
+        
+        // Update Redux state for each batch
+        batchIds.forEach(id => {
+          dispatch(deletePart(id));
+        });
       }
 
-      setSnackbar({ open: true, message: `Deleted ${deletedCount} duplicate entries`, severity: 'success' });
+      setSnackbar({ open: true, message: `Successfully deleted ${deletedCount} duplicate entries`, severity: 'success' });
       setCleanupDialogOpen(false);
       setDuplicatesFound([]);
+      setCleanupProgress(0);
 
       // Refresh the parts list
       const querySnapshot = await getDocs(collection(db, 'parts'));
@@ -628,7 +668,77 @@ const PartMaster = () => {
       dispatch(setParts(data));
     } catch (error) {
       setSnackbar({ open: true, message: 'Error removing duplicates: ' + error.message, severity: 'error' });
+      setCleanupProgress(0);
+    } finally {
+      setCleanupInProgress(false);
     }
+  };
+
+  // Find specific problematic SAP#s and show their exact positions
+  const handleFindProblematicSaps = () => {
+    const problematicSaps = ['7000259', '7000253', '7000240', '7000169', '7000168', '7000037'];
+    console.log('=== FINDING PROBLEMATIC SAP#S IN FILTERED LIST ===');
+    console.log('Total filtered parts:', filteredParts.length);
+    
+    const positions = [];
+    filteredParts.forEach((p, idx) => {
+      if (problematicSaps.includes(p.sapNumber)) {
+        positions.push({
+          position: idx + 1,
+          sap: p.sapNumber,
+          stock: p.currentStock,
+          safety: p.safetyLevel,
+          name: p.name
+        });
+      }
+    });
+    
+    console.log('POSITIONS IN FILTERED LIST:');
+    positions.forEach(p => {
+      console.log(`Position ${p.position}: SAP ${p.sap} (${p.name}) - Stock: ${p.stock}, Safety: ${p.safety}`);
+    });
+    
+    console.log('\nEXPECTED DESCENDING ORDER: 7000259 → 7000253 → 7000240 → 7000169 → 7000168 → 7000037');
+    console.log('ACTUAL ORDER IN LIST:', positions.map(p => p.sap).join(' → '));
+    
+    alert(`Found ${positions.length}/6 problematic SAP#s. Check console for positions.`);
+  };
+
+  // Detect parts with invalid/zero safety levels
+  const handleDetectInvalidSafety = () => {
+    const invalidSafety = parts.filter(p => !p.safetyLevel || p.safetyLevel === 0);
+    console.log('Parts with invalid/zero safety level:', invalidSafety.length);
+    invalidSafety.forEach(p => {
+      console.log(`- SAP: ${p.sapNumber}, Name: ${p.name}, Current Stock: ${p.currentStock}, Safety: ${p.safetyLevel}`);
+    });
+    setSnackbar({ open: true, message: `Found ${invalidSafety.length} parts with invalid safety levels (set to 0)`, severity: 'warning' });
+  };
+
+  // Debug: Verify current sort order
+  const handleVerifySort = () => {
+    console.log('=== SORT VERIFICATION ===');
+    console.log('Total filtered parts:', filteredParts.length);
+    
+    // Show detailed info for each part
+    const detailedInfo = filteredParts.slice(0, 30).map((p, i) => {
+      const sapNum = parseInt(p.sapNumber || '0') || 0;
+      const isLowStock = (p.currentStock || 0) < (p.safetyLevel || 0);
+      return `${i+1}. SAP: ${p.sapNumber} (parsed: ${sapNum}, type: ${typeof p.sapNumber}, lowStock: ${isLowStock}, stock: ${p.currentStock}, safety: ${p.safetyLevel})`;
+    });
+    
+    console.log('First 30 parts with details:\n' + detailedInfo.join('\n'));
+    
+    // Specifically check those problematic SAP#s
+    const problematicSaps = ['7000259', '7000253', '7000240', '7000169', '7000168', '7000037'];
+    const foundParts = filteredParts.filter(p => problematicSaps.includes(p.sapNumber));
+    console.log('\n=== PROBLEMATIC SAP#S FOUND ===');
+    console.log('Found in current list:', foundParts.length, 'of', problematicSaps.length);
+    foundParts.forEach((p, i) => {
+      const isLowStock = (p.currentStock || 0) < (p.safetyLevel || 0);
+      console.log(`${i+1}. SAP: ${p.sapNumber}, Stock: ${p.currentStock}, Safety: ${p.safetyLevel}, LowStock: ${isLowStock}`);
+    });
+    
+    alert(`Sort verification logged. Check console for details. Found ${foundParts.length}/6 problematic SAP#s`);
   };
 
   // Barcode scan handler
@@ -686,6 +796,30 @@ const PartMaster = () => {
               size="small"
             >
               CLEANUP DUPLICATES
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="info"
+              onClick={handleVerifySort}
+              size="small"
+            >
+              VERIFY SORT
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="warning"
+              onClick={handleDetectInvalidSafety}
+              size="small"
+            >
+              DETECT INVALID SAFETY
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="error"
+              onClick={handleFindProblematicSaps}
+              size="small"
+            >
+              FIND PROBLEMATIC SAP#S
             </Button>
             <TextField 
               size="small" 
@@ -1085,11 +1219,27 @@ const PartMaster = () => {
       </Dialog>
 
       {/* Duplicate Cleanup Dialog */}
-      <Dialog open={cleanupDialogOpen} onClose={() => setCleanupDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={cleanupDialogOpen} onClose={() => !cleanupInProgress && setCleanupDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>CLEANUP DUPLICATE PARTS</DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {duplicatesFound.length === 0 ? (
+            {cleanupInProgress ? (
+              <>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                  Deleting duplicates... {cleanupProgress}%
+                </Typography>
+                <Box sx={{ width: '100%' }}>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={cleanupProgress}
+                    sx={{ height: 10, borderRadius: 5 }}
+                  />
+                </Box>
+                <Typography variant="body2" color="textSecondary">
+                  Please wait while duplicate records are being removed from the database...
+                </Typography>
+              </>
+            ) : duplicatesFound.length === 0 ? (
               <Typography variant="body2" color="textSecondary">
                 Checking for duplicates...
               </Typography>
@@ -1135,10 +1285,11 @@ const PartMaster = () => {
           <Button 
             onClick={() => setCleanupDialogOpen(false)} 
             variant="outlined"
+            disabled={cleanupInProgress}
           >
             CANCEL
           </Button>
-          {duplicatesFound.length > 0 && (
+          {duplicatesFound.length > 0 && !cleanupInProgress && (
             <Button 
               onClick={handleRemoveDuplicates} 
               variant="contained"
