@@ -10,7 +10,7 @@ import {
 import { Provider, useDispatch, useSelector } from "react-redux";
 import Box from "@mui/material/Box";
 import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import store from "./redux/store";
 import Navbar from "./components/Navbar";
@@ -91,12 +91,9 @@ function AuthGuard({ authReady, children }) {
   return children;
 }
 
-function AppShell() {
-  // Theme
-  const [mode, setMode] = useState("light");
-  const theme = useMemo(() => createTheme({ palette: { mode } }), [mode]);
-  const toggleTheme = () => setMode((m) => (m === "light" ? "dark" : "light"));
-
+function AppShell({ toggleTheme }) {
+  const theme = useTheme();
+  
   // Initialize user groups and sync data
   useEffect(() => {
     const init = async () => {
@@ -196,11 +193,9 @@ function AppShell() {
   }
 
   return (
-    <ThemeProvider theme={theme}>
-      <AuthGuard authReady={authReady}>
-        <Box sx={{ display: "flex" }}>
-          <CssBaseline />
-          <Box
+    <AuthGuard authReady={authReady}>
+      <Box sx={{ display: "flex" }}>
+        <Box
             sx={{
               width: "100%",
               zIndex: theme.zIndex.drawer + 1,
@@ -212,7 +207,7 @@ function AppShell() {
             }}
           >
             <Navbar
-              theme={mode}
+              theme={theme}
               toggleTheme={toggleTheme}
               user={user}
               onLogout={onLogout}
@@ -292,15 +287,26 @@ function AppShell() {
           </Box>
         </Box>
       </AuthGuard>
+    );
+}
+
+function AppWrapper() {
+  const [mode, setMode] = useState("light");
+  const theme = useMemo(() => createTheme({ palette: { mode } }), [mode]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <AppShell toggleTheme={() => setMode((m) => (m === "light" ? "dark" : "light"))} />
+      </Router>
     </ThemeProvider>
   );
 }
 
 const App = () => (
   <Provider store={store}>
-    <Router>
-      <AppShell />
-    </Router>
+    <AppWrapper />
   </Provider>
 );
 
