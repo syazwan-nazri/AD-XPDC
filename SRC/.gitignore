@@ -1,5 +1,6 @@
 # Ignore node_modules
 node_modules/
+SRC/node_modoules/
 .cache/
 
 # Ignore build output
