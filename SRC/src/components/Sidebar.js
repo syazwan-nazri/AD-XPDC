@@ -62,7 +62,7 @@ const purchasingLinks = [
 const reportLinks = [
   { path: '/reports/dashboard-kpis', text: 'Dashboard', icon: <DashboardIcon />, permission: 'canAccessReports' },
   { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <ReceiptLongIcon />, permission: 'canAccessReports' },
-  { path: '/reports/traceability-report', text: 'Traceability', icon: <HistoryIcon />, permission: 'canAccessReports' },
+
   { path: '/reports/stock-movement', text: 'Movement History', icon: <SwapHorizIcon />, permission: 'canAccessReports' },
   { path: '/reports/low-stock', text: 'Low Stock Alert', icon: <WarningIcon />, permission: 'canAccessReports' },
 ];
@@ -76,12 +76,12 @@ const Sidebar = ({ open, onToggle }) => {
   const toggleDataMaster = () => setDataMasterOpen((prev) => !prev);
   const toggleStockMovement = () => setStockMovementOpen((prev) => !prev);
   const togglePurchasing = () => setPurchasingOpen((prev) => !prev);
-  
+
   const user = useSelector((state) => state.auth.user);
   const userRole = user ? getRoleByGroupId(user.groupId) : null;
 
   // Filter links
-  const filterLinks = (links) => links.filter(link => 
+  const filterLinks = (links) => links.filter(link =>
     !link.permission || (userRole && hasPermission(userRole, link.permission))
   );
 
@@ -157,11 +157,11 @@ const Sidebar = ({ open, onToggle }) => {
         <IconButton onClick={onToggle}>{open ? <ChevronLeftIcon /> : <ChevronRightIcon />}</IconButton>
       </List>
       <Divider />
-      
+
       {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster)}
       {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, stockMovementOpen, toggleStockMovement)}
       {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, purchasingOpen, togglePurchasing)}
-      
+
       {/* Reports section */}
       {filteredReportLinks.length > 0 && (
         <List>

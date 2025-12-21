@@ -43,7 +43,8 @@ import MRF from "./pages/Inventory/MRF";
 import StockTake from "./pages/Inventory/StockTake";
 import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
 import StockValuationReport from "./pages/Reports/StockValuationReport";
-import TraceabilityReport from "./pages/Reports/TraceabilityReport";
+import MovementHistory from "./pages/Reports/MovementHistory";
+import LowStockReport from "./pages/Reports/LowStockReport";
 import ChangePassword from "./pages/Auth/ChangePassword";
 
 const drawerWidth = 260;
@@ -93,7 +94,7 @@ function AuthGuard({ authReady, children }) {
 
 function AppShell({ toggleTheme }) {
   const theme = useTheme();
-  
+
   // Initialize user groups and sync data
   useEffect(() => {
     const init = async () => {
@@ -196,98 +197,97 @@ function AppShell({ toggleTheme }) {
     <AuthGuard authReady={authReady}>
       <Box sx={{ display: "flex" }}>
         <Box
-            sx={{
-              width: "100%",
-              zIndex: theme.zIndex.drawer + 1,
-              position: "fixed",
-              top: 0,
-              left: 0,
-              marginLeft: getMarginLeft(),
-              transition: "margin 0.2s",
-            }}
-          >
-            <Navbar
-              theme={theme}
-              toggleTheme={toggleTheme}
-              user={user}
-              onLogout={onLogout}
-              onMenuClick={handleSidebarMenu}
-            />
-          </Box>
-          {/* Sidebar Drawer */}
-          {user &&
-            (isMobile ? (
-              <Sidebar open={sideBarActualOpen} onToggle={handleSidebarClose} />
-            ) : (
-              <Sidebar
-                open={sidebarOpen}
-                onToggle={() => setSidebarOpen((v) => !v)}
-              />
-            ))}
-          {/* Main content flexes to sidebar width on desktop */}
-          <Box
-            component="main"
-            sx={(theme) => ({
-              flexGrow: 1,
-              p: 3,
-              transition: "margin 0.2s",
-              width: "100%",
-              minWidth: 0, // Crucial for flex items to shrink below content size
-              minHeight: "100vh",
-              background: theme.palette.background.default,
-              overflowX: "hidden",
-            })}
-          >
-            {/* Offset for fixed AppBar */}
-            <Box sx={{ minHeight: 64 }} />
-
-            <Routes>
-              <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route element={<ProtectedRoute />}>
-                <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
-                <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
-                <Route path="/reports/traceability-report" element={<TraceabilityReport />} />
-                <Route path="/reports/stock-movement" element={<TraceabilityReport />} /> {/* Reuse Traceability for now */}
-                <Route path="/reports/low-stock" element={<DashboardKPIs />} /> {/* Reuse Dashboard for now as it has Low Stock card */}
-                <Route path="/change-password" element={<ChangePassword />} />
-              </Route>
-              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
-                <Route path="/admin/user-master" element={<UserManagement />} />
-                <Route
-                  path="/admin/user-group-master"
-                  element={<UserGroupMaster />}
-                />
-                <Route path="/admin/part-master" element={<PartMaster />} />
-                <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
-                <Route path="/admin/bin-master" element={<StorageMaster />} />
-                <Route path="/admin/supplier-master" element={<SupplierMaster />} />
-                <Route path="/admin/machine-master" element={<MachineMaster />} />
-                {/* Other admin protected routes */}
-              </Route>
-              
-              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
-                 <Route path="/inventory/stock-in" element={<StockIn />} />
-                 <Route path="/inventory/stock-out" element={<StockOut />} />
-                 <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
-                 <Route path="/inventory/movement-logs" element={<MovementLog />} />
-                 <Route path="/inventory/mrf" element={<MRF />} />
-                 <Route path="/inventory/stock-take" element={<StockTake />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
-                 <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
-              </Route>
-
-              {/* Other role-protected routes here */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Box>
+          sx={{
+            width: "100%",
+            zIndex: theme.zIndex.drawer + 1,
+            position: "fixed",
+            top: 0,
+            left: 0,
+            marginLeft: getMarginLeft(),
+            transition: "margin 0.2s",
+          }}
+        >
+          <Navbar
+            theme={theme}
+            toggleTheme={toggleTheme}
+            user={user}
+            onLogout={onLogout}
+            onMenuClick={handleSidebarMenu}
+          />
         </Box>
-      </AuthGuard>
-    );
+        {/* Sidebar Drawer */}
+        {user &&
+          (isMobile ? (
+            <Sidebar open={sideBarActualOpen} onToggle={handleSidebarClose} />
+          ) : (
+            <Sidebar
+              open={sidebarOpen}
+              onToggle={() => setSidebarOpen((v) => !v)}
+            />
+          ))}
+        {/* Main content flexes to sidebar width on desktop */}
+        <Box
+          component="main"
+          sx={(theme) => ({
+            flexGrow: 1,
+            p: 3,
+            transition: "margin 0.2s",
+            width: "100%",
+            minWidth: 0, // Crucial for flex items to shrink below content size
+            minHeight: "100vh",
+            background: theme.palette.background.default,
+            overflowX: "hidden",
+          })}
+        >
+          {/* Offset for fixed AppBar */}
+          <Box sx={{ minHeight: 64 }} />
+
+          <Routes>
+            <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+              <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
+              <Route path="/reports/stock-movement" element={<MovementHistory />} />
+              <Route path="/reports/low-stock" element={<LowStockReport />} />
+              <Route path="/change-password" element={<ChangePassword />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
+              <Route path="/admin/user-master" element={<UserManagement />} />
+              <Route
+                path="/admin/user-group-master"
+                element={<UserGroupMaster />}
+              />
+              <Route path="/admin/part-master" element={<PartMaster />} />
+              <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
+              <Route path="/admin/bin-master" element={<StorageMaster />} />
+              <Route path="/admin/supplier-master" element={<SupplierMaster />} />
+              <Route path="/admin/machine-master" element={<MachineMaster />} />
+              {/* Other admin protected routes */}
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
+              <Route path="/inventory/stock-in" element={<StockIn />} />
+              <Route path="/inventory/stock-out" element={<StockOut />} />
+              <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
+              <Route path="/inventory/movement-logs" element={<MovementLog />} />
+              <Route path="/inventory/mrf" element={<MRF />} />
+              <Route path="/inventory/stock-take" element={<StockTake />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
+              <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
+            </Route>
+
+            {/* Other role-protected routes here */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Box>
+      </Box>
+    </AuthGuard>
+  );
 }
 
 function AppWrapper() {
