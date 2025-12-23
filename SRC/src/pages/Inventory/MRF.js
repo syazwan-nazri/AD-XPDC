@@ -39,6 +39,7 @@ const MRF = () => {
   const parts = useSelector(state => state.parts.parts || []);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [availableParts, setAvailableParts] = useState([]);
 
   // MRF Form states
   const [mrfHeader, setMrfHeader] = useState({
@@ -57,6 +58,9 @@ const MRF = () => {
   // Dialog states
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [selectedMRF, setSelectedMRF] = useState(null);
+  const [approvalComments, setApprovalComments] = useState('');
+  const [partSearchFilter, setPartSearchFilter] = useState('');
   const [newItem, setNewItem] = useState({
     sapNumber: '',
     partName: '',
@@ -97,6 +101,30 @@ const MRF = () => {
     fetchMRFData();
   }, []);
 
+  // Fetch Parts data from Firestore or Redux
+  useEffect(() => {
+    const fetchParts = async () => {
+      try {
+        // First, try to use parts from Redux
+        if (parts && parts.length > 0) {
+          setAvailableParts(parts);
+        } else {
+          // If Redux doesn't have parts, fetch from Firestore directly
+          const partsSnapshot = await getDocs(collection(db, 'parts'));
+          const partsData = partsSnapshot.docs.map(doc => ({ 
+            ...doc.data(), 
+            id: doc.id 
+          }));
+          setAvailableParts(partsData);
+        }
+      } catch (error) {
+        console.error('Error fetching parts:', error);
+        setSnackbar({ open: true, message: 'Error loading parts', severity: 'error' });
+      }
+    };
+    fetchParts();
+  }, [parts]);
+
   // Handle add item to MRF
   const handleAddItem = () => {
     if (!newItem.sapNumber || !newItem.quantity) {
@@ -104,7 +132,7 @@ const MRF = () => {
       return;
     }
 
-    const selectedPart = parts.find(p => p.sapNumber === newItem.sapNumber);
+    const selectedPart = availableParts.find(p => p.sapNumber === newItem.sapNumber);
     if (!selectedPart) {
       setSnackbar({ open: true, message: 'Part not found', severity: 'error' });
       return;
@@ -184,6 +212,60 @@ const MRF = () => {
     } catch (error) {
       console.error('Error saving MRF:', error);
       setSnackbar({ open: true, message: 'Error saving MRF', severity: 'error' });
+    }
+  };
+
+  const handleApproveMRF = async () => {
+    if (!selectedMRF) return;
+
+    try {
+      const mrfRef = doc(db, 'mrf', selectedMRF.id);
+      await updateDoc(mrfRef, {
+        status: 'Approved',
+        approvedBy: 'Current User',
+        approvalComments: approvalComments,
+        approvalDate: new Date().toISOString(),
+      });
+
+      setSnackbar({ open: true, message: 'MRF Approved successfully', severity: 'success' });
+      setApprovalDialogOpen(false);
+      setApprovalComments('');
+      setSelectedMRF(null);
+
+      // Refresh MRF list
+      const mrfSnapshot = await getDocs(collection(db, 'mrf'));
+      const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setMrfList(mrfData);
+    } catch (error) {
+      console.error('Error approving MRF:', error);
+      setSnackbar({ open: true, message: 'Error approving MRF', severity: 'error' });
+    }
+  };
+
+  const handleRejectMRF = async () => {
+    if (!selectedMRF) return;
+
+    try {
+      const mrfRef = doc(db, 'mrf', selectedMRF.id);
+      await updateDoc(mrfRef, {
+        status: 'Rejected',
+        rejectedBy: 'Current User',
+        rejectionComments: approvalComments,
+        rejectionDate: new Date().toISOString(),
+      });
+
+      setSnackbar({ open: true, message: 'MRF Rejected', severity: 'warning' });
+      setApprovalDialogOpen(false);
+      setApprovalComments('');
+      setSelectedMRF(null);
+
+      // Refresh MRF list
+      const mrfSnapshot = await getDocs(collection(db, 'mrf'));
+      const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setMrfList(mrfData);
+    } catch (error) {
+      console.error('Error rejecting MRF:', error);
+      setSnackbar({ open: true, message: 'Error rejecting MRF', severity: 'error' });
     }
   };
 
@@ -462,11 +544,36 @@ const MRF = () => {
                         </Tooltip>
                       )}
                       {mrf.status === 'Pending' && (
-                        <Tooltip title="Track">
-                          <IconButton size="small">
-                            <SearchIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <>
+                          <Tooltip title="Approve">
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => {
+                                setSelectedMRF(mrf);
+                                setApprovalDialogOpen(true);
+                              }}
+                              sx={{ mr: 1, textTransform: 'none' }}
+                            >
+                              Approve
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="Reject">
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              onClick={() => {
+                                setSelectedMRF(mrf);
+                                setApprovalDialogOpen(true);
+                              }}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Reject
+                            </Button>
+                          </Tooltip>
+                        </>
                       )}
                       {mrf.status === 'Approved' && (
                         <Tooltip title="Print">
@@ -517,16 +624,33 @@ const MRF = () => {
       </Paper>
 
       {/* Add Item Dialog */}
-      <Dialog open={addItemDialogOpen} onClose={() => setAddItemDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Request Item</DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Dialog open={addItemDialogOpen} onClose={() => {
+        setAddItemDialogOpen(false);
+        setPartSearchFilter('');
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>Add Request Item</DialogTitle>
+        <DialogContent sx={{ py: 1, pt: 3, overflow: 'visible' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'visible' }}>
+            {/* Search Filter for Parts */}
+            <TextField
+              label="Search Parts (SAP# or Name)"
+              placeholder="Enter part SAP# or name to filter..."
+              value={partSearchFilter}
+              onChange={(e) => setPartSearchFilter(e.target.value)}
+              fullWidth
+              size="small"
+              variant="outlined"
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />,
+              }}
+            />
+
             <FormControl fullWidth size="small">
               <InputLabel>Select Part (SAP# - Part Name)</InputLabel>
               <Select
                 value={newItem.sapNumber}
                 onChange={(e) => {
-                  const selectedPart = parts.find(p => p.sapNumber === e.target.value);
+                  const selectedPart = availableParts.find(p => p.sapNumber === e.target.value);
                   if (selectedPart) {
                     setNewItem({
                       ...newItem,
@@ -540,9 +664,15 @@ const MRF = () => {
                 label="Select Part (SAP# - Part Name)"
               >
                 <MenuItem value="">-- Select a Part --</MenuItem>
-                {parts.map((part) => (
+                {availableParts
+                  .filter(part => 
+                    partSearchFilter === '' ||
+                    part.sapNumber.toLowerCase().includes(partSearchFilter.toLowerCase()) ||
+                    part.name.toLowerCase().includes(partSearchFilter.toLowerCase())
+                  )
+                  .map((part) => (
                   <MenuItem key={part.id} value={part.sapNumber}>
-                    {part.sapNumber} - {part.name} (Stock: {part.currentStock || 0})
+                    {part.sapNumber} - {part.name} (Stock: {part.currentStock || 0} {part.unit || 'PCS'})
                   </MenuItem>
                 ))}
               </Select>
@@ -597,7 +727,10 @@ const MRF = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setAddItemDialogOpen(false)} variant="outlined">
+          <Button onClick={() => {
+            setAddItemDialogOpen(false);
+            setPartSearchFilter('');
+          }} variant="outlined">
             CANCEL
           </Button>
           <Button onClick={handleAddItem} variant="contained">
@@ -608,24 +741,36 @@ const MRF = () => {
 
       {/* Approval Dialog */}
       <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Approve MRF</DialogTitle>
+        <DialogTitle>
+          {selectedMRF?.status === 'Pending' ? 'Approve/Reject MRF' : 'Approve MRF'}
+        </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
+              label="MRF Number"
+              disabled
+              value={selectedMRF?.mrfNumber || ''}
+              fullWidth
+              size="small"
+            />
+            <TextField
               label="Requested By"
               disabled
+              value={selectedMRF?.requestedBy || ''}
               fullWidth
               size="small"
             />
             <TextField
               label="Department"
               disabled
+              value={selectedMRF?.department || ''}
               fullWidth
               size="small"
             />
             <TextField
               label="Total Items"
               disabled
+              value={selectedMRF?.items?.length || 0}
               fullWidth
               size="small"
             />
@@ -636,16 +781,33 @@ const MRF = () => {
               fullWidth
               size="small"
               placeholder="Add your comments here..."
+              value={approvalComments}
+              onChange={(e) => setApprovalComments(e.target.value)}
             />
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setApprovalDialogOpen(false)} variant="outlined" color="error">
-            REJECT
+          <Button onClick={() => setApprovalDialogOpen(false)} variant="outlined">
+            CANCEL
           </Button>
-          <Button onClick={() => setApprovalDialogOpen(false)} variant="contained">
-            APPROVE
-          </Button>
+          {selectedMRF?.status === 'Pending' && (
+            <>
+              <Button 
+                onClick={handleRejectMRF} 
+                variant="contained" 
+                color="error"
+              >
+                REJECT
+              </Button>
+              <Button 
+                onClick={handleApproveMRF} 
+                variant="contained" 
+                color="success"
+              >
+                APPROVE
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
