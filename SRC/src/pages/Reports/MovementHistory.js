@@ -101,7 +101,22 @@ const MovementHistory = () => {
             headerName: 'Date & Time',
             width: 180,
             type: 'dateTime',
-            valueGetter: (params) => params.row?.dateObj // Ensure compatible with DataGrid v6/v7
+            valueGetter: (value, row) => {
+                // If value is already a Date object (from row.dateObj), return it
+                if (value instanceof Date) return value;
+                // If row.dateObj is the source, use that
+                if (row?.dateObj instanceof Date) return row.dateObj;
+                // Fallback: try parsing timestamp
+                try {
+                    return row?.date?.toDate ? row.date.toDate() : new Date(row.date);
+                } catch (e) {
+                    return null;
+                }
+            },
+            valueFormatter: (value) => {
+                if (!value) return '';
+                return value.toLocaleString();
+            },
         },
         { field: 'type', headerName: 'Type', width: 100 },
         { field: 'partName', headerName: 'Part Name', width: 200, flex: 1 },
@@ -273,7 +288,7 @@ const MovementHistory = () => {
                         },
                     }}
                     pageSizeOptions={[10, 25, 50, 100]}
-                    checkboxSelection
+                    checkboxSelection={false}
                     disableRowSelectionOnClick
                     slots={{ toolbar: GridToolbar }}
                     slotProps={{

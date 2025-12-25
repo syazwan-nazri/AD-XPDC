@@ -43,6 +43,8 @@ import Snackbar from "@mui/material/Snackbar";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import CircularProgress from "@mui/material/CircularProgress";
+import InputAdornment from "@mui/material/InputAdornment";
+import SearchIcon from "@mui/icons-material/Search";
 
 const defaultForm = {
   email: "",
@@ -69,6 +71,8 @@ const UserManagement = () => {
     msg: "",
     severity: "success",
   });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   // State for showing generated password
   const [createdUserDialog, setCreatedUserDialog] = useState({
@@ -101,10 +105,10 @@ const UserManagement = () => {
       const groups = querySnapshot.docs.map((doc) => {
         const data = doc.data();
         return {
+          ...data,
           id: doc.id,
           groupId: data.groupId || doc.id,
-          groupName: data.name || data.groupName || doc.id,
-          ...data,
+          groupName: data.name || data.groupName || doc.id || '',
         };
       });
       setUserGroups(groups);
@@ -147,7 +151,7 @@ const UserManagement = () => {
   const handleSave = async () => {
     const { email, username, department, groupId, id } = modal.data;
     console.log("Save user - groupId:", groupId, "isAdmin:", isAdmin);
-    
+
     if (!email || !username || !department || !groupId) {
       setSnackbar({
         open: true,
@@ -170,9 +174,9 @@ const UserManagement = () => {
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("username", "==", username));
       const querySnapshot = await getDocs(q);
-      
+
       const isDuplicateUsername = querySnapshot.docs.some(doc => doc.id !== id); // Exclude current user if editing
-      
+
       if (isDuplicateUsername) {
         setSnackbar({
           open: true,
@@ -194,42 +198,42 @@ const UserManagement = () => {
       } else {
         // On create: generate password, create user in Firebase Auth using SECONDARY APP
         const generatedPassword = generatePassword(10);
-        
+
         // Initialize a secondary app to create user without logging out the admin
         const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
         const secondaryAuth = getAuth(secondaryApp);
-        
+
         try {
-            const cred = await createUserWithEmailAndPassword(
-              secondaryAuth,
-              email,
-              generatedPassword
-            );
-            
-            await setDoc(doc(db, "users", cred.user.uid), {
-              email,
-              username,
-              department,
-              groupId,
-              uid: cred.user.uid,
-              status: "active",
-              mustChangePassword: true, // Force password change
-              createdAt: new Date().toISOString(),
-            });
-            
-            // Show the generated password to the admin
-            setCreatedUserDialog({
-              open: true,
-              email: email,
-              password: generatedPassword,
-            });
-            
-            setSnackbar({ open: true, msg: "User added.", severity: "success" });
+          const cred = await createUserWithEmailAndPassword(
+            secondaryAuth,
+            email,
+            generatedPassword
+          );
+
+          await setDoc(doc(db, "users", cred.user.uid), {
+            email,
+            username,
+            department,
+            groupId,
+            uid: cred.user.uid,
+            status: "active",
+            mustChangePassword: true, // Force password change
+            createdAt: new Date().toISOString(),
+          });
+
+          // Show the generated password to the admin
+          setCreatedUserDialog({
+            open: true,
+            email: email,
+            password: generatedPassword,
+          });
+
+          setSnackbar({ open: true, msg: "User added.", severity: "success" });
         } finally {
-            // Clean up the secondary app
-            if (secondaryApp) {
-              await deleteApp(secondaryApp);
-            }
+          // Clean up the secondary app
+          if (secondaryApp) {
+            await deleteApp(secondaryApp);
+          }
         }
       }
       closeModal();
@@ -280,21 +284,27 @@ const UserManagement = () => {
   };
 
   const columns = [
-    { field: "email", headerName: "Email", flex: 1 },
     { field: "username", headerName: "Username", flex: 0.7 },
+    { field: "email", headerName: "Email", flex: 1 },
     { field: "department", headerName: "Department", width: 140 },
     {
       field: "groupId",
       headerName: "Group",
       width: 180,
-      renderCell: ({ row }) =>
-        userGroups.find((g) => g.groupId === row.groupId)?.groupName ||
-        row.groupId,
+      // valueGetter helps sort by the displayed name instead of the ID
+      // DataGrid v6+: valueGetter(value, row)
+      valueGetter: (value, row) => {
+        const gId = value || row?.groupId;
+        const group = userGroups.find((g) => g.groupId === gId);
+        return group?.groupName || gId || "";
+      },
     },
     {
       field: "actions",
       headerName: "Actions",
       width: 130,
+      sortable: false,
+      filterable: false,
       renderCell: ({ row }) => (
         <>
           <IconButton size="small" onClick={() => openEdit(row)}>
@@ -311,6 +321,17 @@ const UserManagement = () => {
       ),
     },
   ];
+
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.department?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRole =
+      roleFilter === "all" || user.groupId === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
 
   return (
     <Box
@@ -336,6 +357,45 @@ const UserManagement = () => {
           </Button>
         )}
       </Box>
+
+      {/* Search and Filter Section */}
+      <Box display="flex" gap={2} mb={3}>
+        <TextField
+          label="Search Users"
+          variant="outlined"
+          size="small"
+          fullWidth
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel id="role-filter-label">Filter by Group</InputLabel>
+          <Select
+            labelId="role-filter-label"
+            value={roleFilter}
+            label="Filter by Group"
+            onChange={(e) => setRoleFilter(e.target.value)}
+          >
+            <MenuItem value="all">All Groups</MenuItem>
+            {userGroups.map((group) => (
+              <MenuItem
+                key={group.groupId || group.id}
+                value={group.groupId || group.id}
+              >
+                {group.groupName || group.name || group.id}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
       <div style={{ height: 520, width: "100%" }}>
         {loading ? (
           <Box
@@ -348,7 +408,7 @@ const UserManagement = () => {
           </Box>
         ) : (
           <DataGrid
-            rows={users}
+            rows={filteredUsers}
             columns={columns}
             autoHeight
             pageSize={8}
@@ -431,9 +491,9 @@ const UserManagement = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={closeModal}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            color="primary" 
+          <Button
+            variant="contained"
+            color="primary"
             onClick={handleSave}
             disabled={!isAdmin}
           >
@@ -443,8 +503,8 @@ const UserManagement = () => {
       </Dialog>
 
       {/* Created User Password Dialog */}
-      <Dialog 
-        open={createdUserDialog.open} 
+      <Dialog
+        open={createdUserDialog.open}
         onClose={() => setCreatedUserDialog({ ...createdUserDialog, open: false })}
         maxWidth="xs"
         fullWidth
@@ -454,11 +514,11 @@ const UserManagement = () => {
           <Typography variant="body1" gutterBottom>
             The user has been created. Please share the following password with them. They will be required to change it upon first login.
           </Typography>
-          <Box 
-            sx={{ 
-              bgcolor: 'action.hover', 
-              p: 2, 
-              borderRadius: 1, 
+          <Box
+            sx={{
+              bgcolor: 'action.hover',
+              p: 2,
+              borderRadius: 1,
               mt: 2,
               display: 'flex',
               alignItems: 'center',
