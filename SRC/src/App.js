@@ -274,6 +274,9 @@ function AppShell({ toggleTheme }) {
               <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
               <Route path="/inventory/movement-logs" element={<MovementLog />} />
               <Route path="/inventory/mrf" element={<MRF />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
               <Route path="/inventory/stock-take" element={<StockTake />} />
             </Route>
 

@@ -17,6 +17,7 @@ export const Roles = {
       canAccessReports: true,
       canAccessInventory: true,
       canAccessProcurement: true,
+      canAccessStockTake: true,
     }
   },
   STOREKEEPER: {
@@ -36,6 +37,7 @@ export const Roles = {
       canAccessReports: true,
       canAccessInventory: true,
       canAccessProcurement: false,
+      canAccessStockTake: true,
     }
   },
   PROCUREMENT: {
@@ -55,6 +57,7 @@ export const Roles = {
       canAccessReports: true,
       canAccessInventory: false,
       canAccessProcurement: true,
+      canAccessStockTake: true,
     }
   },
   MAINTENANCE: {
@@ -73,6 +76,7 @@ export const Roles = {
       canAccessSupplierManagement: false,
       canAccessReports: true,
       canAccessInventory: true, // Can request stock out
+      canAccessStockTake: false,
       canAccessProcurement: false,
     }
   }
