@@ -48,7 +48,7 @@ const MRF = () => {
     requestedBy: '',
     department: '',
     project: '',
-    priority: 'Medium',
+    priority: '',
     requiredDate: '',
   });
 
@@ -204,7 +204,7 @@ const MRF = () => {
         requestedBy: '',
         department: '',
         project: '',
-        priority: 'Medium',
+        priority: '',
         requiredDate: '',
       });
       setMrfItems([]);
@@ -341,21 +341,7 @@ const MRF = () => {
           />
         </Box>
 
-        {/* Priority Selection */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>Priority</Typography>
-          <FormControl component="fieldset">
-            <RadioGroup
-              row
-              value={mrfHeader.priority}
-              onChange={(e) => setMrfHeader({ ...mrfHeader, priority: e.target.value })}
-            >
-              <FormControlLabel value="High" control={<Radio />} label="High" />
-              <FormControlLabel value="Medium" control={<Radio />} label="Medium" />
-              <FormControlLabel value="Low" control={<Radio />} label="Low" />
-            </RadioGroup>
-          </FormControl>
-        </Box>
+
       </Paper>
 
       {/* Requested Items Section */}
@@ -441,44 +427,30 @@ const MRF = () => {
         />
       </Paper>
 
-      {/* Approval Workflow Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          APPROVAL WORKFLOW
-        </Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography>Requester:</Typography>
-            <Checkbox disabled />
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography>Supervisor:</Typography>
-            <Checkbox disabled />
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography>Store Manager:</Typography>
-            <Checkbox disabled />
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography>HOD:</Typography>
-            <Checkbox disabled />
-          </Box>
-        </Box>
-      </Paper>
-
       {/* Actions Section */}
       <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
           ACTIONS
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" onClick={() => handleSaveMRF('Draft')}>
-            SAVE DRAFT
-          </Button>
           <Button variant="contained" onClick={() => handleSaveMRF('Submitted')}>
             SUBMIT
           </Button>
-          <Button variant="outlined">PRINT</Button>
+          <Button variant="outlined" onClick={() => {
+            setMrfHeader({
+              mrfNumber: '',
+              date: new Date().toISOString().split('T')[0],
+              requestedBy: '',
+              department: '',
+              project: '',
+              priority: '',
+              requiredDate: '',
+            });
+            setMrfItems([]);
+            setJustification('');
+          }}>
+            CLEAR
+          </Button>
           <Button variant="outlined" color="error">
             CANCEL
           </Button>
@@ -531,57 +503,62 @@ const MRF = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Tooltip title="View">
-                        <IconButton size="small">
-                          <SearchIcon fontSize="small" />
-                        </IconButton>
+                      <Tooltip title="Approve">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          onClick={async () => {
+                            setSelectedMRF(mrf);
+                            try {
+                              const mrfRef = doc(db, 'mrf', mrf.id);
+                              await updateDoc(mrfRef, {
+                                status: 'Approved',
+                                approvedBy: 'Current User',
+                                approvalDate: new Date().toISOString(),
+                              });
+                              setSnackbar({ open: true, message: 'MRF Approved successfully', severity: 'success' });
+                              const mrfSnapshot = await getDocs(collection(db, 'mrf'));
+                              const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                              setMrfList(mrfData);
+                            } catch (error) {
+                              console.error('Error approving MRF:', error);
+                              setSnackbar({ open: true, message: 'Error approving MRF', severity: 'error' });
+                            }
+                          }}
+                          sx={{ mr: 1, textTransform: 'none' }}
+                        >
+                          Approve
+                        </Button>
                       </Tooltip>
-                      {mrf.status === 'Draft' && (
-                        <Tooltip title="Edit">
-                          <IconButton size="small">
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {mrf.status === 'Pending' && (
-                        <>
-                          <Tooltip title="Approve">
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="success"
-                              onClick={() => {
-                                setSelectedMRF(mrf);
-                                setApprovalDialogOpen(true);
-                              }}
-                              sx={{ mr: 1, textTransform: 'none' }}
-                            >
-                              Approve
-                            </Button>
-                          </Tooltip>
-                          <Tooltip title="Reject">
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="error"
-                              onClick={() => {
-                                setSelectedMRF(mrf);
-                                setApprovalDialogOpen(true);
-                              }}
-                              sx={{ textTransform: 'none' }}
-                            >
-                              Reject
-                            </Button>
-                          </Tooltip>
-                        </>
-                      )}
-                      {mrf.status === 'Approved' && (
-                        <Tooltip title="Print">
-                          <IconButton size="small">
-                            <SearchIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="Reject">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          onClick={async () => {
+                            setSelectedMRF(mrf);
+                            try {
+                              const mrfRef = doc(db, 'mrf', mrf.id);
+                              await updateDoc(mrfRef, {
+                                status: 'Rejected',
+                                rejectedBy: 'Current User',
+                                rejectionDate: new Date().toISOString(),
+                              });
+                              setSnackbar({ open: true, message: 'MRF Rejected', severity: 'warning' });
+                              const mrfSnapshot = await getDocs(collection(db, 'mrf'));
+                              const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                              setMrfList(mrfData);
+                            } catch (error) {
+                              console.error('Error rejecting MRF:', error);
+                              setSnackbar({ open: true, message: 'Error rejecting MRF', severity: 'error' });
+                            }
+                          }}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Reject
+                        </Button>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))
