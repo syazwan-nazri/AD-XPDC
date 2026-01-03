@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { useSelector } from 'react-redux';
-import { Button, Snackbar, TextField, Autocomplete, Paper, Box, Typography } from '@mui/material';
+import { Button, Snackbar, TextField, Autocomplete, Paper, Box, Typography, Grid, Card, CardContent, Divider, Stack, Alert } from '@mui/material';
+import { LocalShipping, CheckCircle } from '@mui/icons-material';
 
 const StockOut = () => {
   const user = useSelector(state => state.auth.user);
@@ -11,7 +12,7 @@ const StockOut = () => {
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
   const [receiver, setReceiver] = useState('');
-  const [workOrder, setWorkOrder] = useState('');
+  const [mrfNumber, setMrfNumber] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
@@ -52,7 +53,7 @@ const StockOut = () => {
         userName: user.username || user.email,
         remarks: remarks,
         receiver: receiver,
-        workOrder: workOrder
+        mrfNumber: mrfNumber
       });
 
       setSnackbar({ open: true, message: 'Stock Out Successful', severity: 'success' });
@@ -60,7 +61,7 @@ const StockOut = () => {
       setQuantity('');
       setRemarks('');
       setReceiver('');
-      setWorkOrder('');
+      setMrfNumber('');
       
       const updatedParts = parts.map(p => p.id === selectedPart.id ? { ...p, currentStock: newStock } : p);
       setParts(updatedParts);
@@ -72,64 +73,210 @@ const StockOut = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', mt: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h5" gutterBottom>Stock Out (Issue)</Typography>
-        
-        <Autocomplete
-          options={parts}
-          getOptionLabel={(option) => `${option.sapNumber} - ${option.name} (Stock: ${option.currentStock || 0})`}
-          value={selectedPart}
-          onChange={(event, newValue) => setSelectedPart(newValue)}
-          renderInput={(params) => <TextField {...params} label="Select Part" margin="normal" />}
-        />
+    <Box sx={{ 
+      minHeight: '100vh', 
+      background: '#ffffff',
+      py: 4 
+    }}>
+      <Box sx={{ maxWidth: 700, mx: 'auto', px: 2 }}>
+        {/* Header Card */}
+        <Card sx={{ 
+          mb: 3, 
+          background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+          color: 'white',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+        }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <LocalShipping sx={{ fontSize: 40 }} />
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Stock Out</Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>Issue & Log Inventory</Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
 
-        <TextField
-          label="Quantity"
-          type="number"
-          fullWidth
-          margin="normal"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-        />
+        {/* Main Form Card */}
+        <Paper elevation={6} sx={{ 
+          p: 4,
+          borderRadius: 3,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+          backgroundColor: '#ffffff'
+        }}>
+          
+          {/* Part Selection Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" sx={{ 
+              fontWeight: 600, 
+              mb: 2,
+              color: '#1976d2',
+              textTransform: 'uppercase',
+              fontSize: '0.85rem',
+              letterSpacing: 1
+            }}>
+              📦 Item Details
+            </Typography>
+            <Autocomplete
+              options={parts}
+              getOptionLabel={(option) => `${option.sapNumber} - ${option.name} (Stock: ${option.currentStock || 0})`}
+              value={selectedPart}
+              onChange={(event, newValue) => setSelectedPart(newValue)}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="Select Part" 
+                  margin="normal"
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      '&:hover fieldset': {
+                        borderColor: '#1976d2',
+                      },
+                    }
+                  }}
+                />
+              )}
+            />
+            <TextField
+              label="Quantity"
+              type="number"
+              fullWidth
+              margin="normal"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                  '&:hover fieldset': {
+                    borderColor: '#1976d2',
+                  },
+                }
+              }}
+            />
+          </Box>
 
-        <TextField
-          label="Receiver (Technician Name)"
-          fullWidth
-          margin="normal"
-          value={receiver}
-          onChange={(e) => setReceiver(e.target.value)}
-        />
+          <Divider sx={{ my: 3 }} />
 
-        <TextField
-          label="Work Order #"
-          fullWidth
-          margin="normal"
-          value={workOrder}
-          onChange={(e) => setWorkOrder(e.target.value)}
-        />
+          {/* Receiver & Work Order Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" sx={{ 
+              fontWeight: 600, 
+              mb: 2,
+              color: '#1976d2',
+              textTransform: 'uppercase',
+              fontSize: '0.85rem',
+              letterSpacing: 1
+            }}>
+              👤 Receiver Information
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Receiver (Technician Name)"
+                  fullWidth
+                  margin="normal"
+                  value={receiver}
+                  onChange={(e) => setReceiver(e.target.value)}
+                  variant="outlined"
+                  placeholder="Name"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      '&:hover fieldset': {
+                        borderColor: '#1976d2',
+                      },
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="MRF Number"
+                  fullWidth
+                  margin="normal"
+                  value={mrfNumber}
+                  onChange={(e) => setMrfNumber(e.target.value)}
+                  variant="outlined"
+                  placeholder="MRF-XXXXX"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      '&:hover fieldset': {
+                        borderColor: '#1976d2',
+                      },
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Box>
 
-        <TextField
-          label="Remarks"
-          fullWidth
-          multiline
-          rows={3}
-          margin="normal"
-          value={remarks}
-          onChange={(e) => setRemarks(e.target.value)}
-        />
+          <Divider sx={{ my: 3 }} />
 
-        <Button 
-          variant="contained" 
-          color="warning"
-          fullWidth 
-          size="large" 
-          sx={{ mt: 3 }} 
-          onClick={handleSubmit}
-        >
-          CONFIRM STOCK OUT
-        </Button>
-      </Paper>
+          {/* Additional Info Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" sx={{ 
+              fontWeight: 600, 
+              mb: 2,
+              color: '#1976d2',
+              textTransform: 'uppercase',
+              fontSize: '0.85rem',
+              letterSpacing: 1
+            }}>
+              📝 Additional Notes
+            </Typography>
+            <TextField
+              label="Remarks"
+              fullWidth
+              multiline
+              rows={3}
+              margin="normal"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              variant="outlined"
+              placeholder="Add any special notes or conditions..."
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                  '&:hover fieldset': {
+                    borderColor: '#1976d2',
+                  },
+                }
+              }}
+            />
+          </Box>
+
+          {/* Action Button */}
+          <Button 
+            variant="contained" 
+            fullWidth 
+            size="large" 
+            onClick={handleSubmit}
+            startIcon={<CheckCircle />}
+            sx={{ 
+              mt: 3,
+              background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+              py: 1.8,
+              fontWeight: 600,
+              fontSize: '1rem',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              borderRadius: '12px',
+              boxShadow: '0 4px 15px rgba(25, 118, 210, 0.4)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 25px rgba(25, 118, 210, 0.6)',
+                transform: 'translateY(-2px)'
+              }
+            }}
+          >
+            Confirm Stock Out
+          </Button>
+        </Paper>
+      </Box>
       <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} severity={snackbar.severity} />
     </Box>
   );
