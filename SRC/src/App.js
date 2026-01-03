@@ -251,30 +251,44 @@ function AppShell({ toggleTheme }) {
             <Route element={<ProtectedRoute />}>
               <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
               <Route path="/reports/stock-inquiry" element={<StockInquiryReport />} />
-              <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
               <Route path="/reports/stock-movement" element={<MovementHistory />} />
               <Route path="/reports/low-stock" element={<LowStockReport />} />
               <Route path="/change-password" element={<ChangePassword />} />
             </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
+              <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
+            </Route>
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
               <Route path="/admin/user-master" element={<UserManagement />} />
-              <Route
-                path="/admin/user-group-master"
-                element={<UserGroupMaster />}
-              />
+              <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
+              <Route path="/admin/supplier-master" element={<SupplierMaster />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
               <Route path="/admin/part-master" element={<PartMaster />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER]} />}>
               <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
               <Route path="/admin/bin-master" element={<StorageMaster />} />
-              <Route path="/admin/supplier-master" element={<SupplierMaster />} />
-              <Route path="/admin/machine-master" element={<MachineMaster />} />
-              {/* Other admin protected routes */}
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
+              <Route path="/admin/machine-master" element={<MachineMaster />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER]} />}>
               <Route path="/inventory/stock-in" element={<StockIn />} />
               <Route path="/inventory/stock-out" element={<StockOut />} />
               <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
               <Route path="/inventory/movement-logs" element={<MovementLog />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
               <Route path="/inventory/mrf" element={<MRF />} />
             </Route>
 
@@ -292,7 +306,7 @@ function AppShell({ toggleTheme }) {
           </Routes>
         </Box>
       </Box>
-    </AuthGuard>
+    </AuthGuard >
   );
 }
 

@@ -11,6 +11,7 @@ export const Roles = {
       // Module access permissions
       canAccessUserManagement: true,
       canAccessPartMaster: true,
+      canAccessPartGroupMaster: true,
       canAccessAssetRegistry: true,
       canAccessStorageLocations: true,
       canAccessSupplierManagement: true,
@@ -18,6 +19,8 @@ export const Roles = {
       canAccessInventory: true,
       canAccessProcurement: true,
       canAccessStockTake: true,
+      canAccessMRF: true,
+      canAccessStockValuation: true,
     }
   },
   STOREKEEPER: {
@@ -31,6 +34,7 @@ export const Roles = {
       // Module access permissions
       canAccessUserManagement: false,
       canAccessPartMaster: true,
+      canAccessPartGroupMaster: true,
       canAccessAssetRegistry: true,
       canAccessStorageLocations: true,
       canAccessSupplierManagement: false,
@@ -38,6 +42,8 @@ export const Roles = {
       canAccessInventory: true,
       canAccessProcurement: false,
       canAccessStockTake: true,
+      canAccessMRF: true,
+      canAccessStockValuation: true,
     }
   },
   PROCUREMENT: {
@@ -58,6 +64,8 @@ export const Roles = {
       canAccessInventory: false,
       canAccessProcurement: true,
       canAccessStockTake: true,
+      canAccessMRF: false,
+      canAccessStockValuation: true,
     }
   },
   MAINTENANCE: {
@@ -75,9 +83,11 @@ export const Roles = {
       canAccessStorageLocations: false,
       canAccessSupplierManagement: false,
       canAccessReports: true,
-      canAccessInventory: true, // Can request stock out
+      canAccessInventory: false,
       canAccessStockTake: false,
       canAccessProcurement: false,
+      canAccessMRF: true,
+      canAccessStockValuation: false,
     }
   }
 };
@@ -103,6 +113,6 @@ export const getAccessibleModules = (userRole) => {
   if (role.permissions.canAccessStorageLocations) modules.push('storageLocations');
   if (role.permissions.canAccessSupplierManagement) modules.push('supplierManagement');
   if (role.permissions.canAccessReports) modules.push('reports');
-  
+
   return modules;
 };
