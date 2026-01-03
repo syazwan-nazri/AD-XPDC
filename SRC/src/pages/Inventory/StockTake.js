@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { useDispatch, useSelector } from 'react-redux';
 import { setParts } from '../../redux/partsSlice';
 import {
@@ -27,14 +29,21 @@ import {
   Alert,
   LinearProgress,
   Chip,
+
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import CameraIcon from '@mui/icons-material/PhotoCamera';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const StockTake = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const parts = useSelector(state => state.parts.parts || []);
   const [storageLocations, setStorageLocations] = useState([]);
@@ -46,33 +55,27 @@ const StockTake = () => {
   const [sessionForm, setSessionForm] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
-    selectionMode: 'All', // All, ByLocation, ByGroup
-    selectedLocationId: '',
-    selectedGroupId: '',
     startedBy: 'Current User',
     startDate: new Date().toISOString().split('T')[0],
     status: 'Not Started',
   });
 
+
+
   const [stockTakeSessions, setStockTakeSessions] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
-  const [countEntries, setCountEntries] = useState([]);
+
+  // Search & Filter
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('All');
+
   const [pageStart, setPageStart] = useState(0);
-  const [stockCountPageStart, setStockCountPageStart] = useState(0);
   const pageSize = 20;
 
   // Dialog states
-  const [barcodeDialogOpen, setBarcodeDialogOpen] = useState(false);
-  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
-  const [viewVarianceDialogOpen, setViewVarianceDialogOpen] = useState(false);
-  const [selectedSessionView, setSelectedSessionView] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedSessionEdit, setSelectedSessionEdit] = useState(null);
   const [editStatus, setEditStatus] = useState('');
-
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [currentCountItem, setCurrentCountItem] = useState(null);
-  const [approvalComments, setApprovalComments] = useState('');
 
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -109,83 +112,7 @@ const StockTake = () => {
     fetchData();
   }, [dispatch, parts.length]);
 
-  // Get filtered parts for current session
-  // Get filtered parts for current session or preview
-  const filteredParts = useMemo(() => {
-    // If a session is active, use its criteria
-    const criteria = currentSession ? {
-      selectionMode: currentSession.selectionMode,
-      selectedLocationId: currentSession.selectedLocationId,
-      selectedGroupId: currentSession.selectedGroupId
-    } : {
-      selectionMode: sessionForm.selectionMode,
-      selectedLocationId: sessionForm.selectedLocationId,
-      selectedGroupId: sessionForm.selectedGroupId
-    };
 
-    return parts.filter(p => {
-      if (criteria.selectionMode === 'ByLocation') {
-        const location = storageLocations.find(l => l.id === criteria.selectedLocationId);
-        if (!location) return false;
-        // Match Rack Number and Level
-        const partRack = p.rackNumber || '';
-        const partLevel = p.rackLevel || '';
-        const locRack = location.rackNumber || '';
-        const locLevel = location.rackLevel || '';
-
-        // Exact match
-        return partRack == locRack && partLevel == locLevel;
-      }
-
-      if (criteria.selectionMode === 'ByGroup') {
-        if (!criteria.selectedGroupId) return false;
-        // Match Material Group ID or Name?
-        // parts store 'materialGroupId' usually, but legacy might have 'materialGroup' name string.
-        // Let's assume ID if available, else name check
-        if (p.materialGroupId) return p.materialGroupId === criteria.selectedGroupId;
-        // Fallback to name match if p.materialGroup exists
-        const group = materialGroups.find(g => g.id === criteria.selectedGroupId);
-        if (group && p.materialGroup) return p.materialGroup === group.materialGroup;
-        return false;
-      }
-
-      return true; // Mode 'All'
-    });
-  }, [parts, currentSession, sessionForm, storageLocations, materialGroups]);
-
-  // Calculate progress
-  const progressStats = useMemo(() => {
-    const total = filteredParts.length;
-    const counted = countEntries.length;
-    const remaining = total - counted;
-    const percentage = total > 0 ? Math.round((counted / total) * 100) : 0;
-
-    return { total, counted, remaining, percentage };
-  }, [filteredParts, countEntries]);
-
-  // Calculate variance report
-  const varianceReport = useMemo(() => {
-    if (!currentSession || currentSession.status !== 'In Progress') return null;
-
-    const variances = countEntries.map(entry => {
-      const variance = (entry.countQty || 0) - (entry.stockQty || 0);
-      return { ...entry, variance };
-    });
-
-    const zeroVariance = variances.filter(v => v.variance === 0).length;
-    const positiveVariance = variances.filter(v => v.variance > 0);
-    const negativeVariance = variances.filter(v => v.variance < 0);
-    const totalVarianceValue = positiveVariance.reduce((sum, v) => sum + (v.variance * 100), 0) +
-      negativeVariance.reduce((sum, v) => sum + (v.variance * 100), 0);
-
-    return {
-      variances,
-      zeroVariance,
-      positiveCount: positiveVariance.length,
-      negativeCount: negativeVariance.length,
-      totalVarianceValue,
-    };
-  }, [currentSession, countEntries]);
 
   // Handle start new stock take
   const handleStartStockTake = async () => {
@@ -203,158 +130,34 @@ const StockTake = () => {
     try {
       const docRef = await addDoc(collection(db, 'stockTakeSessions'), newSession);
       const createdSession = { ...newSession, id: docRef.id };
-      setStockTakeSessions([...stockTakeSessions, createdSession]);
-      setCurrentSession(createdSession);
-      setCountEntries([]);
-      setSnackbar({ open: true, message: 'Stock Take session started', severity: 'success' });
+
+      // Navigate to process page
+      navigate('/inventory/stock-take/process', { state: { session: createdSession } });
+
     } catch (error) {
       console.error('Error starting session:', error);
       setSnackbar({ open: true, message: 'Error starting session', severity: 'error' });
     }
   };
 
-  // Handle barcode scan
-  const handleBarcodeScan = () => {
-    const scannedPart = parts.find(p => p.sapNumber === barcodeInput);
-    if (scannedPart) {
-      setCurrentCountItem({
-        sapNumber: scannedPart.sapNumber,
-        partName: scannedPart.name,
-        location: scannedPart.rackNumber ? `${scannedPart.rackNumber}-${scannedPart.rackLevel}` : 'N/A',
-        stockQty: scannedPart.currentStock || 0,
-        countQty: '',
-        id: Date.now(),
-      });
-      setBarcodeInput('');
-    } else {
-      setSnackbar({ open: true, message: 'Part not found', severity: 'error' });
-    }
+  const handleSessionClick = (session) => {
+    navigate('/inventory/stock-take/process', { state: { session } });
   };
 
-  // Handle save count
-  const handleSaveCount = () => {
-    if (!currentCountItem.countQty) {
-      setSnackbar({ open: true, message: 'Please enter count quantity', severity: 'error' });
-      return;
-    }
 
-    const existingIndex = countEntries.findIndex(e => e.sapNumber === currentCountItem.sapNumber);
-    if (existingIndex >= 0) {
-      const updated = [...countEntries];
-      updated[existingIndex] = currentCountItem;
-      setCountEntries(updated);
-    } else {
-      setCountEntries([...countEntries, currentCountItem]);
-    }
-
-    setCurrentCountItem(null);
-    setBarcodeDialogOpen(false);
-    setSnackbar({ open: true, message: 'Count saved', severity: 'success' });
-  };
-
-  // Handle approve stock take
-  const handleApproveStockTake = async () => {
-    if (!currentSession) return;
-
-    // Mandatory remarks check
-    if (!approvalComments || approvalComments.trim() === '') {
-      setSnackbar({ open: true, message: 'Approval remarks are mandatory', severity: 'error' });
-      return;
-    }
-
-    try {
-      const batch = writeBatch(db);
-
-      // Update parts stock and add movement logs
-      countEntries.forEach(entry => {
-        const variance = (entry.countQty || 0) - (entry.stockQty || 0);
-        if (variance !== 0) {
-          // Find part ID (entry might not have it if it comes from session, need to match sapNumber)
-          // Actually entry should have matched data, but local `countEntries` has `sapNumber`.
-          // We need to find the part's doc ID from the `parts` list.
-          const part = parts.find(p => p.sapNumber === entry.sapNumber);
-          if (part && part.id) {
-            const partRef = doc(db, 'parts', part.id);
-            batch.update(partRef, {
-              currentStock: entry.countQty,
-              updatedAt: new Date().toISOString()
-            });
-
-            // Add movement log
-            const logRef = doc(collection(db, 'movement_logs'));
-            batch.set(logRef, {
-              date: new Date(),
-              type: 'STOCK TAKE',
-              partName: part.name,
-              sapNumber: part.sapNumber,
-              quantity: variance, // + for gain, - for loss
-              userName: sessionForm.startedBy || 'System',
-              remarks: `Stock Take Adjustment: ${approvalComments} (Session ${months[sessionForm.month - 1]} ${sessionForm.year})`
-            });
-          }
-        }
-      });
-
-      // Update session status
-      const sessionRef = doc(db, 'stockTakeSessions', currentSession.id);
-      batch.update(sessionRef, {
-        status: 'Approved',
-        approvalComments,
-        approvedAt: new Date().toISOString(),
-      });
-
-      await batch.commit();
-
-      const updated = { ...currentSession, status: 'Approved', approvalComments };
-      setCurrentSession(updated);
-      setApprovalDialogOpen(false);
-      setApprovalComments('');
-
-      // Refresh stock take sessions list and parts
-      const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
-      const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setStockTakeSessions(sessionData);
-
-      // Refresh parts in Redux
-      const partsSnapshot = await getDocs(collection(db, 'parts'));
-      const partsData = partsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      dispatch(setParts(partsData));
-
-      setSnackbar({ open: true, message: 'Stock Take approved and adjustments posted', severity: 'success' });
-    } catch (error) {
-      console.error('Error approving:', error);
-      setSnackbar({ open: true, message: 'Error approving stock take', severity: 'error' });
-    }
-  };
-
-  // Handle save progress
-  const handleSaveProgress = async () => {
-    if (!currentSession) return;
-
-    try {
-      await updateDoc(doc(db, 'stockTakeSessions', currentSession.id), {
-        items: countEntries,
-        lastUpdated: new Date().toISOString(),
-      });
-
-      const updated = { ...currentSession, items: countEntries };
-      setCurrentSession(updated);
-
-      // Refresh stock take sessions list
-      const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
-      const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setStockTakeSessions(sessionData);
-
-      setSnackbar({ open: true, message: 'Progress saved successfully', severity: 'success' });
-    } catch (error) {
-      console.error('Error saving progress:', error);
-      setSnackbar({ open: true, message: 'Error saving progress', severity: 'error' });
-    }
-  };
 
   // Pagination for history
-  const pageEnd = Math.min(pageStart + pageSize, stockTakeSessions.length);
-  const sessionsPaginated = stockTakeSessions.slice(pageStart, pageEnd);
+  // Filter
+  const filteredSessions = stockTakeSessions.filter(session => {
+    const matchStatus = historyStatusFilter === 'All' || session.status === historyStatusFilter;
+    const searchString = `${months[session.month - 1]} ${session.year} ${session.status}`.toLowerCase();
+    const matchSearch = searchString.includes(historySearch.toLowerCase());
+    return matchStatus && matchSearch;
+  });
+
+  // Pagination for history
+  const pageEnd = Math.min(pageStart + pageSize, filteredSessions.length);
+  const sessionsPaginated = filteredSessions.slice(pageStart, pageEnd);
 
   if (loading) {
     return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
@@ -395,57 +198,6 @@ const StockTake = () => {
             size="small"
           />
 
-          <FormControl fullWidth size="small">
-            <InputLabel>Selection Mode</InputLabel>
-            <Select
-              value={sessionForm.selectionMode}
-              onChange={(e) => setSessionForm({
-                ...sessionForm,
-                selectionMode: e.target.value,
-                selectedLocationId: '',
-                selectedGroupId: ''
-              })}
-              label="Selection Mode"
-            >
-              <MenuItem value="All">All Parts</MenuItem>
-              <MenuItem value="ByLocation">By Location</MenuItem>
-              <MenuItem value="ByGroup">By Material Group</MenuItem>
-            </Select>
-          </FormControl>
-
-          {sessionForm.selectionMode === 'ByLocation' && (
-            <FormControl fullWidth size="small">
-              <InputLabel>Location</InputLabel>
-              <Select
-                value={sessionForm.selectedLocationId}
-                onChange={(e) => setSessionForm({ ...sessionForm, selectedLocationId: e.target.value })}
-                label="Location"
-              >
-                {storageLocations.map(loc => (
-                  <MenuItem key={loc.id} value={loc.id}>
-                    {loc.binId} - {loc.description} ({loc.rackNumber}-{loc.rackLevel})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-
-          {sessionForm.selectionMode === 'ByGroup' && (
-            <FormControl fullWidth size="small">
-              <InputLabel>Material Group</InputLabel>
-              <Select
-                value={sessionForm.selectedGroupId}
-                onChange={(e) => setSessionForm({ ...sessionForm, selectedGroupId: e.target.value })}
-                label="Material Group"
-              >
-                {materialGroups.map(group => (
-                  <MenuItem key={group.id} value={group.id}>
-                    {group.materialGroup}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
         </Box>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, mb: 2 }}>
@@ -485,228 +237,38 @@ const StockTake = () => {
         </Box>
       </Paper>
 
-      {/* Stock Count Entry Section */}
-      {currentSession && currentSession.status === 'In Progress' && (
-        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              STOCK COUNT ENTRY ({parts && parts.length > 0 ? parts.length : 0} PARTS)
-            </Typography>
-            {loading && <Typography variant="body2" sx={{ color: '#999' }}>Loading parts...</Typography>}
-          </Box>
 
-          {parts && parts.length > 0 ? (
-            <Box sx={{ overflowX: 'auto' }}>
-              <Table size="small">
-                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Part Name</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Location</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock Qty</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Count Qty</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Variance</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {parts && parts.slice(stockCountPageStart, stockCountPageStart + pageSize).map((part) => {
-                    const countEntry = countEntries.find(e => e.sapNumber === part.sapNumber);
-                    const countQty = countEntry ? countEntry.countQty : '';
-                    const variance = (countQty || 0) - (part.currentStock || 0);
-                    const location = part.rackNumber ? `${part.rackNumber}-${part.rackLevel}` : 'N/A';
-
-                    return (
-                      <TableRow key={part.sapNumber} hover>
-                        <TableCell>{part.sapNumber}</TableCell>
-                        <TableCell>{part.name}</TableCell>
-                        <TableCell>{location}</TableCell>
-                        <TableCell>{part.currentStock || 0}</TableCell>
-                        <TableCell>
-                          <TextField
-                            size="small"
-                            type="number"
-                            value={countQty}
-                            onChange={(e) => {
-                              const value = e.target.value ? parseInt(e.target.value) : '';
-                              const existingIndex = countEntries.findIndex(en => en.sapNumber === part.sapNumber);
-                              if (existingIndex >= 0) {
-                                const updated = [...countEntries];
-                                updated[existingIndex] = {
-                                  ...updated[existingIndex],
-                                  countQty: value,
-                                };
-                                setCountEntries(updated);
-                              } else if (value !== '') {
-                                setCountEntries([...countEntries, {
-                                  sapNumber: part.sapNumber,
-                                  partName: part.name,
-                                  location: location,
-                                  stockQty: part.currentStock || 0,
-                                  countQty: value,
-                                  id: Date.now() + Math.random(),
-                                }]);
-                              }
-                            }}
-                            placeholder="Enter count"
-                            sx={{ width: '100px' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {countQty !== '' && (
-                            <Chip
-                              label={variance > 0 ? `+${variance}` : variance}
-                              color={variance === 0 ? 'default' : variance > 0 ? 'success' : 'error'}
-                              size="small"
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {countEntry && (
-                            <Tooltip title="Clear">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => setCountEntries(countEntries.filter(e => e.sapNumber !== part.sapNumber))}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Box>
-          ) : (
-            <Box sx={{ py: 3, textAlign: 'center', color: '#999' }}>
-              <Typography variant="body2">
-                {loading ? 'Loading parts data...' : 'No spare parts registered in Part Master. Please check the Part Master configuration.'}
-              </Typography>
-            </Box>
-          )}
-
-          {parts && parts.length > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setStockCountPageStart(Math.max(0, stockCountPageStart - pageSize))}
-                  disabled={stockCountPageStart === 0}
-                >
-                  &lt;&lt; Previous
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setStockCountPageStart(stockCountPageStart + pageSize)}
-                  disabled={stockCountPageStart + pageSize >= parts.length}
-                >
-                  Next &gt;&gt;
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={handleSaveProgress}
-                >
-                  SAVE PROGRESS
-                </Button>
-              </Box>
-              <Typography variant="body2" sx={{ color: '#666' }}>
-                Showing {parts.length > 0 ? stockCountPageStart + 1 : 0}-{Math.min(stockCountPageStart + pageSize, parts.length)} of {parts.length} parts
-              </Typography>
-            </Box>
-          )}
-        </Paper>
-      )}
-
-      {/* Variance Report Section */}
-      {currentSession && varianceReport && (
-        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              VARIANCE REPORT
-            </Typography>
-          </Box>
-
-          <Box sx={{ overflowX: 'auto', mb: 2 }}>
-            <Table size="small">
-              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Part Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Location</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock Qty</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Count Qty</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Variance</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {varianceReport.variances.filter(v => v.variance !== 0).map((entry) => (
-                  <TableRow key={entry.id} hover>
-                    <TableCell>{entry.sapNumber}</TableCell>
-                    <TableCell>{entry.partName}</TableCell>
-                    <TableCell>{entry.location}</TableCell>
-                    <TableCell>{entry.stockQty}</TableCell>
-                    <TableCell>{entry.countQty}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={entry.variance > 0 ? `+${entry.variance}` : entry.variance}
-                        color={entry.variance > 0 ? 'success' : 'error'}
-                        size="small"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-
-          <Paper sx={{ p: 2, backgroundColor: '#f9f9f9', mb: 2 }}>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              <strong>Summary:</strong>
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2 }}>
-              <Typography variant="body2">
-                Total Items: <strong>{countEntries.length}</strong>
-              </Typography>
-              <Typography variant="body2">
-                Zero Variance: <strong>{varianceReport.zeroVariance}</strong>
-              </Typography>
-              <Typography variant="body2">
-                Positive: <strong>{varianceReport.positiveCount}</strong>
-              </Typography>
-              <Typography variant="body2">
-                Negative: <strong>{varianceReport.negativeCount}</strong>
-              </Typography>
-            </Box>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Total Variance Value: <strong>${Math.abs(varianceReport.totalVarianceValue)}</strong>
-            </Typography>
-          </Paper>
-
-          {currentSession.status === 'In Progress' && (
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button variant="outlined" color="error">REJECT COUNT</Button>
-              <Button
-                variant="contained"
-                onClick={() => setApprovalDialogOpen(true)}
-              >
-                APPROVE COUNT
-              </Button>
-            </Box>
-          )}
-        </Paper>
-      )}
 
       {/* Stock Take History Section */}
       <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
           STOCK TAKE HISTORY ({stockTakeSessions.length} RECORDS)
         </Typography>
+
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <TextField
+            label="Search"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={historySearch}
+            onChange={(e) => setHistorySearch(e.target.value)}
+            placeholder="Search by Month, Year, Status..."
+          />
+          <FormControl size="small" sx={{ width: 200 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={historyStatusFilter}
+              onChange={(e) => setHistoryStatusFilter(e.target.value)}
+              label="Status"
+            >
+              <MenuItem value="All">All Status</MenuItem>
+              <MenuItem value="Approved">Approved</MenuItem>
+              <MenuItem value="In Progress">In Progress</MenuItem>
+              <MenuItem value="Rejected">Rejected</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
 
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
@@ -729,7 +291,12 @@ const StockTake = () => {
                   }).length : 0;
 
                   return (
-                    <TableRow key={session.id} hover>
+                    <TableRow
+                      key={session.id}
+                      hover
+                      onClick={() => handleSessionClick(session)}
+                      sx={{ cursor: 'pointer' }}
+                    >
                       <TableCell>{months[session.month - 1]}</TableCell>
                       <TableCell>{session.year}</TableCell>
                       <TableCell>
@@ -819,178 +386,9 @@ const StockTake = () => {
         </Box>
       </Paper>
 
-      {/* Barcode Scanner Dialog */}
-      <Dialog open={barcodeDialogOpen} onClose={() => setBarcodeDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>SCAN BARCODE</DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Select Part or Scan SAP #</InputLabel>
-                <Select
-                  value={barcodeInput}
-                  onChange={(e) => {
-                    setBarcodeInput(e.target.value);
-                    const scannedPart = parts.find(p => p.sapNumber === e.target.value);
-                    if (scannedPart) {
-                      setCurrentCountItem({
-                        sapNumber: scannedPart.sapNumber,
-                        partName: scannedPart.name,
-                        location: scannedPart.rackNumber ? `${scannedPart.rackNumber}-${scannedPart.rackLevel}` : 'N/A',
-                        stockQty: scannedPart.currentStock || 0,
-                        countQty: '',
-                        id: Date.now(),
-                      });
-                    }
-                  }}
-                  label="Select Part or Scan SAP #"
-                >
-                  {parts.map((part) => (
-                    <MenuItem key={part.sapNumber} value={part.sapNumber}>
-                      {part.sapNumber} - {part.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
 
-            {currentCountItem && (
-              <>
-                <TextField
-                  label="SAP #"
-                  value={currentCountItem.sapNumber}
-                  disabled
-                  fullWidth
-                  size="small"
-                />
-                <TextField
-                  label="Part Name"
-                  value={currentCountItem.partName}
-                  disabled
-                  fullWidth
-                  size="small"
-                />
-                <TextField
-                  label="Location"
-                  value={currentCountItem.location}
-                  disabled
-                  fullWidth
-                  size="small"
-                />
-                <TextField
-                  label="Stock Qty"
-                  value={currentCountItem.stockQty}
-                  disabled
-                  fullWidth
-                  size="small"
-                  type="number"
-                />
-                <TextField
-                  label="Count Qty"
-                  value={currentCountItem.countQty}
-                  onChange={(e) => setCurrentCountItem({ ...currentCountItem, countQty: parseInt(e.target.value) || '' })}
-                  fullWidth
-                  size="small"
-                  type="number"
-                  required
-                  autoFocus
-                />
-              </>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => {
-            setBarcodeDialogOpen(false);
-            setCurrentCountItem(null);
-            setBarcodeInput('');
-          }} variant="outlined">
-            CANCEL
-          </Button>
-          {currentCountItem && (
-            <Button onClick={handleSaveCount} variant="contained">
-              SAVE & NEXT
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
 
-      {/* Approval Dialog */}
-      <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Approve Stock Take - {months[sessionForm.month - 1]} {sessionForm.year}</DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {varianceReport && (
-              <>
-                <Typography variant="body2">
-                  Total Items: <strong>{countEntries.length}</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Zero Variance: <strong>{varianceReport.zeroVariance} items</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Positive Variance: <strong>{varianceReport.positiveCount} items</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Negative Variance: <strong>{varianceReport.negativeCount} items</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Net Variance: <strong>${Math.abs(varianceReport.totalVarianceValue)}</strong>
-                </Typography>
-              </>
-            )}
-            <TextField
-              label="Approval Remarks (Mandatory for Stock Adjustment)"
-              value={approvalComments}
-              onChange={(e) => setApprovalComments(e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
-              sx={{ mb: 2 }}
-              required
-              error={!approvalComments}
-              helperText={!approvalComments ? "Remarks are required to approve" : ""}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setApprovalDialogOpen(false)} variant="outlined" color="error">
-            REJECT
-          </Button>
-          <Button onClick={handleApproveStockTake} variant="contained">
-            APPROVE
-          </Button>
-        </DialogActions>
-      </Dialog>
 
-      {/* View Variance Dialog */}
-      <Dialog open={viewVarianceDialogOpen} onClose={() => setViewVarianceDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Stock Take Details - {selectedSessionView && months[selectedSessionView.month - 1]} {selectedSessionView?.year}</DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Typography variant="body2">
-            Status: <strong>{selectedSessionView?.status}</strong>
-          </Typography>
-          <Typography variant="body2">
-            Started By: <strong>{selectedSessionView?.startedBy}</strong>
-          </Typography>
-          <Typography variant="body2">
-            Location: <strong>{selectedSessionView?.location}</strong>
-          </Typography>
-          <Typography variant="body2">
-            Material Group: <strong>{selectedSessionView?.materialGroup}</strong>
-          </Typography>
-          {selectedSessionView?.approvalComments && (
-            <Typography variant="body2" sx={{ mt: 2 }}>
-              Comments: <strong>{selectedSessionView.approvalComments}</strong>
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setViewVarianceDialogOpen(false)} variant="contained">
-            CLOSE
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Edit Status Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>

@@ -41,6 +41,7 @@ import InternalTransfer from "./pages/Inventory/InternalTransfer";
 import MovementLog from "./pages/Inventory/MovementLog";
 import MRF from "./pages/Inventory/MRF";
 import StockTake from "./pages/Inventory/StockTake";
+import StockTakeProcess from "./pages/Inventory/StockTakeProcess";
 import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
 import StockInquiryReport from "./pages/Reports/StockInquiryReport";
 import StockValuationReport from "./pages/Reports/StockValuationReport";
@@ -294,6 +295,7 @@ function AppShell({ toggleTheme }) {
 
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
               <Route path="/inventory/stock-take" element={<StockTake />} />
+              <Route path="/inventory/stock-take/process" element={<StockTakeProcess />} />
 
             </Route>
 
