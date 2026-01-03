@@ -216,10 +216,41 @@ const StockTake = () => {
       setCurrentSession(updated);
       setApprovalDialogOpen(false);
       setApprovalComments('');
+      
+      // Refresh stock take sessions list
+      const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
+      const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setStockTakeSessions(sessionData);
+      
       setSnackbar({ open: true, message: 'Stock Take approved', severity: 'success' });
     } catch (error) {
       console.error('Error approving:', error);
       setSnackbar({ open: true, message: 'Error approving stock take', severity: 'error' });
+    }
+  };
+
+  // Handle save progress
+  const handleSaveProgress = async () => {
+    if (!currentSession) return;
+
+    try {
+      await updateDoc(doc(db, 'stockTakeSessions', currentSession.id), {
+        items: countEntries,
+        lastUpdated: new Date().toISOString(),
+      });
+
+      const updated = { ...currentSession, items: countEntries };
+      setCurrentSession(updated);
+      
+      // Refresh stock take sessions list
+      const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
+      const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setStockTakeSessions(sessionData);
+
+      setSnackbar({ open: true, message: 'Progress saved successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error saving progress:', error);
+      setSnackbar({ open: true, message: 'Error saving progress', severity: 'error' });
     }
   };
 
@@ -333,26 +364,27 @@ const StockTake = () => {
         <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              STOCK COUNT ENTRY ({parts.length} PARTS)
+              STOCK COUNT ENTRY ({parts && parts.length > 0 ? parts.length : 0} PARTS)
             </Typography>
+            {loading && <Typography variant="body2" sx={{ color: '#999' }}>Loading parts...</Typography>}
           </Box>
 
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table size="small">
-              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Part Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Location</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock Qty</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Count Qty</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Variance</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {parts && parts.length > 0 ? (
-                  parts.slice(stockCountPageStart, stockCountPageStart + pageSize).map((part) => {
+          {parts && parts.length > 0 ? (
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Part Name</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Location</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Stock Qty</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Count Qty</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Variance</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {parts && parts.slice(stockCountPageStart, stockCountPageStart + pageSize).map((part) => {
                     const countEntry = countEntries.find(e => e.sapNumber === part.sapNumber);
                     const countQty = countEntry ? countEntry.countQty : '';
                     const variance = (countQty || 0) - (part.currentStock || 0);
@@ -418,20 +450,21 @@ const StockTake = () => {
                         </TableCell>
                       </TableRow>
                     );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 3, color: '#999' }}>
-                      No spare parts registered in Part Master.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Box>
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
+          ) : (
+            <Box sx={{ py: 3, textAlign: 'center', color: '#999' }}>
+              <Typography variant="body2">
+                {loading ? 'Loading parts data...' : 'No spare parts registered in Part Master. Please check the Part Master configuration.'}
+              </Typography>
+            </Box>
+          )}
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+          {parts && parts.length > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="outlined"
                 size="small"
@@ -448,12 +481,19 @@ const StockTake = () => {
               >
                 Next &gt;&gt;
               </Button>
-              <Button variant="contained" size="small">SAVE PROGRESS</Button>
+              <Button 
+                variant="contained" 
+                size="small"
+                onClick={handleSaveProgress}
+              >
+                SAVE PROGRESS
+              </Button>
+              </Box>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                Showing {parts.length > 0 ? stockCountPageStart + 1 : 0}-{Math.min(stockCountPageStart + pageSize, parts.length)} of {parts.length} parts
+              </Typography>
             </Box>
-            <Typography variant="body2" sx={{ color: '#666' }}>
-              Showing {parts.length > 0 ? stockCountPageStart + 1 : 0}-{Math.min(stockCountPageStart + pageSize, parts.length)} of {parts.length} parts
-            </Typography>
-          </Box>
+          )}
         </Paper>
       )}
 
@@ -549,46 +589,50 @@ const StockTake = () => {
                 <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Month</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Year</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Items</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Variance</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {sessionsPaginated.length > 0 ? (
-                sessionsPaginated.map((session) => (
-                  <TableRow key={session.id} hover>
-                    <TableCell>{months[session.month - 1]}</TableCell>
-                    <TableCell>{session.year}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={session.status}
-                        color={
-                          session.status === 'Approved' ? 'success' :
-                          session.status === 'Rejected' ? 'error' :
-                          'warning'
-                        }
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>500</TableCell>
-                    <TableCell>20 items</TableCell>
-                    <TableCell>
-                      <Tooltip title="Edit">
-                        <IconButton
+                sessionsPaginated.map((session) => {
+                  // Calculate items and variance for this session
+                  const sessionItems = session.items ? session.items.length : 0;
+                  const sessionVariances = session.items ? session.items.filter(item => {
+                    const variance = (item.countQty || 0) - (item.stockQty || 0);
+                    return variance !== 0;
+                  }).length : 0;
+                  
+                  return (
+                    <TableRow key={session.id} hover>
+                      <TableCell>{months[session.month - 1]}</TableCell>
+                      <TableCell>{session.year}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={session.status}
+                          color={
+                            session.status === 'Approved' ? 'success' :
+                            session.status === 'Rejected' ? 'error' :
+                            'warning'
+                          }
                           size="small"
-                          onClick={() => {
-                            setSelectedSessionEdit(session);
-                            setEditStatus(session.status);
-                            setEditDialogOpen(true);
-                          }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setSelectedSessionEdit(session);
+                              setEditStatus(session.status);
+                              setEditDialogOpen(true);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
                           onClick={async () => {
                             if (window.confirm('Are you sure you want to delete this record?')) {
                               try {
@@ -609,7 +653,8 @@ const StockTake = () => {
                       </Tooltip>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#999' }}>
