@@ -61,6 +61,9 @@ const StockTake = () => {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [viewVarianceDialogOpen, setViewVarianceDialogOpen] = useState(false);
   const [selectedSessionView, setSelectedSessionView] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedSessionEdit, setSelectedSessionEdit] = useState(null);
+  const [editStatus, setEditStatus] = useState('');
 
   const [barcodeInput, setBarcodeInput] = useState('');
   const [currentCountItem, setCurrentCountItem] = useState(null);
@@ -321,8 +324,6 @@ const StockTake = () => {
           >
             START NEW STOCK TAKE
           </Button>
-          <Button variant="outlined">CLOSE SESSION</Button>
-          <Button variant="outlined">EXPORT TEMPLATE</Button>
         </Box>
       </Paper>
 
@@ -531,7 +532,6 @@ const StockTake = () => {
               >
                 APPROVE COUNT
               </Button>
-              <Button variant="outlined">EXPORT REPORT</Button>
             </Box>
           )}
         </Paper>
@@ -575,15 +575,37 @@ const StockTake = () => {
                     <TableCell>500</TableCell>
                     <TableCell>20 items</TableCell>
                     <TableCell>
-                      <Tooltip title="View">
+                      <Tooltip title="Edit">
                         <IconButton
                           size="small"
                           onClick={() => {
-                            setSelectedSessionView(session);
-                            setViewVarianceDialogOpen(true);
+                            setSelectedSessionEdit(session);
+                            setEditStatus(session.status);
+                            setEditDialogOpen(true);
                           }}
                         >
-                          <VisibilityIcon fontSize="small" />
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          onClick={async () => {
+                            if (window.confirm('Are you sure you want to delete this record?')) {
+                              try {
+                                await deleteDoc(doc(db, 'stockTakeSessions', session.id));
+                                setSnackbar({ open: true, message: 'Record deleted successfully', severity: 'success' });
+                                const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
+                                const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                                setStockTakeSessions(sessionData);
+                              } catch (error) {
+                                console.error('Error deleting record:', error);
+                                setSnackbar({ open: true, message: 'Error deleting record', severity: 'error' });
+                              }
+                            }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
@@ -780,6 +802,56 @@ const StockTake = () => {
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setViewVarianceDialogOpen(false)} variant="contained">
             CLOSE
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Status Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Change Status</DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="In Progress">In Progress</MenuItem>
+                <MenuItem value="Complete">Complete</MenuItem>
+                <MenuItem value="Approved">Approved</MenuItem>
+                <MenuItem value="Rejected">Rejected</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setEditDialogOpen(false)} variant="outlined">
+            CANCEL
+          </Button>
+          <Button
+            onClick={async () => {
+              try {
+                const sessionRef = doc(db, 'stockTakeSessions', selectedSessionEdit.id);
+                await updateDoc(sessionRef, {
+                  status: editStatus,
+                });
+                setSnackbar({ open: true, message: 'Status updated successfully', severity: 'success' });
+                const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
+                const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                setStockTakeSessions(sessionData);
+                setEditDialogOpen(false);
+                setSelectedSessionEdit(null);
+                setEditStatus('');
+              } catch (error) {
+                console.error('Error updating status:', error);
+                setSnackbar({ open: true, message: 'Error updating status', severity: 'error' });
+              }
+            }}
+            variant="contained"
+          >
+            SAVE
           </Button>
         </DialogActions>
       </Dialog>
