@@ -42,6 +42,7 @@ import MovementLog from "./pages/Inventory/MovementLog";
 import MRF from "./pages/Inventory/MRF";
 import StockTake from "./pages/Inventory/StockTake";
 import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
+import StockInquiryReport from "./pages/Reports/StockInquiryReport";
 import StockValuationReport from "./pages/Reports/StockValuationReport";
 import MovementHistory from "./pages/Reports/MovementHistory";
 import LowStockReport from "./pages/Reports/LowStockReport";
@@ -249,6 +250,7 @@ function AppShell({ toggleTheme }) {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+              <Route path="/reports/stock-inquiry" element={<StockInquiryReport />} />
               <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
               <Route path="/reports/stock-movement" element={<MovementHistory />} />
               <Route path="/reports/low-stock" element={<LowStockReport />} />
@@ -278,6 +280,7 @@ function AppShell({ toggleTheme }) {
 
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
               <Route path="/inventory/stock-take" element={<StockTake />} />
+
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>

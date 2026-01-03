@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import { db } from '../../firebase/config';
-import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { useDispatch, useSelector } from 'react-redux';
+import { setParts } from '../../redux/partsSlice';
 import {
   Box,
   Paper,
@@ -35,7 +35,10 @@ import CameraIcon from '@mui/icons-material/PhotoCamera';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const StockTake = () => {
+  const dispatch = useDispatch();
   const parts = useSelector(state => state.parts.parts || []);
+  const [storageLocations, setStorageLocations] = useState([]);
+  const [materialGroups, setMaterialGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -43,8 +46,9 @@ const StockTake = () => {
   const [sessionForm, setSessionForm] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
-    location: 'Engineering Store',
-    materialGroup: 'All',
+    selectionMode: 'All', // All, ByLocation, ByGroup
+    selectedLocationId: '',
+    selectedGroupId: '',
     startedBy: 'Current User',
     startDate: new Date().toISOString().split('T')[0],
     status: 'Not Started',
@@ -72,7 +76,7 @@ const StockTake = () => {
 
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // Fetch stock take data
+  // Fetch stock take data and master data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -80,6 +84,21 @@ const StockTake = () => {
         const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
         const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         setStockTakeSessions(sessionData);
+
+        const locationSnapshot = await getDocs(collection(db, 'storageLocations'));
+        const locationData = locationSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setStorageLocations(locationData);
+
+        const groupSnapshot = await getDocs(collection(db, 'materialGroups'));
+        const groupData = groupSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setMaterialGroups(groupData);
+
+        // Ensure parts are loaded
+        if (parts.length === 0) {
+          const partsSnapshot = await getDocs(collection(db, 'parts'));
+          const partsData = partsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+          dispatch(setParts(partsData));
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
         setSnackbar({ open: true, message: 'Error fetching data', severity: 'error' });
@@ -88,19 +107,51 @@ const StockTake = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [dispatch, parts.length]);
 
   // Get filtered parts for current session
+  // Get filtered parts for current session or preview
   const filteredParts = useMemo(() => {
-    if (!currentSession) return [];
-    
+    // If a session is active, use its criteria
+    const criteria = currentSession ? {
+      selectionMode: currentSession.selectionMode,
+      selectedLocationId: currentSession.selectedLocationId,
+      selectedGroupId: currentSession.selectedGroupId
+    } : {
+      selectionMode: sessionForm.selectionMode,
+      selectedLocationId: sessionForm.selectedLocationId,
+      selectedGroupId: sessionForm.selectedGroupId
+    };
+
     return parts.filter(p => {
-      if (sessionForm.materialGroup !== 'All' && p.materialGroup !== sessionForm.materialGroup) {
+      if (criteria.selectionMode === 'ByLocation') {
+        const location = storageLocations.find(l => l.id === criteria.selectedLocationId);
+        if (!location) return false;
+        // Match Rack Number and Level
+        const partRack = p.rackNumber || '';
+        const partLevel = p.rackLevel || '';
+        const locRack = location.rackNumber || '';
+        const locLevel = location.rackLevel || '';
+
+        // Exact match
+        return partRack == locRack && partLevel == locLevel;
+      }
+
+      if (criteria.selectionMode === 'ByGroup') {
+        if (!criteria.selectedGroupId) return false;
+        // Match Material Group ID or Name?
+        // parts store 'materialGroupId' usually, but legacy might have 'materialGroup' name string.
+        // Let's assume ID if available, else name check
+        if (p.materialGroupId) return p.materialGroupId === criteria.selectedGroupId;
+        // Fallback to name match if p.materialGroup exists
+        const group = materialGroups.find(g => g.id === criteria.selectedGroupId);
+        if (group && p.materialGroup) return p.materialGroup === group.materialGroup;
         return false;
       }
-      return true;
+
+      return true; // Mode 'All'
     });
-  }, [parts, currentSession, sessionForm.materialGroup]);
+  }, [parts, currentSession, sessionForm, storageLocations, materialGroups]);
 
   // Calculate progress
   const progressStats = useMemo(() => {
@@ -124,8 +175,8 @@ const StockTake = () => {
     const zeroVariance = variances.filter(v => v.variance === 0).length;
     const positiveVariance = variances.filter(v => v.variance > 0);
     const negativeVariance = variances.filter(v => v.variance < 0);
-    const totalVarianceValue = positiveVariance.reduce((sum, v) => sum + (v.variance * 100), 0) + 
-                                negativeVariance.reduce((sum, v) => sum + (v.variance * 100), 0);
+    const totalVarianceValue = positiveVariance.reduce((sum, v) => sum + (v.variance * 100), 0) +
+      negativeVariance.reduce((sum, v) => sum + (v.variance * 100), 0);
 
     return {
       variances,
@@ -205,24 +256,71 @@ const StockTake = () => {
   const handleApproveStockTake = async () => {
     if (!currentSession) return;
 
+    // Mandatory remarks check
+    if (!approvalComments || approvalComments.trim() === '') {
+      setSnackbar({ open: true, message: 'Approval remarks are mandatory', severity: 'error' });
+      return;
+    }
+
     try {
-      await updateDoc(doc(db, 'stockTakeSessions', currentSession.id), {
+      const batch = writeBatch(db);
+
+      // Update parts stock and add movement logs
+      countEntries.forEach(entry => {
+        const variance = (entry.countQty || 0) - (entry.stockQty || 0);
+        if (variance !== 0) {
+          // Find part ID (entry might not have it if it comes from session, need to match sapNumber)
+          // Actually entry should have matched data, but local `countEntries` has `sapNumber`.
+          // We need to find the part's doc ID from the `parts` list.
+          const part = parts.find(p => p.sapNumber === entry.sapNumber);
+          if (part && part.id) {
+            const partRef = doc(db, 'parts', part.id);
+            batch.update(partRef, {
+              currentStock: entry.countQty,
+              updatedAt: new Date().toISOString()
+            });
+
+            // Add movement log
+            const logRef = doc(collection(db, 'movement_logs'));
+            batch.set(logRef, {
+              date: new Date(),
+              type: 'STOCK TAKE',
+              partName: part.name,
+              sapNumber: part.sapNumber,
+              quantity: variance, // + for gain, - for loss
+              userName: sessionForm.startedBy || 'System',
+              remarks: `Stock Take Adjustment: ${approvalComments} (Session ${months[sessionForm.month - 1]} ${sessionForm.year})`
+            });
+          }
+        }
+      });
+
+      // Update session status
+      const sessionRef = doc(db, 'stockTakeSessions', currentSession.id);
+      batch.update(sessionRef, {
         status: 'Approved',
         approvalComments,
         approvedAt: new Date().toISOString(),
       });
 
+      await batch.commit();
+
       const updated = { ...currentSession, status: 'Approved', approvalComments };
       setCurrentSession(updated);
       setApprovalDialogOpen(false);
       setApprovalComments('');
-      
-      // Refresh stock take sessions list
+
+      // Refresh stock take sessions list and parts
       const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
       const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setStockTakeSessions(sessionData);
-      
-      setSnackbar({ open: true, message: 'Stock Take approved', severity: 'success' });
+
+      // Refresh parts in Redux
+      const partsSnapshot = await getDocs(collection(db, 'parts'));
+      const partsData = partsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      dispatch(setParts(partsData));
+
+      setSnackbar({ open: true, message: 'Stock Take approved and adjustments posted', severity: 'success' });
     } catch (error) {
       console.error('Error approving:', error);
       setSnackbar({ open: true, message: 'Error approving stock take', severity: 'error' });
@@ -241,7 +339,7 @@ const StockTake = () => {
 
       const updated = { ...currentSession, items: countEntries };
       setCurrentSession(updated);
-      
+
       // Refresh stock take sessions list
       const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
       const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -297,29 +395,57 @@ const StockTake = () => {
             size="small"
           />
 
-          <FormControl fullWidth size="small" disabled>
-            <InputLabel>Location</InputLabel>
+          <FormControl fullWidth size="small">
+            <InputLabel>Selection Mode</InputLabel>
             <Select
-              value={sessionForm.location}
-              label="Location"
-              disabled
+              value={sessionForm.selectionMode}
+              onChange={(e) => setSessionForm({
+                ...sessionForm,
+                selectionMode: e.target.value,
+                selectedLocationId: '',
+                selectedGroupId: ''
+              })}
+              label="Selection Mode"
             >
-              <MenuItem value="Engineering Store">Engineering Store</MenuItem>
+              <MenuItem value="All">All Parts</MenuItem>
+              <MenuItem value="ByLocation">By Location</MenuItem>
+              <MenuItem value="ByGroup">By Material Group</MenuItem>
             </Select>
           </FormControl>
 
-          <FormControl fullWidth size="small">
-            <InputLabel>Material Group</InputLabel>
-            <Select
-              value={sessionForm.materialGroup}
-              onChange={(e) => setSessionForm({ ...sessionForm, materialGroup: e.target.value })}
-              label="Material Group"
-            >
-              <MenuItem value="All">All</MenuItem>
-              <MenuItem value="Electrical">Electrical</MenuItem>
-              <MenuItem value="Mechanical">Mechanical</MenuItem>
-            </Select>
-          </FormControl>
+          {sessionForm.selectionMode === 'ByLocation' && (
+            <FormControl fullWidth size="small">
+              <InputLabel>Location</InputLabel>
+              <Select
+                value={sessionForm.selectedLocationId}
+                onChange={(e) => setSessionForm({ ...sessionForm, selectedLocationId: e.target.value })}
+                label="Location"
+              >
+                {storageLocations.map(loc => (
+                  <MenuItem key={loc.id} value={loc.id}>
+                    {loc.binId} - {loc.description} ({loc.rackNumber}-{loc.rackLevel})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          {sessionForm.selectionMode === 'ByGroup' && (
+            <FormControl fullWidth size="small">
+              <InputLabel>Material Group</InputLabel>
+              <Select
+                value={sessionForm.selectedGroupId}
+                onChange={(e) => setSessionForm({ ...sessionForm, selectedGroupId: e.target.value })}
+                label="Material Group"
+              >
+                {materialGroups.map(group => (
+                  <MenuItem key={group.id} value={group.id}>
+                    {group.materialGroup}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
         </Box>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, mb: 2 }}>
@@ -389,7 +515,7 @@ const StockTake = () => {
                     const countQty = countEntry ? countEntry.countQty : '';
                     const variance = (countQty || 0) - (part.currentStock || 0);
                     const location = part.rackNumber ? `${part.rackNumber}-${part.rackLevel}` : 'N/A';
-                    
+
                     return (
                       <TableRow key={part.sapNumber} hover>
                         <TableCell>{part.sapNumber}</TableCell>
@@ -465,29 +591,29 @@ const StockTake = () => {
           {parts && parts.length > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
               <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setStockCountPageStart(Math.max(0, stockCountPageStart - pageSize))}
-                disabled={stockCountPageStart === 0}
-              >
-                &lt;&lt; Previous
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setStockCountPageStart(stockCountPageStart + pageSize)}
-                disabled={stockCountPageStart + pageSize >= parts.length}
-              >
-                Next &gt;&gt;
-              </Button>
-              <Button 
-                variant="contained" 
-                size="small"
-                onClick={handleSaveProgress}
-              >
-                SAVE PROGRESS
-              </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setStockCountPageStart(Math.max(0, stockCountPageStart - pageSize))}
+                  disabled={stockCountPageStart === 0}
+                >
+                  &lt;&lt; Previous
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setStockCountPageStart(stockCountPageStart + pageSize)}
+                  disabled={stockCountPageStart + pageSize >= parts.length}
+                >
+                  Next &gt;&gt;
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSaveProgress}
+                >
+                  SAVE PROGRESS
+                </Button>
               </Box>
               <Typography variant="body2" sx={{ color: '#666' }}>
                 Showing {parts.length > 0 ? stockCountPageStart + 1 : 0}-{Math.min(stockCountPageStart + pageSize, parts.length)} of {parts.length} parts
@@ -601,7 +727,7 @@ const StockTake = () => {
                     const variance = (item.countQty || 0) - (item.stockQty || 0);
                     return variance !== 0;
                   }).length : 0;
-                  
+
                   return (
                     <TableRow key={session.id} hover>
                       <TableCell>{months[session.month - 1]}</TableCell>
@@ -611,8 +737,8 @@ const StockTake = () => {
                           label={session.status}
                           color={
                             session.status === 'Approved' ? 'success' :
-                            session.status === 'Rejected' ? 'error' :
-                            'warning'
+                              session.status === 'Rejected' ? 'error' :
+                                'warning'
                           }
                           size="small"
                         />
@@ -633,26 +759,26 @@ const StockTake = () => {
                         <Tooltip title="Delete">
                           <IconButton
                             size="small"
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this record?')) {
-                              try {
-                                await deleteDoc(doc(db, 'stockTakeSessions', session.id));
-                                setSnackbar({ open: true, message: 'Record deleted successfully', severity: 'success' });
-                                const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
-                                const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                                setStockTakeSessions(sessionData);
-                              } catch (error) {
-                                console.error('Error deleting record:', error);
-                                setSnackbar({ open: true, message: 'Error deleting record', severity: 'error' });
+                            onClick={async () => {
+                              if (window.confirm('Are you sure you want to delete this record?')) {
+                                try {
+                                  await deleteDoc(doc(db, 'stockTakeSessions', session.id));
+                                  setSnackbar({ open: true, message: 'Record deleted successfully', severity: 'success' });
+                                  const sessionSnapshot = await getDocs(collection(db, 'stockTakeSessions'));
+                                  const sessionData = sessionSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                                  setStockTakeSessions(sessionData);
+                                } catch (error) {
+                                  console.error('Error deleting record:', error);
+                                  setSnackbar({ open: true, message: 'Error deleting record', severity: 'error' });
+                                }
                               }
-                            }
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               ) : (
@@ -814,13 +940,16 @@ const StockTake = () => {
               </>
             )}
             <TextField
-              label="Comments"
-              multiline
-              rows={3}
+              label="Approval Remarks (Mandatory for Stock Adjustment)"
               value={approvalComments}
               onChange={(e) => setApprovalComments(e.target.value)}
               fullWidth
-              placeholder="Add your approval comments..."
+              multiline
+              rows={3}
+              sx={{ mb: 2 }}
+              required
+              error={!approvalComments}
+              helperText={!approvalComments ? "Remarks are required to approve" : ""}
             />
           </Box>
         </DialogContent>

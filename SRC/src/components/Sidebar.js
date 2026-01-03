@@ -51,7 +51,7 @@ const stockMovementLinks = [
   { path: '/inventory/stock-out', text: 'Stock Out', icon: <OutboxIcon />, permission: 'canAccessInventory' },
   { path: '/inventory/internal-transfer', text: 'Internal Transfer', icon: <SwapHorizIcon />, permission: 'canAccessInventory' },
   { path: '/inventory/movement-logs', text: 'Movement Logs', icon: <HistoryIcon />, permission: 'canAccessInventory' },
-  { path: '/inventory/stock-take', text: 'Stock Take', icon: <Inventory2Icon />, permission: 'canAccessInventory' },
+  { path: '/inventory/stock-take', text: 'Stock Take', icon: <Inventory2Icon />, permission: 'canAccessStockTake' },
   { path: '/inventory/mrf', text: 'MRF', icon: <ReceiptLongIcon />, permission: 'canAccessInventory' },
 ];
 
@@ -61,6 +61,7 @@ const purchasingLinks = [
 
 const reportLinks = [
   { path: '/reports/dashboard-kpis', text: 'Dashboard', icon: <DashboardIcon />, permission: 'canAccessReports' },
+  { path: '/reports/stock-inquiry', text: 'Stock Inquiry', icon: <Inventory2Icon />, permission: 'canAccessReports' },
   { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <ReceiptLongIcon />, permission: 'canAccessReports' },
 
   { path: '/reports/stock-movement', text: 'Movement History', icon: <SwapHorizIcon />, permission: 'canAccessReports' },
