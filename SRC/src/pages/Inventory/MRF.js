@@ -370,7 +370,6 @@ const MRF = () => {
                 <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Quantity</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Unit</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Stock Available</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Urgent</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -383,9 +382,6 @@ const MRF = () => {
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>{item.unit}</TableCell>
                     <TableCell>{item.stockAvailable}</TableCell>
-                    <TableCell>
-                      <Checkbox checked={item.urgent} disabled size="small" />
-                    </TableCell>
                     <TableCell>
                       <Tooltip title="Delete">
                         <IconButton
@@ -690,16 +686,6 @@ const MRF = () => {
               size="small"
               required
               inputProps={{ min: 1 }}
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={newItem.urgent}
-                  onChange={(e) => setNewItem({ ...newItem, urgent: e.target.checked })}
-                />
-              }
-              label="Mark as Urgent"
             />
           </Box>
         </DialogContent>

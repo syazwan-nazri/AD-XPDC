@@ -54,6 +54,7 @@ const StockTake = () => {
   const [currentSession, setCurrentSession] = useState(null);
   const [countEntries, setCountEntries] = useState([]);
   const [pageStart, setPageStart] = useState(0);
+  const [stockCountPageStart, setStockCountPageStart] = useState(0);
   const pageSize = 20;
 
   // Dialog states
@@ -327,72 +328,13 @@ const StockTake = () => {
         </Box>
       </Paper>
 
-      {/* Progress Overview Section */}
-      {currentSession && currentSession.status === 'In Progress' && (
-        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-            PROGRESS OVERVIEW
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <Typography variant="body2">
-              Total Items: <strong>{progressStats.total}</strong>
-            </Typography>
-            <Typography variant="body2">
-              Counted: <strong>{progressStats.counted}</strong>
-            </Typography>
-            <Typography variant="body2">
-              Remaining: <strong>{progressStats.remaining}</strong>
-            </Typography>
-            <Typography variant="body2">
-              Progress: <strong>{progressStats.percentage}%</strong>
-            </Typography>
-          </Box>
-          <LinearProgress variant="determinate" value={progressStats.percentage} sx={{ mb: 2 }} />
-
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table size="small">
-              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Location</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Total Items</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Counted</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Progress</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Warehouse A</TableCell>
-                  <TableCell>300</TableCell>
-                  <TableCell>120</TableCell>
-                  <TableCell>40%</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Warehouse B</TableCell>
-                  <TableCell>200</TableCell>
-                  <TableCell>30</TableCell>
-                  <TableCell>15%</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </Box>
-        </Paper>
-      )}
-
       {/* Stock Count Entry Section */}
       {currentSession && currentSession.status === 'In Progress' && (
         <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              STOCK COUNT ENTRY ({countEntries.length} COUNTED)
+              STOCK COUNT ENTRY ({parts.length} PARTS)
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={<CameraIcon />}
-              onClick={() => setBarcodeDialogOpen(true)}
-              size="small"
-            >
-              SCAN BARCODE
-            </Button>
           </Box>
 
           <Box sx={{ overflowX: 'auto' }}>
@@ -409,33 +351,70 @@ const StockTake = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {countEntries.length > 0 ? (
-                  countEntries.map((entry) => {
-                    const variance = (entry.countQty || 0) - (entry.stockQty || 0);
+                {parts && parts.length > 0 ? (
+                  parts.slice(stockCountPageStart, stockCountPageStart + pageSize).map((part) => {
+                    const countEntry = countEntries.find(e => e.sapNumber === part.sapNumber);
+                    const countQty = countEntry ? countEntry.countQty : '';
+                    const variance = (countQty || 0) - (part.currentStock || 0);
+                    const location = part.rackNumber ? `${part.rackNumber}-${part.rackLevel}` : 'N/A';
+                    
                     return (
-                      <TableRow key={entry.id} hover>
-                        <TableCell>{entry.sapNumber}</TableCell>
-                        <TableCell>{entry.partName}</TableCell>
-                        <TableCell>{entry.location}</TableCell>
-                        <TableCell>{entry.stockQty}</TableCell>
-                        <TableCell>{entry.countQty}</TableCell>
+                      <TableRow key={part.sapNumber} hover>
+                        <TableCell>{part.sapNumber}</TableCell>
+                        <TableCell>{part.name}</TableCell>
+                        <TableCell>{location}</TableCell>
+                        <TableCell>{part.currentStock || 0}</TableCell>
                         <TableCell>
-                          <Chip
-                            label={variance > 0 ? `+${variance}` : variance}
-                            color={variance === 0 ? 'default' : variance > 0 ? 'success' : 'error'}
+                          <TextField
                             size="small"
+                            type="number"
+                            value={countQty}
+                            onChange={(e) => {
+                              const value = e.target.value ? parseInt(e.target.value) : '';
+                              const existingIndex = countEntries.findIndex(en => en.sapNumber === part.sapNumber);
+                              if (existingIndex >= 0) {
+                                const updated = [...countEntries];
+                                updated[existingIndex] = {
+                                  ...updated[existingIndex],
+                                  countQty: value,
+                                };
+                                setCountEntries(updated);
+                              } else if (value !== '') {
+                                setCountEntries([...countEntries, {
+                                  sapNumber: part.sapNumber,
+                                  partName: part.name,
+                                  location: location,
+                                  stockQty: part.currentStock || 0,
+                                  countQty: value,
+                                  id: Date.now() + Math.random(),
+                                }]);
+                              }
+                            }}
+                            placeholder="Enter count"
+                            sx={{ width: '100px' }}
                           />
                         </TableCell>
                         <TableCell>
-                          <Tooltip title="Delete">
-                            <IconButton
+                          {countQty !== '' && (
+                            <Chip
+                              label={variance > 0 ? `+${variance}` : variance}
+                              color={variance === 0 ? 'default' : variance > 0 ? 'success' : 'error'}
                               size="small"
-                              color="error"
-                              onClick={() => setCountEntries(countEntries.filter(e => e.id !== entry.id))}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {countEntry && (
+                            <Tooltip title="Clear">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setCountEntries(countEntries.filter(e => e.sapNumber !== part.sapNumber))}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -443,7 +422,7 @@ const StockTake = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={7} align="center" sx={{ py: 3, color: '#999' }}>
-                      No count entries. Use SCAN BARCODE to add items.
+                      No spare parts registered in Part Master.
                     </TableCell>
                   </TableRow>
                 )}
@@ -451,9 +430,29 @@ const StockTake = () => {
             </Table>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-            <Button variant="outlined" size="small">NEXT PAGE</Button>
-            <Button variant="contained" size="small">SAVE PROGRESS</Button>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setStockCountPageStart(Math.max(0, stockCountPageStart - pageSize))}
+                disabled={stockCountPageStart === 0}
+              >
+                &lt;&lt; Previous
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setStockCountPageStart(stockCountPageStart + pageSize)}
+                disabled={stockCountPageStart + pageSize >= parts.length}
+              >
+                Next &gt;&gt;
+              </Button>
+              <Button variant="contained" size="small">SAVE PROGRESS</Button>
+            </Box>
+            <Typography variant="body2" sx={{ color: '#666' }}>
+              Showing {parts.length > 0 ? stockCountPageStart + 1 : 0}-{Math.min(stockCountPageStart + pageSize, parts.length)} of {parts.length} parts
+            </Typography>
           </Box>
         </Paper>
       )}
@@ -655,20 +654,33 @@ const StockTake = () => {
         <DialogContent sx={{ py: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <TextField
-                label="Barcode / SAP #"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                fullWidth
-                size="small"
-                autoFocus
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') handleBarcodeScan();
-                }}
-              />
-              <Button variant="contained" onClick={handleBarcodeScan} sx={{ mt: 0.5 }}>
-                Search
-              </Button>
+              <FormControl fullWidth size="small">
+                <InputLabel>Select Part or Scan SAP #</InputLabel>
+                <Select
+                  value={barcodeInput}
+                  onChange={(e) => {
+                    setBarcodeInput(e.target.value);
+                    const scannedPart = parts.find(p => p.sapNumber === e.target.value);
+                    if (scannedPart) {
+                      setCurrentCountItem({
+                        sapNumber: scannedPart.sapNumber,
+                        partName: scannedPart.name,
+                        location: scannedPart.rackNumber ? `${scannedPart.rackNumber}-${scannedPart.rackLevel}` : 'N/A',
+                        stockQty: scannedPart.currentStock || 0,
+                        countQty: '',
+                        id: Date.now(),
+                      });
+                    }
+                  }}
+                  label="Select Part or Scan SAP #"
+                >
+                  {parts.map((part) => (
+                    <MenuItem key={part.sapNumber} value={part.sapNumber}>
+                      {part.sapNumber} - {part.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
 
             {currentCountItem && (
