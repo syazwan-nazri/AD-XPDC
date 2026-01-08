@@ -41,9 +41,12 @@ const dataInputMasterLinks = [
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartGroupMaster' },
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
   { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
 =======
+=======
+>>>>>>> Stashed changes
   {
     text: 'Storage Master',
     icon: <StorageIcon />,
@@ -104,7 +107,11 @@ const Sidebar = ({ open, onToggle }) => {
   if (!user) return null;
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const renderSection = (title, icon, links, isOpen, toggleOpen, sectionColor) => {
+=======
+  const renderSection = (title, icon, links, sectionId) => {
+>>>>>>> Stashed changes
 =======
   const renderSection = (title, icon, links, sectionId) => {
 >>>>>>> Stashed changes
@@ -113,6 +120,7 @@ const Sidebar = ({ open, onToggle }) => {
     return (
       <Box sx={{ mb: 1 }}>
         <List>
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
           <ListItem 
             button 
@@ -137,6 +145,8 @@ const Sidebar = ({ open, onToggle }) => {
               fontSize: 22
             }}>
 =======
+=======
+>>>>>>> Stashed changes
           <ListItem button onClick={() => handleToggle(sectionId)} sx={{ justifyContent: open ? 'initial' : 'center', px: open ? 2 : 0 }}>
             <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
 >>>>>>> Stashed changes
@@ -286,6 +296,7 @@ const Sidebar = ({ open, onToggle }) => {
       </Box>
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Navigation Sections */}
       <Box sx={{ py: 2, px: open ? 0 : 1 }}>
         {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster, '#8b5cf6')}
@@ -362,10 +373,15 @@ const Sidebar = ({ open, onToggle }) => {
         )}
       </Box>
 =======
+=======
+>>>>>>> Stashed changes
       {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, 'dataMaster')}
       {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, 'stockMovement')}
       {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, 'purchasing')}
       {renderSection("Reports", <ReceiptLongIcon />, filteredReportLinks, 'reports')}
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     </Drawer>
   );
