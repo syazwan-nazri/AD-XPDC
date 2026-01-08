@@ -219,8 +219,9 @@ const StockIn = () => {
             </Box>
           </Card>
         </Box>
+      </Container>
 
-        {/* New Stock Entry Form */}
+      {/* New Stock Entry Form */}
         <Paper elevation={0} sx={{ 
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
@@ -709,7 +710,6 @@ const StockIn = () => {
             )}
           </Box>
         </Paper>
-      </Container>
 
       <Snackbar 
         open={snackbar.open} 
