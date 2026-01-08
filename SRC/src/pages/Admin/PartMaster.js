@@ -3,13 +3,72 @@ import { useSelector, useDispatch } from 'react-redux';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { setParts, addPart, deletePart, updatePart } from '../../redux/partsSlice';
-import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Typography, MenuItem, Select, FormControl, InputLabel, InputAdornment, Chip, LinearProgress } from '@mui/material';
+import {
+  Box,
+  Paper,
+  TextField,
+  Button,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Tooltip,
+  Typography,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  InputAdornment,
+  Chip,
+  LinearProgress,
+  Grid,
+  Card,
+  CardContent,
+  Divider,
+  Stack,
+  TablePagination,
+  CircularProgress,
+  Alert,
+  Autocomplete,
+  Badge,
+  Avatar,
+} from '@mui/material';
 import Barcode from 'react-barcode';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SearchIcon from '@mui/icons-material/Search';
-import WarningIcon from '@mui/icons-material/Warning';
+import {
+  QrCode as QrCodeIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Warning as WarningIcon,
+  Inventory as InventoryIcon,
+  Category as CategoryIcon,
+  Storage as StorageIcon,
+  Add as AddIcon,
+  Clear as ClearIcon,
+  FileUpload as FileUploadIcon,
+  CleaningServices as CleaningServicesIcon,
+  Print as PrintIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  FilterList as FilterListIcon,
+  Numbers as NumbersIcon,
+  Barcode as BarcodeIcon,
+  Description as DescriptionIcon,
+  LocalOffer as LocalOfferIcon,
+  LocationOn as LocationOnIcon,
+  SafetyDivider as SafetyDividerIcon,
+  Replay as ReplayIcon,
+  VerifiedUser as VerifiedUserIcon,
+  Analytics as AnalyticsIcon,
+} from '@mui/icons-material';
 import BarcodeScanner from '../../components/BarcodeScanner';
 
 // Main Part Master Page
@@ -28,14 +87,17 @@ const PartMaster = () => {
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', 
     safetyLevel: '', replenishQty: '', currentStock: '' 
   });
+  
   // Track the current running SAP#
   const [currentRunningSap, setCurrentRunningSap] = useState('7000001');
+  
   // Dialog for SAP# mismatch
   const [sapDialogOpen, setSapDialogOpen] = useState(false);
   const [pendingAdd, setPendingAdd] = useState(false);
   
-  const [pageStart, setPageStart] = useState(0); // index of first item in current page
-  const pageSize = 50;
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   
   // Modal states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -64,14 +126,28 @@ const PartMaster = () => {
   const [replenishQtyError, setReplenishQtyError] = useState(false);
   const [editReplenishQtyError, setEditReplenishQtyError] = useState(false);
   const [currentStockError, setCurrentStockError] = useState(false);
+  
+  // CSV Import states
   const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const [csvPreview, setCsvPreview] = useState([]);
   const [csvErrors, setCsvErrors] = useState([]);
+  
+  // Cleanup states
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
   const [duplicatesFound, setDuplicatesFound] = useState([]);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const [cleanupProgress, setCleanupProgress] = useState(0);
+
+  // Stats states
+  const [stats, setStats] = useState({
+    total: 0,
+    lowStock: 0,
+    zeroStock: 0,
+    categories: 0,
+    averageStock: 0,
+  });
+
   useEffect(() => {
     const fetchParts = async () => {
       setLoading(true);
@@ -82,21 +158,39 @@ const PartMaster = () => {
           if (d.safetyLevel === undefined && d.minStockLevel !== undefined) {
             d.safetyLevel = d.minStockLevel;
           }
-          // Backward compatibility: map legacy maxStockLevel to replenishQty
           if (d.replenishQty === undefined && d.maxStockLevel !== undefined) {
             d.replenishQty = d.maxStockLevel;
           }
           return d;
         });
         dispatch(setParts(data));
+        calculateStats(data);
       } catch (error) {
-        setSnackbar({ open: true, message: 'Fetch error', severity: 'error' });
+        setSnackbar({ open: true, message: 'Error fetching parts data', severity: 'error' });
       } finally {
         setLoading(false);
       }
     };
     fetchParts();
   }, [dispatch]);
+
+  // Calculate statistics
+  const calculateStats = (data) => {
+    const total = data.length;
+    const lowStock = data.filter(p => (p.currentStock || 0) < (p.safetyLevel || 0)).length;
+    const zeroStock = data.filter(p => (p.currentStock || 0) === 0).length;
+    const categories = [...new Set(data.map(p => p.category).filter(Boolean))].length;
+    const totalStock = data.reduce((sum, p) => sum + (p.currentStock || 0), 0);
+    const averageStock = total > 0 ? Math.round(totalStock / total) : 0;
+
+    setStats({
+      total,
+      lowStock,
+      zeroStock,
+      categories,
+      averageStock,
+    });
+  };
 
   // Auto-generate SAP# whenever parts list changes
   useEffect(() => {
@@ -137,63 +231,35 @@ const PartMaster = () => {
 
     // Sort: low stock items at top, then by SAP# numerically
     const sorted = filtered.sort((a, b) => {
-      // Parse SAP# for numeric comparison
       const sapA = parseInt(a.sapNumber || '0') || 0;
       const sapB = parseInt(b.sapNumber || '0') || 0;
       
-      // Determine if each is low stock (currentStock < safetyLevel)
-      // Only consider low stock if safetyLevel > 0 (0 means safety level not set)
       const aHasValidSafety = (a.safetyLevel || 0) > 0;
       const bHasValidSafety = (b.safetyLevel || 0) > 0;
       const aIsLowStock = aHasValidSafety && (a.currentStock || 0) < (a.safetyLevel || 0);
       const bIsLowStock = bHasValidSafety && (b.currentStock || 0) < (b.safetyLevel || 0);
       
-      // Low stock items come first
       if (aIsLowStock && !bIsLowStock) return -1;
       if (!aIsLowStock && bIsLowStock) return 1;
       
-      // If both are low stock or both are not, sort by SAP# (descending - higher numbers at top)
       return sapB - sapA;
     });
-    
-    // Debug: log first 10 SAP numbers to verify sort order
-    if (sorted.length > 0) {
-      console.log('Filtered parts sort order (first 10):', sorted.slice(0, 10).map(p => ({ sap: p.sapNumber, stock: p.currentStock, safety: p.safetyLevel })));
-    }
     
     return sorted;
   }, [parts, searchQuery, filterCategory, filterRackLevel]);
 
-  // Validate SAP# (7 digits only, must start with 7)
-  const validateSapNumber = (value) => {
-    const regex = /^7\d{6}$/;
-    return regex.test(value);
-  };
-  
-  // Validate Rack Number (2 digits only)
-  const validateRackNumber = (value) => {
-    if (!value) return true; // Allow empty
-    const regex = /^\d{2}$/;
-    return regex.test(value);
-  };
-  
-  // Validate Rack Level (A, B, C, or D only)
-  const validateRackLevel = (value) => {
-    if (!value) return true; // Allow empty
-    const regex = /^[ABCD]$/i;
-    return regex.test(value);
-  };
-  
-  // Validate Internal Ref No (ABCD123, ABC123, AB123, AB1234, with optional spaces)
+  // Validate functions (keep as is)
+  const validateSapNumber = (value) => /^7\d{6}$/.test(value);
+  const validateRackNumber = (value) => !value || /^\d{2}$/.test(value);
+  const validateRackLevel = (value) => !value || /^[ABCD]$/i.test(value);
   const validateInternalRef = (value) => {
     if (!value) return false;
     const regex = /^([A-Z]{4}\s?\d{3}|[A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}|[A-Z]{2}\s?\d{4})$/i;
     return regex.test(value);
   };
-  
-  // Add part
+
+  // Add part (keep functionality)
   const handleAddPart = async (force = false) => {
-    // Reset all errors
     setSapError(false);
     setInternalRefError(false);
     setNameError(false);
@@ -201,10 +267,7 @@ const PartMaster = () => {
     setRackNumberError(false);
     setRackLevelError(false);
     
-    // Validate all required fields
     let hasError = false;
-
-    // Required checks: flag all empty fields at once
     if (!form.sapNumber || form.sapNumber.trim() === '') { setSapError(true); hasError = true; }
     if (!form.internalRef || form.internalRef.trim() === '') { setInternalRefError(true); hasError = true; }
     if (!form.name || form.name.trim() === '') { setNameError(true); hasError = true; }
@@ -215,7 +278,6 @@ const PartMaster = () => {
     if (form.replenishQty === '' || form.replenishQty === null || form.replenishQty === undefined) { setReplenishQtyError(true); hasError = true; }
     if (form.currentStock === '' || form.currentStock === null || form.currentStock === undefined) { setCurrentStockError(true); hasError = true; }
 
-    // If any required field is missing, show generic incomplete form message and stop
     if (hasError) {
       setSnackbar({ open: true, message: 'Incomplete Form. Please provide the missing information.', severity: 'error' });
       return;
@@ -230,7 +292,7 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'SAP # already exists', severity: 'error' });
       return;
     }
-    // Check if SAP# is not the current running number and not forced
+    
     if (!force && form.sapNumber !== currentRunningSap) {
       setSapDialogOpen(true);
       setPendingAdd(true);
@@ -265,7 +327,6 @@ const PartMaster = () => {
       return;
     }
 
-    // Safety Level required and must be 0 or above
     if (form.safetyLevel === '' || form.safetyLevel === null || form.safetyLevel === undefined) {
       setSafetyLevelError(true);
       setSnackbar({ open: true, message: 'Safety Level is required', severity: 'error' });
@@ -277,7 +338,6 @@ const PartMaster = () => {
       return;
     }
 
-    // Replenish Quantity required and must be 0 or above
     if (form.replenishQty === '' || form.replenishQty === null || form.replenishQty === undefined) {
       setReplenishQtyError(true);
       setSnackbar({ open: true, message: 'Replenish Quantity is required', severity: 'error' });
@@ -289,8 +349,6 @@ const PartMaster = () => {
       return;
     }
     
-    // No missing fields at this point; continue
-
     try {
       const newPart = {
         ...form,
@@ -301,13 +359,13 @@ const PartMaster = () => {
       };
       const docRef = await addDoc(collection(db, 'parts'), newPart);
       dispatch(addPart({ ...newPart, id: docRef.id }));
-      setSnackbar({ open: true, message: 'Part added', severity: 'success' });
-      // Auto-generate next SAP# after successful add
+      setSnackbar({ open: true, message: 'Part added successfully', severity: 'success' });
       const nextSapNumber = (parseInt(form.sapNumber, 10) + 1).toString();
       setForm({ sapNumber: nextSapNumber, internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: '' });
       setCurrentRunningSap(nextSapNumber);
+      calculateStats([...parts, { ...newPart, id: docRef.id }]);
     } catch (e) {
-      setSnackbar({ open: true, message: 'Add failed', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to add part', severity: 'error' });
     }
   };
 
@@ -346,7 +404,7 @@ const PartMaster = () => {
     setCurrentStockError(false);
   };
   
-  // Edit handlers
+  // Edit handlers (keep functionality)
   const handleEditClick = (part) => {
     setEditingId(part.id);
     setEditForm({
@@ -389,7 +447,6 @@ const PartMaster = () => {
       return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
     }
 
-    // Check for duplicate part name (excluding current part)
     const duplicateName = parts.some(p => 
       p.id !== editingId && p.name.toLowerCase() === editForm.name.toLowerCase()
     );
@@ -397,7 +454,6 @@ const PartMaster = () => {
       return setSnackbar({ open: true, message: 'Part name already exists', severity: 'error' });
     }
 
-    // Safety Level required and must be 0 or above on edit
     if (editForm.safetyLevel === '' || editForm.safetyLevel === null || editForm.safetyLevel === undefined) {
       setEditSafetyLevelError(true);
       return setSnackbar({ open: true, message: 'Safety Level is required', severity: 'error' });
@@ -407,7 +463,6 @@ const PartMaster = () => {
       return setSnackbar({ open: true, message: 'Safety Level must be 0 or greater', severity: 'error' });
     }
 
-    // Replenish Quantity required and must be 0 or above on edit
     if (editForm.replenishQty === '' || editForm.replenishQty === null || editForm.replenishQty === undefined) {
       setEditReplenishQtyError(true);
       return setSnackbar({ open: true, message: 'Replenish Quantity is required', severity: 'error' });
@@ -431,14 +486,15 @@ const PartMaster = () => {
       };
       await updateDoc(doc(db, 'parts', editingId), updatedPart);
       dispatch(updatePart({ ...updatedPart, id: editingId }));
-      setSnackbar({ open: true, message: 'Part updated', severity: 'success' });
+      setSnackbar({ open: true, message: 'Part updated successfully', severity: 'success' });
       handleEditClose();
+      calculateStats(parts.map(p => p.id === editingId ? { ...updatedPart, id: editingId } : p));
     } catch (e) {
-      setSnackbar({ open: true, message: 'Update failed', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to update part', severity: 'error' });
     }
   };
   
-  // Delete handlers
+  // Delete handlers (keep functionality)
   const handleDeleteClick = (part) => {
     setDeleteTarget(part);
     setDeleteDialogOpen(true);
@@ -454,14 +510,15 @@ const PartMaster = () => {
     try {
       await deleteDoc(doc(db, 'parts', deleteTarget.id));
       dispatch(deletePart(deleteTarget.id));
-      setSnackbar({ open: true, message: 'Deleted', severity: 'success' });
+      setSnackbar({ open: true, message: 'Part deleted successfully', severity: 'success' });
       handleDeleteClose();
+      calculateStats(parts.filter(p => p.id !== deleteTarget.id));
     } catch (e) {
-      setSnackbar({ open: true, message: 'Delete failed', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to delete part', severity: 'error' });
     }
   };
 
-  // CSV Import handler
+  // CSV Import handler (keep functionality)
   const handleCsvFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -473,7 +530,6 @@ const PartMaster = () => {
         const lines = csv.split('\n').filter(line => line.trim());
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
         
-        // Required columns: sapNumber, internalRef, name, category, safetyLevel, replenishQty
         const requiredColumns = ['sapnumber', 'internalref', 'name', 'category', 'safetylevel', 'replenishqty'];
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
         
@@ -496,7 +552,6 @@ const PartMaster = () => {
             row[h] = values[idx] || '';
           });
           
-          // Validate row
           const rowErrors = [];
           if (!row.sapnumber) rowErrors.push(`Row ${i}: SAP # is required`);
           else if (!/^7\d{6}$/.test(row.sapnumber)) rowErrors.push(`Row ${i}: SAP # must be 7 digits starting with 7`);
@@ -579,6 +634,7 @@ const PartMaster = () => {
       setCsvFile(null);
       setCsvPreview([]);
       setCsvErrors([]);
+      calculateStats([...parts, ...newParts]);
     } catch (error) {
       setSnackbar({ open: true, message: 'Import failed: ' + error.message, severity: 'error' });
     }
@@ -616,13 +672,12 @@ const PartMaster = () => {
     }
   };
 
-  // Remove duplicate entries (keep first, delete others) - OPTIMIZED with batch operations
+  // Remove duplicate entries (keep first, delete others)
   const handleRemoveDuplicates = async () => {
     try {
       setCleanupInProgress(true);
       setCleanupProgress(0);
       
-      // Collect all IDs to delete
       const allIdsToDelete = [];
       duplicatesFound.forEach(duplicate => {
         for (let i = 1; i < duplicate.ids.length; i++) {
@@ -633,9 +688,7 @@ const PartMaster = () => {
       const totalToDelete = allIdsToDelete.length;
       let deletedCount = 0;
 
-      // Firestore batch operations have a max of 500 operations per batch
-      // So we'll create multiple batches if needed
-      const batchSize = 100; // Conservative batch size for safety
+      const batchSize = 100;
       
       for (let i = 0; i < allIdsToDelete.length; i += batchSize) {
         const batch = writeBatch(db);
@@ -645,13 +698,11 @@ const PartMaster = () => {
           batch.delete(doc(db, 'parts', id));
         });
         
-        // Commit batch
         await batch.commit();
         
         deletedCount += batchIds.length;
         setCleanupProgress(Math.round((deletedCount / totalToDelete) * 100));
         
-        // Update Redux state for each batch
         batchIds.forEach(id => {
           dispatch(deletePart(id));
         });
@@ -662,83 +713,16 @@ const PartMaster = () => {
       setDuplicatesFound([]);
       setCleanupProgress(0);
 
-      // Refresh the parts list
       const querySnapshot = await getDocs(collection(db, 'parts'));
       const data = querySnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
       dispatch(setParts(data));
+      calculateStats(data);
     } catch (error) {
       setSnackbar({ open: true, message: 'Error removing duplicates: ' + error.message, severity: 'error' });
       setCleanupProgress(0);
     } finally {
       setCleanupInProgress(false);
     }
-  };
-
-  // Find specific problematic SAP#s and show their exact positions
-  const handleFindProblematicSaps = () => {
-    const problematicSaps = ['7000259', '7000253', '7000240', '7000169', '7000168', '7000037'];
-    console.log('=== FINDING PROBLEMATIC SAP#S IN FILTERED LIST ===');
-    console.log('Total filtered parts:', filteredParts.length);
-    
-    const positions = [];
-    filteredParts.forEach((p, idx) => {
-      if (problematicSaps.includes(p.sapNumber)) {
-        positions.push({
-          position: idx + 1,
-          sap: p.sapNumber,
-          stock: p.currentStock,
-          safety: p.safetyLevel,
-          name: p.name
-        });
-      }
-    });
-    
-    console.log('POSITIONS IN FILTERED LIST:');
-    positions.forEach(p => {
-      console.log(`Position ${p.position}: SAP ${p.sap} (${p.name}) - Stock: ${p.stock}, Safety: ${p.safety}`);
-    });
-    
-    console.log('\nEXPECTED DESCENDING ORDER: 7000259 → 7000253 → 7000240 → 7000169 → 7000168 → 7000037');
-    console.log('ACTUAL ORDER IN LIST:', positions.map(p => p.sap).join(' → '));
-    
-    alert(`Found ${positions.length}/6 problematic SAP#s. Check console for positions.`);
-  };
-
-  // Detect parts with invalid/zero safety levels
-  const handleDetectInvalidSafety = () => {
-    const invalidSafety = parts.filter(p => !p.safetyLevel || p.safetyLevel === 0);
-    console.log('Parts with invalid/zero safety level:', invalidSafety.length);
-    invalidSafety.forEach(p => {
-      console.log(`- SAP: ${p.sapNumber}, Name: ${p.name}, Current Stock: ${p.currentStock}, Safety: ${p.safetyLevel}`);
-    });
-    setSnackbar({ open: true, message: `Found ${invalidSafety.length} parts with invalid safety levels (set to 0)`, severity: 'warning' });
-  };
-
-  // Debug: Verify current sort order
-  const handleVerifySort = () => {
-    console.log('=== SORT VERIFICATION ===');
-    console.log('Total filtered parts:', filteredParts.length);
-    
-    // Show detailed info for each part
-    const detailedInfo = filteredParts.slice(0, 30).map((p, i) => {
-      const sapNum = parseInt(p.sapNumber || '0') || 0;
-      const isLowStock = (p.currentStock || 0) < (p.safetyLevel || 0);
-      return `${i+1}. SAP: ${p.sapNumber} (parsed: ${sapNum}, type: ${typeof p.sapNumber}, lowStock: ${isLowStock}, stock: ${p.currentStock}, safety: ${p.safetyLevel})`;
-    });
-    
-    console.log('First 30 parts with details:\n' + detailedInfo.join('\n'));
-    
-    // Specifically check those problematic SAP#s
-    const problematicSaps = ['7000259', '7000253', '7000240', '7000169', '7000168', '7000037'];
-    const foundParts = filteredParts.filter(p => problematicSaps.includes(p.sapNumber));
-    console.log('\n=== PROBLEMATIC SAP#S FOUND ===');
-    console.log('Found in current list:', foundParts.length, 'of', problematicSaps.length);
-    foundParts.forEach((p, i) => {
-      const isLowStock = (p.currentStock || 0) < (p.safetyLevel || 0);
-      console.log(`${i+1}. SAP: ${p.sapNumber}, Stock: ${p.currentStock}, Safety: ${p.safetyLevel}, LowStock: ${isLowStock}`);
-    });
-    
-    alert(`Sort verification logged. Check console for details. Found ${foundParts.length}/6 problematic SAP#s`);
   };
 
   // Barcode scan handler
@@ -758,648 +742,1874 @@ const PartMaster = () => {
     setBarcodeTarget(null);
   };
 
-  const pageParts = filteredParts.slice(pageStart, pageStart + pageSize);
-  const total = filteredParts.length;
-  const showingEnd = Math.min(pageStart + pageSize, total);
-  const handlePrev = () => setPageStart(s => Math.max(0, s - pageSize));
-  const handleNext = () => {
-    if (pageStart + pageSize < total) setPageStart(s => s + pageSize);
+  // Pagination handlers
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
   };
 
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Get status color for low stock
+  const getStockStatusColor = (stock, safety) => {
+    if (stock === 0) return 'error';
+    if (stock < safety) return 'warning';
+    return 'success';
+  };
+
+  // Get stock status text
+  const getStockStatusText = (stock, safety) => {
+    if (stock === 0) return 'Out of Stock';
+    if (stock < safety) return 'Low Stock';
+    return 'In Stock';
+  };
+
+  // Refresh data
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'parts'));
+      const data = querySnapshot.docs.map(doc => {
+        const d = { ...doc.data(), id: doc.id };
+        if (d.safetyLevel === undefined && d.minStockLevel !== undefined) {
+          d.safetyLevel = d.minStockLevel;
+        }
+        if (d.replenishQty === undefined && d.maxStockLevel !== undefined) {
+          d.replenishQty = d.maxStockLevel;
+        }
+        return d;
+      });
+      dispatch(setParts(data));
+      calculateStats(data);
+      setSnackbar({ open: true, message: 'Data refreshed successfully', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Error refreshing data', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && parts.length === 0) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 'calc(100vh - 64px)',
+        backgroundColor: '#f8fafc'
+      }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ m: 0, p: 0 }}>
-      <Paper elevation={2} sx={{ p:2, mb:3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <h2 style={{ margin:0 }}>PART MASTER - ENGINEERING STORE SPARE PART</h2>
-          <Box width="300px">
-            <BarcodeScanner onScan={handleScan} label="Scan to Search" autoFocus={false} />
-          </Box>
-        </Box>
-      </Paper>
-
-      <Paper elevation={1} sx={{ p:2, mb:3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-          <h3 style={{ margin:0 }}>PART MASTER LIST ({filteredParts.length} ITEMS)</h3>
-          <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
-            <Button 
-              variant="contained" 
-              color="success"
-              onClick={() => setCsvImportDialogOpen(true)}
-              size="small"
-            >
-              IMPORT CSV
-            </Button>
-            <Button 
-              variant="contained" 
-              color="warning"
-              onClick={handleDetectDuplicates}
-              size="small"
-            >
-              CLEANUP DUPLICATES
-            </Button>
-            <Button 
-              variant="outlined" 
-              color="info"
-              onClick={handleVerifySort}
-              size="small"
-            >
-              VERIFY SORT
-            </Button>
-            <Button 
-              variant="outlined" 
-              color="warning"
-              onClick={handleDetectInvalidSafety}
-              size="small"
-            >
-              DETECT INVALID SAFETY
-            </Button>
-            <Button 
-              variant="outlined" 
-              color="error"
-              onClick={handleFindProblematicSaps}
-              size="small"
-            >
-              FIND PROBLEMATIC SAP#S
-            </Button>
-            <TextField 
-              size="small" 
-              label="Search" 
-              value={searchQuery} 
-              onChange={e => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
-              }}
-            />
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Category</InputLabel>
-              <Select value={filterCategory} label="Category" onChange={e => setFilterCategory(e.target.value)}>
-                <MenuItem value=""><em>All</em></MenuItem>
-                {categories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Rack Level</InputLabel>
-              <Select value={filterRackLevel} label="Rack Level" onChange={e => setFilterRackLevel(e.target.value)}>
-                <MenuItem value=""><em>All</em></MenuItem>
-                {['A', 'B', 'C', 'D'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Box>
-        </Box>
-
-        {loading ? <div>Loading...</div> : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>SAP#</TableCell>
-                <TableCell>Int.Ref</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Rack No</TableCell>
-                <TableCell>Level</TableCell>
-                <TableCell>Safety Level</TableCell>
-                <TableCell>Replenish Quantity</TableCell>
-                <TableCell>Current Stock</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {pageParts.map(p => {
-                const isLowStock = (p.currentStock || 0) <= (p.safetyLevel || p.minStockLevel || 0);
-                return (
-                  <TableRow key={p.id} sx={{ bgcolor: isLowStock ? '#fff4e5' : 'inherit' }}>
-                    <TableCell>{p.sapNumber}</TableCell>
-                    <TableCell>{p.internalRef}</TableCell>
-                    <TableCell>{p.name}</TableCell>
-                    <TableCell>{p.category}</TableCell>
-                    <TableCell>{p.rackNumber}</TableCell>
-                    <TableCell>{p.rackLevel}</TableCell>
-                    <TableCell>{(p.safetyLevel ?? p.minStockLevel) || 0}</TableCell>
-                    <TableCell>{(p.replenishQty ?? p.maxStockLevel) || 0}</TableCell>
-                    <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {p.currentStock || 0}
-                        {isLowStock && <Tooltip title="Low Stock"><WarningIcon color="warning" fontSize="small" /></Tooltip>}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="View Barcode">
-                        <IconButton size="small" onClick={() => handleBarcodeClick(p)}>
-                          <QrCodeIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <IconButton size="small" onClick={() => handleEditClick(p)}>
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleDeleteClick(p)}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {pageParts.length === 0 && (
-                <TableRow><TableCell colSpan={10}>No parts found</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        )}
-        <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', mt:1 }}>
-          <div>
-            <Button size="small" onClick={handlePrev} disabled={pageStart === 0}>{'<< Previous'}</Button>
-            <Button size="small" onClick={handleNext} disabled={pageStart + pageSize >= total}>{'Next >>'}</Button>
-          </div>
-          <div>Showing {pageStart + 1}-{showingEnd} of {total} items</div>
-        </Box>
-      </Paper>
-
-      <Paper elevation={1} sx={{ p:2 }}>
-        <h3 style={{ marginTop:0 }}>NEW PART ENTRY</h3>
-        <Box sx={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:2 }}>
-          <TextField 
-            label="SAP #" 
-            value={form.sapNumber} 
-            onChange={e => {
-              const value = e.target.value;
-              setForm(f => ({ ...f, sapNumber: value }));
-              
-              const isValidFormat = validateSapNumber(value);
-              const isDuplicate = value && parts.some(p => p.sapNumber === value);
-              setSapError(value && (!isValidFormat || isDuplicate));
-            }}
-            error={sapError}
-            helperText={sapError ? (
-              parts.some(p => p.sapNumber === form.sapNumber) 
-                ? "SAP # already exists" 
-                : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
-            ) : "Auto-generated (editable)"}
-            required 
-            size="small"
-          />
-          <TextField 
-            label="Internal Ref No" 
-            value={form.internalRef} 
-            onChange={e => {
-              const value = e.target.value.toUpperCase();
-              setForm(f => ({ ...f, internalRef: value }));
-              
-              const isValidFormat = validateInternalRef(value);
-              const isDuplicate = value && parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === value.replace(/\s+/g, '').toUpperCase());
-              setInternalRefError(value && (!isValidFormat || isDuplicate));
-            }}
-            error={internalRefError}
-            helperText={internalRefError ? (
-              parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())
-                ? "Internal Ref No already exists"
-                : "Format: ABCD123, ABC123, AB123, AB1234 (with or without space)"
-            ) : ""}
-            required
-            inputProps={{ style: { textTransform: 'uppercase' } }}
-            size="small"
-          />
-          <TextField 
-            label="Name" 
-            value={form.name} 
-            onChange={e => {
-              const value = e.target.value.toUpperCase();
-              setForm(f => ({ ...f, name: value }));
-              
-              const trimmedValue = value.trim();
-              const isDuplicate = trimmedValue && parts.some(p => p.name && p.name.trim().toLowerCase() === trimmedValue.toLowerCase());
-              setNameError((!value || value.trim() === '') || isDuplicate);
-            }}
-            error={nameError}
-            helperText={nameError ? (
-              form.name && form.name.trim() && parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())
-                ? "Name already exists"
-                : "Name is required"
-            ) : ""}
-            required
-            inputProps={{ style: { textTransform: 'uppercase' } }}
-            size="small"
-          />
-          <TextField 
-            label="Category" 
-            value={form.category} 
-            onChange={e => {
-              const value = e.target.value.toUpperCase();
-              setForm(f => ({ ...f, category: value }));
-              setCategoryError(!value || value.trim() === '');
-            }}
-            error={categoryError}
-            helperText={categoryError ? 'Category is required' : ''}
-            required
-            inputProps={{ style: { textTransform: 'uppercase' } }}
-            size="small"
-          />
-          <TextField 
-            label="Rack Number" 
-            value={form.rackNumber} 
-            onChange={e => {
-              const value = e.target.value;
-              setForm(f => ({ ...f, rackNumber: value }));
-              setRackNumberError(value && !validateRackNumber(value));
-            }}
-            error={rackNumberError}
-            helperText={rackNumberError ? (form.rackNumber ? "Must be exactly 2 digits (e.g., 00, 01, 10)" : "Rack Number is required") : ""}
-            required
-            size="small"
-          />
-          <TextField 
-            label="Rack Level" 
-            value={form.rackLevel} 
-            onChange={e => {
-              const value = e.target.value.toUpperCase();
-              setForm(f => ({ ...f, rackLevel: value }));
-              setRackLevelError(value && !validateRackLevel(value));
-            }}
-            error={rackLevelError}
-            helperText={rackLevelError ? (form.rackLevel ? 'Must be A, B, C, or D' : 'Rack Level is required') : ''}
-            inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
-            required
-            size="small"
-          />
-          <TextField 
-            label="Safety Level" 
-            type="number"
-            value={form.safetyLevel} 
-            onChange={e => {
-              const value = e.target.value;
-              setForm(f => ({ ...f, safetyLevel: value }));
-              setSafetyLevelError(value === '' || Number(value) < 0);
-            }}
-            inputProps={{ min: 0 }}
-            error={safetyLevelError}
-            helperText={safetyLevelError ? (form.safetyLevel === '' ? 'Safety Level is required' : 'Must be 0 or greater') : ''}
-            size="small"
-            required
-          />
-          <TextField 
-            label="Replenish Quantity" 
-            type="number"
-            value={form.replenishQty} 
-            onChange={e => {
-              const value = e.target.value;
-              setForm(f => ({ ...f, replenishQty: value }));
-              setReplenishQtyError(value === '' || Number(value) < 0);
-            }}
-            inputProps={{ min: 0 }}
-            error={replenishQtyError}
-            helperText={replenishQtyError ? (form.replenishQty === '' ? 'Replenish Quantity is required' : 'Must be 0 or greater') : ''}
-            size="small"
-            required
-          />
-          <TextField 
-            label="Current Stock" 
-            type="number"
-            value={form.currentStock} 
-            onChange={e => {
-              const value = e.target.value;
-              setForm(f => ({ ...f, currentStock: value }));
-              setCurrentStockError(value === '');
-            }}
-            size="small"
-            required
-            error={currentStockError}
-            helperText={currentStockError ? 'Current Stock is required' : ''}
-          />
-        </Box>
-        <Box sx={{ mt:2 }}>
-          <Button variant="contained" onClick={() => handleAddPart()} sx={{ mr:1 }}>ADD PART</Button>
-          <Button variant="outlined" onClick={handleClear}>CLEAR</Button>
-        </Box>
-        {/* SAP# mismatch dialog */}
-        <Dialog open={sapDialogOpen} onClose={handleSapDialogClose}>
-          <DialogTitle>SAP # Sequence Mismatch</DialogTitle>
-          <DialogContent>
-            <Typography gutterBottom>
-              The entered SAP # (<b>{form.sapNumber}</b>) does not match the current system sequence. The correct number to use is <b>{currentRunningSap}</b>. Please revise your entry.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleSapDialogEditBack} color="primary" autoFocus>Edit Back</Button>
-          </DialogActions>
-        </Dialog>
-      </Paper>
-
-      {/* Edit Part Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="md" fullWidth>
-        <DialogTitle>EDIT PART</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, mt:1 }}>
-            <TextField 
-              label="SAP #" 
-              value={editForm.sapNumber} 
-              disabled 
-              fullWidth 
-              error={editSapError}
-              helperText={editSapError ? "SAP # must be 7 digits starting with 7" : ""}
-            />
-            <TextField label="Internal Ref No" value={editForm.internalRef} onChange={e => setEditForm(f => ({ ...f, internalRef: e.target.value }))} fullWidth />
-            <TextField 
-              label="Name" 
-              value={editForm.name} 
-              onChange={e => setEditForm(f => ({ ...f, name: e.target.value.toUpperCase() }))} 
-              fullWidth 
-              inputProps={{ style: { textTransform: 'uppercase' } }}
-            />
-            <TextField 
-              label="Category" 
-              value={editForm.category} 
-              onChange={e => setEditForm(f => ({ ...f, category: e.target.value.toUpperCase() }))} 
-              fullWidth 
-              inputProps={{ style: { textTransform: 'uppercase' } }}
-            />
-            <TextField 
-              label="Rack Number" 
-              value={editForm.rackNumber} 
-              onChange={e => {
-                const value = e.target.value;
-                setEditForm(f => ({ ...f, rackNumber: value }));
-                setEditRackNumberError(value && !validateRackNumber(value));
-              }}
-              error={editRackNumberError}
-              helperText={editRackNumberError ? "Must be exactly 2 digits (e.g., 00, 01, 10)" : ""}
-              fullWidth 
-            />
-            <TextField 
-              label="Rack Level" 
-              value={editForm.rackLevel} 
-              onChange={e => {
-                const value = e.target.value.toUpperCase();
-                setEditForm(f => ({ ...f, rackLevel: value }));
-                setEditRackLevelError(value && !validateRackLevel(value));
-              }}
-              error={editRackLevelError}
-              inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
-              fullWidth 
-            />
-            <TextField 
-              label="Safety Level" 
-              type="number"
-              value={editForm.safetyLevel} 
-              onChange={e => {
-                const value = e.target.value;
-                setEditForm(f => ({ ...f, safetyLevel: value }));
-                setEditSafetyLevelError(value === '' || Number(value) < 0);
-              }}
-              inputProps={{ min: 0 }}
-              error={editSafetyLevelError}
-              helperText={editSafetyLevelError ? (editForm.safetyLevel === '' ? 'Safety Level is required' : 'Must be 0 or greater') : ''}
-              fullWidth
-              required
-            />
-            <TextField 
-              label="Replenish Quantity" 
-              type="number"
-              value={editForm.replenishQty} 
-              onChange={e => {
-                const value = e.target.value;
-                setEditForm(f => ({ ...f, replenishQty: value }));
-                setEditReplenishQtyError(value === '' || Number(value) < 0);
-              }}
-              inputProps={{ min: 0 }}
-              error={editReplenishQtyError}
-              helperText={editReplenishQtyError ? (editForm.replenishQty === '' ? 'Replenish Quantity is required' : 'Must be 0 or greater') : ''}
-              fullWidth
-              required
-            />
-            <TextField 
-              label="Current Stock" 
-              type="number"
-              value={editForm.currentStock} 
-              onChange={e => setEditForm(f => ({ ...f, currentStock: e.target.value }))}
-              fullWidth
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p:2 }}>
-          <Button onClick={handleEditClose} variant="outlined">CANCEL</Button>
-          <Button onClick={handleSaveChanges} variant="contained">SAVE CHANGES</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleDeleteClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
-        <DialogContent>
-          <Box sx={{ py:2 }}>
-            <p style={{ marginTop:0 }}>Are you sure you want to delete this part?</p>
-            <Box sx={{ my:2 }}>
-              <p><strong>SAP #:</strong> {deleteTarget?.sapNumber}</p>
-              <p><strong>Name:</strong> {deleteTarget?.name}</p>
+    <Box sx={{ 
+      minHeight: 'calc(100vh - 64px)',
+      backgroundColor: '#f8fafc',
+      p: 3,
+      width: '100%'
+    }}>
+      {/* Main Content Container */}
+      <Box sx={{ 
+        width: '100%',
+        maxWidth: 'none',
+        margin: '0 auto'
+      }}>
+        {/* Header Section */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+            }}>
+              <InventoryIcon sx={{ fontSize: 28 }} />
             </Box>
-            <p style={{ color:'red', marginBottom:0 }}>This action cannot be undone.</p>
+            <Box>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 700, 
+                color: '#1e293b',
+                mb: 0.5
+              }}>
+                Part Master
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#64748b' }}>
+                Engineering Store Spare Part Management
+              </Typography>
+            </Box>
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ p:2 }}>
-          <Button onClick={handleDeleteClose} variant="outlined">CANCEL</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error">CONFIRM DELETE</Button>
-        </DialogActions>
-      </Dialog>
 
-      {/* Barcode Dialog */}
-      <Dialog open={barcodeDialogOpen} onClose={handleBarcodeClose} maxWidth="sm" fullWidth>
-        <DialogTitle>BARCODE</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-            {barcodeTarget && (
-              <>
-                <Barcode value={barcodeTarget.sapNumber} />
-                <Typography variant="h6" sx={{ mt: 2 }}>{barcodeTarget.name}</Typography>
-                <Typography variant="body1" color="textSecondary">{barcodeTarget.internalRef}</Typography>
-              </>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleBarcodeClose}>CLOSE</Button>
-          <Button onClick={() => window.print()} variant="contained">PRINT</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Duplicate Cleanup Dialog */}
-      <Dialog open={cleanupDialogOpen} onClose={() => !cleanupInProgress && setCleanupDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>CLEANUP DUPLICATE PARTS</DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {cleanupInProgress ? (
-              <>
-                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                  Deleting duplicates... {cleanupProgress}%
+          {/* Stats Cards */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Total Parts
                 </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  {stats.total}
+                </Typography>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <WarningIcon sx={{ color: '#f59e0b', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Low Stock
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {stats.lowStock}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CategoryIcon sx={{ color: '#10b981', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Categories
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {stats.categories}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <StorageIcon sx={{ color: '#8b5cf6', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Avg Stock
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {stats.averageStock}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Box>
+        </Box>
+
+        {/* Search and Filter Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#eff6ff'
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600,
+              color: '#1e293b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <SearchIcon sx={{ fontSize: 20, color: '#3b82f6' }} />
+              Search & Filter Parts
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              Find parts by name, SAP#, or other criteria
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 3 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Search Parts"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, SAP#, internal ref..."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setSearchQuery('')} size="small">
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
                 <Box sx={{ width: '100%' }}>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={cleanupProgress}
-                    sx={{ height: 10, borderRadius: 5 }}
+                  <BarcodeScanner 
+                    onScan={handleScan} 
+                    label="Scan Barcode" 
+                    autoFocus={false}
+                    size="small"
+                    fullWidth
                   />
                 </Box>
-                <Typography variant="body2" color="textSecondary">
-                  Please wait while duplicate records are being removed from the database...
-                </Typography>
-              </>
-            ) : duplicatesFound.length === 0 ? (
-              <Typography variant="body2" color="textSecondary">
-                Checking for duplicates...
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="Category"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  fullWidth
+                  select
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                >
+                  <MenuItem value="">All Categories</MenuItem>
+                  {categories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="Rack Level"
+                  value={filterRackLevel}
+                  onChange={(e) => setFilterRackLevel(e.target.value)}
+                  fullWidth
+                  select
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                >
+                  <MenuItem value="">All Levels</MenuItem>
+                  {['A', 'B', 'C', 'D'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={1}>
+                <Tooltip title="Refresh data">
+                  <IconButton 
+                    onClick={refreshData}
+                    sx={{ 
+                      color: '#3b82f6',
+                      backgroundColor: 'white',
+                      border: '1px solid #e2e8f0',
+                      '&:hover': {
+                        backgroundColor: '#eff6ff'
+                      }
+                    }}
+                  >
+                    <RefreshIcon />
+                  </IconButton>
+                </Tooltip>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
+
+        {/* Parts List Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#eff6ff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <InventoryIcon sx={{ fontSize: 20, color: '#3b82f6' }} />
+                Parts Master List
               </Typography>
-            ) : (
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                {filteredParts.length} parts found
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Import CSV">
+                <Button
+                  variant="outlined"
+                  startIcon={<FileUploadIcon />}
+                  onClick={() => setCsvImportDialogOpen(true)}
+                  size="small"
+                  sx={{ 
+                    borderRadius: '10px',
+                    borderColor: '#e2e8f0',
+                    color: '#64748b',
+                    textTransform: 'none',
+                    '&:hover': {
+                      borderColor: '#3b82f6',
+                      color: '#3b82f6'
+                    }
+                  }}
+                >
+                  Import
+                </Button>
+              </Tooltip>
+              <Tooltip title="Cleanup Duplicates">
+                <Button
+                  variant="outlined"
+                  startIcon={<CleaningServicesIcon />}
+                  onClick={handleDetectDuplicates}
+                  size="small"
+                  sx={{ 
+                    borderRadius: '10px',
+                    borderColor: '#e2e8f0',
+                    color: '#64748b',
+                    textTransform: 'none',
+                    '&:hover': {
+                      borderColor: '#f59e0b',
+                      color: '#f59e0b'
+                    }
+                  }}
+                >
+                  Cleanup
+                </Button>
+              </Tooltip>
+            </Box>
+          </Box>
+
+          {/* Parts Table */}
+          {loading ? (
+            <Box sx={{ p: 6, textAlign: 'center' }}>
+              <CircularProgress />
+            </Box>
+          ) : filteredParts.length === 0 ? (
+            <Box sx={{ 
+              p: 6, 
+              textAlign: 'center',
+              color: '#94a3b8'
+            }}>
+              <InventoryIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                No parts found
+              </Typography>
+              <Typography variant="body2">
+                {parts.length === 0 ? 
+                  "No parts found. Add your first part below." :
+                  "No parts match your search criteria. Try changing your filters."}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table sx={{ minWidth: 1200 }}>
+                  <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>SAP#</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Internal Ref</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Part Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Location</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Safety Level</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Replenish Qty</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Current Stock</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredParts
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map((p) => {
+                        const safetyLevel = (p.safetyLevel ?? p.minStockLevel) || 0;
+                        const currentStock = p.currentStock || 0;
+                        const isLowStock = currentStock < safetyLevel;
+                        const isZeroStock = currentStock === 0;
+                        
+                        return (
+                          <TableRow key={p.id} hover sx={{ 
+                            backgroundColor: isZeroStock ? '#fef2f2' : isLowStock ? '#fffbeb' : 'inherit'
+                          }}>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                                {p.sapNumber}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={p.internalRef || '—'}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontWeight: 500 }}
+                              />
+                            </TableCell>
+                            <TableCell>{p.name}</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={p.category || '—'}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{ fontWeight: 500 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {p.rackNumber || '—'}
+                                </Typography>
+                                {p.rackLevel && (
+                                  <Chip 
+                                    label={`Lvl ${p.rackLevel}`}
+                                    size="small"
+                                    variant="outlined"
+                                    color="secondary"
+                                  />
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                                {safetyLevel}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                                {(p.replenishQty ?? p.maxStockLevel) || 0}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {currentStock}
+                                </Typography>
+                                {(isLowStock || isZeroStock) && (
+                                  <Tooltip title={isZeroStock ? "Out of Stock" : "Low Stock"}>
+                                    <WarningIcon color={isZeroStock ? "error" : "warning"} fontSize="small" />
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={getStockStatusText(currentStock, safetyLevel)}
+                                color={getStockStatusColor(currentStock, safetyLevel)}
+                                size="small"
+                                sx={{ fontWeight: 600, minWidth: 100 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Tooltip title="View Barcode">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleBarcodeClick(p)}
+                                    sx={{ 
+                                      color: '#3b82f6',
+                                      '&:hover': { backgroundColor: '#eff6ff' }
+                                    }}
+                                  >
+                                    <QrCodeIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Edit Part">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditClick(p)}
+                                    sx={{ 
+                                      color: '#f59e0b',
+                                      '&:hover': { backgroundColor: '#fffbeb' }
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete Part">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDeleteClick(p)}
+                                    sx={{ 
+                                      '&:hover': { backgroundColor: '#fef2f2' }
+                                    }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              {/* Pagination */}
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={filteredParts.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                sx={{ 
+                  borderTop: '1px solid #e2e8f0',
+                  '& .MuiTablePagination-toolbar': {
+                    padding: 2
+                  }
+                }}
+              />
+            </>
+          )}
+        </Paper>
+
+        {/* New Part Entry Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#eff6ff'
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600,
+              color: '#1e293b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <AddIcon sx={{ fontSize: 20, color: '#3b82f6' }} />
+              New Part Entry
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              Fill in the details below to add a new part
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 4 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6} lg={3}>
+                <TextField
+                  label="SAP #"
+                  value={form.sapNumber}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm(f => ({ ...f, sapNumber: value }));
+                    const isValidFormat = validateSapNumber(value);
+                    const isDuplicate = value && parts.some(p => p.sapNumber === value);
+                    setSapError(value && (!isValidFormat || isDuplicate));
+                  }}
+                  error={sapError}
+                  helperText={sapError ? (
+                    parts.some(p => p.sapNumber === form.sapNumber) 
+                      ? "SAP # already exists" 
+                      : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
+                  ) : "Auto-generated (editable)"}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <NumbersIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <TextField
+                  label="Internal Ref No"
+                  value={form.internalRef}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase();
+                    setForm(f => ({ ...f, internalRef: value }));
+                    const isValidFormat = validateInternalRef(value);
+                    const isDuplicate = value && parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === value.replace(/\s+/g, '').toUpperCase());
+                    setInternalRefError(value && (!isValidFormat || isDuplicate));
+                  }}
+                  error={internalRefError}
+                  helperText={internalRefError ? (
+                    parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())
+                      ? "Internal Ref No already exists"
+                      : "Format: ABCD123, ABC123, AB123, AB1234"
+                  ) : ""}
+                  required
+                  fullWidth
+                  inputProps={{ style: { textTransform: 'uppercase' } }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocalOfferIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <TextField
+                  label="Part Name"
+                  value={form.name}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase();
+                    setForm(f => ({ ...f, name: value }));
+                    const trimmedValue = value.trim();
+                    const isDuplicate = trimmedValue && parts.some(p => p.name && p.name.trim().toLowerCase() === trimmedValue.toLowerCase());
+                    setNameError((!value || value.trim() === '') || isDuplicate);
+                  }}
+                  error={nameError}
+                  helperText={nameError ? (
+                    form.name && form.name.trim() && parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())
+                      ? "Name already exists"
+                      : "Name is required"
+                  ) : ""}
+                  required
+                  fullWidth
+                  inputProps={{ style: { textTransform: 'uppercase' } }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <DescriptionIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <TextField
+                  label="Category"
+                  value={form.category}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase();
+                    setForm(f => ({ ...f, category: value }));
+                    setCategoryError(!value || value.trim() === '');
+                  }}
+                  error={categoryError}
+                  helperText={categoryError ? 'Category is required' : ''}
+                  required
+                  fullWidth
+                  inputProps={{ style: { textTransform: 'uppercase' } }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CategoryIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <TextField
+                  label="Rack Number"
+                  value={form.rackNumber}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm(f => ({ ...f, rackNumber: value }));
+                    setRackNumberError(value && !validateRackNumber(value));
+                  }}
+                  error={rackNumberError}
+                  helperText={rackNumberError ? (form.rackNumber ? "Must be exactly 2 digits" : "Rack Number is required") : ""}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOnIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <TextField
+                  label="Rack Level"
+                  value={form.rackLevel}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase();
+                    setForm(f => ({ ...f, rackLevel: value }));
+                    setRackLevelError(value && !validateRackLevel(value));
+                  }}
+                  error={rackLevelError}
+                  helperText={rackLevelError ? (form.rackLevel ? 'Must be A, B, C, or D' : 'Rack Level is required') : ''}
+                  inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <StorageIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={2}>
+                <TextField
+                  label="Safety Level"
+                  type="number"
+                  value={form.safetyLevel}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm(f => ({ ...f, safetyLevel: value }));
+                    setSafetyLevelError(value === '' || Number(value) < 0);
+                  }}
+                  inputProps={{ min: 0 }}
+                  error={safetyLevelError}
+                  helperText={safetyLevelError ? (form.safetyLevel === '' ? 'Required' : 'Must be ≥ 0') : ''}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SafetyDividerIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={2}>
+                <TextField
+                  label="Replenish Qty"
+                  type="number"
+                  value={form.replenishQty}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm(f => ({ ...f, replenishQty: value }));
+                    setReplenishQtyError(value === '' || Number(value) < 0);
+                  }}
+                  inputProps={{ min: 0 }}
+                  error={replenishQtyError}
+                  helperText={replenishQtyError ? (form.replenishQty === '' ? 'Required' : 'Must be ≥ 0') : ''}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <ReplayIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={2}>
+                <TextField
+                  label="Current Stock"
+                  type="number"
+                  value={form.currentStock}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm(f => ({ ...f, currentStock: value }));
+                    setCurrentStockError(value === '');
+                  }}
+                  required
+                  fullWidth
+                  error={currentStockError}
+                  helperText={currentStockError ? 'Current Stock is required' : ''}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <InventoryIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
+
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              gap: 2,
+              pt: 4,
+              mt: 2,
+              borderTop: '1px solid #e2e8f0'
+            }}>
+              <Button 
+                variant="contained"
+                onClick={() => handleAddPart()}
+                startIcon={<AddIcon />}
+                sx={{ 
+                  minWidth: 200,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                  '&:hover': {
+                    boxShadow: '0 6px 20px rgba(59, 130, 246, 0.6)',
+                    transform: 'translateY(-2px)'
+                  },
+                  '&:disabled': {
+                    background: '#e2e8f0',
+                    color: '#94a3b8'
+                  }
+                }}
+              >
+                Add Part
+              </Button>
+              <Button 
+                variant="outlined"
+                onClick={handleClear}
+                startIcon={<ClearIcon />}
+                sx={{ 
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  borderColor: '#e2e8f0',
+                  color: '#64748b',
+                  '&:hover': {
+                    borderColor: '#3b82f6',
+                    color: '#3b82f6'
+                  }
+                }}
+              >
+                Clear Form
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Enhanced SAP# Mismatch Dialog */}
+      <Dialog 
+        open={sapDialogOpen} 
+        onClose={handleSapDialogClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#fffbeb'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon sx={{ color: '#f59e0b' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              SAP # Sequence Mismatch
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Alert 
+            severity="warning" 
+            sx={{ 
+              mb: 3,
+              borderRadius: '10px',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a'
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#92400e' }}>
+              Sequence Mismatch Detected
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#92400e', mt: 0.5 }}>
+              Your entered SAP# doesn't follow the sequential order.
+            </Typography>
+          </Alert>
+          <Box sx={{ p: 2, backgroundColor: '#f8fafc', borderRadius: '10px' }}>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
+                  Entered SAP#
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#ef4444', fontWeight: 600 }}>
+                  {form.sapNumber}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
+                  Expected SAP#
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  {currentRunningSap}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748b', mt: 3 }}>
+            To maintain sequential integrity, please use the expected SAP#. 
+            This helps prevent gaps in the numbering system.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
+          <Button 
+            onClick={handleSapDialogClose}
+            variant="outlined"
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b',
+              textTransform: 'none'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSapDialogEditBack}
+            variant="contained"
+            sx={{ 
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+            autoFocus
+          >
+            Use {currentRunningSap}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Edit Part Dialog */}
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={handleEditClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#eff6ff'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <EditIcon sx={{ color: '#3b82f6' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Edit Part Details
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="SAP #"
+                value={editForm.sapNumber}
+                disabled
+                fullWidth
+                error={editSapError}
+                helperText={editSapError ? "SAP # must be 7 digits starting with 7" : ""}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Internal Ref No"
+                value={editForm.internalRef}
+                onChange={(e) => setEditForm(f => ({ ...f, internalRef: e.target.value }))}
+                fullWidth
+                inputProps={{ style: { textTransform: 'uppercase' } }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Part Name"
+                value={editForm.name}
+                onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value.toUpperCase() }))}
+                fullWidth
+                inputProps={{ style: { textTransform: 'uppercase' } }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Category"
+                value={editForm.category}
+                onChange={(e) => setEditForm(f => ({ ...f, category: e.target.value.toUpperCase() }))}
+                fullWidth
+                inputProps={{ style: { textTransform: 'uppercase' } }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Rack Number"
+                value={editForm.rackNumber}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditForm(f => ({ ...f, rackNumber: value }));
+                  setEditRackNumberError(value && !validateRackNumber(value));
+                }}
+                error={editRackNumberError}
+                helperText={editRackNumberError ? "Must be exactly 2 digits" : ""}
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Rack Level"
+                value={editForm.rackLevel}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase();
+                  setEditForm(f => ({ ...f, rackLevel: value }));
+                  setEditRackLevelError(value && !validateRackLevel(value));
+                }}
+                error={editRackLevelError}
+                inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Safety Level"
+                type="number"
+                value={editForm.safetyLevel}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditForm(f => ({ ...f, safetyLevel: value }));
+                  setEditSafetyLevelError(value === '' || Number(value) < 0);
+                }}
+                inputProps={{ min: 0 }}
+                error={editSafetyLevelError}
+                helperText={editSafetyLevelError ? (editForm.safetyLevel === '' ? 'Required' : 'Must be ≥ 0') : ''}
+                fullWidth
+                required
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Replenish Quantity"
+                type="number"
+                value={editForm.replenishQty}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditForm(f => ({ ...f, replenishQty: value }));
+                  setEditReplenishQtyError(value === '' || Number(value) < 0);
+                }}
+                inputProps={{ min: 0 }}
+                error={editReplenishQtyError}
+                helperText={editReplenishQtyError ? (editForm.replenishQty === '' ? 'Required' : 'Must be ≥ 0') : ''}
+                fullWidth
+                required
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Current Stock"
+                type="number"
+                value={editForm.currentStock}
+                onChange={(e) => setEditForm(f => ({ ...f, currentStock: e.target.value }))}
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
+          <Button 
+            onClick={handleEditClose}
+            variant="outlined"
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b',
+              textTransform: 'none'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveChanges}
+            variant="contained"
+            sx={{ 
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Delete Confirmation Dialog */}
+      <Dialog 
+        open={deleteDialogOpen} 
+        onClose={handleDeleteClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#fef2f2'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon sx={{ color: '#ef4444' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Confirm Delete
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mb: 3,
+              borderRadius: '10px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca'
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b' }}>
+              This action cannot be undone
+            </Typography>
+          </Alert>
+          
+          {deleteTarget && (
+            <Box sx={{ p: 2, backgroundColor: '#f8fafc', borderRadius: '10px' }}>
+              <Typography variant="subtitle2" sx={{ color: '#64748b', mb: 2 }}>
+                You are about to delete:
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    SAP #
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {deleteTarget.sapNumber}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Internal Ref
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {deleteTarget.internalRef || '—'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Part Name
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {deleteTarget.name}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
+          <Button 
+            onClick={handleDeleteClose}
+            variant="outlined"
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b',
+              textTransform: 'none'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            sx={{ 
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Delete Part
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Barcode Dialog */}
+      <Dialog 
+        open={barcodeDialogOpen} 
+        onClose={handleBarcodeClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#eff6ff'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <QrCodeIcon sx={{ color: '#3b82f6' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Barcode / QR Code
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ py: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {barcodeTarget && (
               <>
-                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-                  Found {duplicatesFound.length} duplicate SAP# entries
-                </Typography>
-                <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                  <Table size="small">
-                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 'bold' }}>SAP #</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Part Name</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Occurrences</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>To Delete</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {duplicatesFound.map((dup, idx) => (
-                        <TableRow key={idx} sx={{ backgroundColor: '#fff3e0' }}>
-                          <TableCell>{dup.sapNumber}</TableCell>
-                          <TableCell>{dup.name}</TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f', fontWeight: 'bold' }}>
-                            {dup.count}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f', fontWeight: 'bold' }}>
-                            {dup.count - 1}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <Box sx={{ 
+                  p: 3, 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '10px',
+                  backgroundColor: 'white',
+                  mb: 3
+                }}>
+                  <Barcode 
+                    value={barcodeTarget.sapNumber} 
+                    width={2}
+                    height={80}
+                    fontSize={14}
+                  />
                 </Box>
-                <Typography variant="body2" color="error">
-                  ⚠️ This will keep the first entry and delete {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)} duplicate record(s).
-                </Typography>
+                <Box sx={{ textAlign: 'center', width: '100%' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                    {barcodeTarget.name}
+                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mb: 2 }}>
+                    <Chip 
+                      label={`SAP: ${barcodeTarget.sapNumber}`}
+                      color="primary"
+                      variant="outlined"
+                    />
+                    <Chip 
+                      label={`Ref: ${barcodeTarget.internalRef || '—'}`}
+                      color="secondary"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Category: {barcodeTarget.category || '—'} | 
+                    Location: Rack {barcodeTarget.rackNumber || '—'} Level {barcodeTarget.rackLevel || '—'}
+                  </Typography>
+                </Box>
               </>
             )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
           <Button 
-            onClick={() => setCleanupDialogOpen(false)} 
+            onClick={handleBarcodeClose}
+            variant="outlined"
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b',
+              textTransform: 'none'
+            }}
+          >
+            Close
+          </Button>
+          <Button 
+            onClick={() => window.print()}
+            variant="contained"
+            startIcon={<PrintIcon />}
+            sx={{ 
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Print
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Duplicate Cleanup Dialog */}
+      <Dialog 
+        open={cleanupDialogOpen} 
+        onClose={() => !cleanupInProgress && setCleanupDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#fffbeb'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CleaningServicesIcon sx={{ color: '#f59e0b' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Duplicate Parts Cleanup
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          {cleanupInProgress ? (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <CircularProgress size={60} thickness={4} sx={{ mb: 3, color: '#f59e0b' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                Removing Duplicates...
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+                Please wait while duplicate records are being cleaned up.
+              </Typography>
+              <Box sx={{ width: '100%', mb: 2 }}>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={cleanupProgress}
+                  sx={{ 
+                    height: 10, 
+                    borderRadius: 5,
+                    backgroundColor: '#e2e8f0',
+                    '& .MuiLinearProgress-bar': {
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      borderRadius: 5
+                    }
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
+                Progress: {cleanupProgress}%
+              </Typography>
+            </Box>
+          ) : duplicatesFound.length === 0 ? (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <CheckCircleIcon sx={{ fontSize: 64, color: '#10b981', mb: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                No Duplicates Found!
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                Your parts database is clean and contains no duplicate SAP# entries.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Alert 
+                severity="warning" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: '10px',
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a'
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#92400e' }}>
+                  Found {duplicatesFound.length} duplicate SAP# entries
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#92400e', mt: 0.5 }}>
+                  Total duplicate records to remove: {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)}
+                </Typography>
+              </Alert>
+              
+              <Box sx={{ maxHeight: 300, overflowY: 'auto', mb: 3 }}>
+                <Table size="small">
+                  <TableHead sx={{ backgroundColor: '#f8fafc', position: 'sticky', top: 0 }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>SAP #</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Part Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Occurrences</TableCell>
+                      <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>To Delete</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {duplicatesFound.map((dup, idx) => (
+                      <TableRow key={idx} sx={{ backgroundColor: idx % 2 === 0 ? '#fffbeb' : '#fff' }}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                            {dup.sapNumber}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: '#64748b' }}>
+                            {dup.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>
+                          <Chip 
+                            label={dup.count}
+                            color="warning"
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>
+                          <Chip 
+                            label={dup.count - 1}
+                            color="error"
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+              
+              <Alert 
+                severity="info" 
+                sx={{ 
+                  borderRadius: '10px',
+                  backgroundColor: '#eff6ff',
+                  border: '1px solid #bfdbfe'
+                }}
+              >
+                <Typography variant="body2" sx={{ color: '#1e40af' }}>
+                  Note: This will keep the first occurrence of each duplicate and remove all subsequent entries.
+                </Typography>
+              </Alert>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
+          <Button 
+            onClick={() => setCleanupDialogOpen(false)}
             variant="outlined"
             disabled={cleanupInProgress}
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b',
+              textTransform: 'none'
+            }}
           >
-            CANCEL
+            Cancel
           </Button>
           {duplicatesFound.length > 0 && !cleanupInProgress && (
             <Button 
-              onClick={handleRemoveDuplicates} 
+              onClick={handleRemoveDuplicates}
               variant="contained"
-              color="error"
+              color="warning"
+              sx={{ 
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
             >
-              DELETE {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)} DUPLICATES
+              Remove {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)} Duplicates
             </Button>
           )}
         </DialogActions>
       </Dialog>
 
-      {/* CSV Import Dialog */}
-      <Dialog open={csvImportDialogOpen} onClose={() => setCsvImportDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>IMPORT PARTS FROM CSV</DialogTitle>
+      {/* Enhanced CSV Import Dialog */}
+      <Dialog 
+        open={csvImportDialogOpen} 
+        onClose={() => setCsvImportDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#eff6ff'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FileUploadIcon sx={{ color: '#3b82f6' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Import Parts from CSV
+            </Typography>
+          </Box>
+        </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {csvPreview.length === 0 && csvErrors.length === 0 && (
-              <>
-                <Typography variant="body2" color="textSecondary">
-                  CSV format should include columns: SAP Number, Internal Ref, Name, Category, Safety Level, Replenish Qty
+          {csvPreview.length === 0 && csvErrors.length === 0 ? (
+            <Box sx={{ textAlign: 'center', p: 3 }}>
+              <FileUploadIcon sx={{ fontSize: 64, color: '#94a3b8', mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                Upload CSV File
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+                CSV format should include columns: SAP Number, Internal Ref, Name, Category, Safety Level, Replenish Qty
+              </Typography>
+              <Box 
+                sx={{ 
+                  border: '2px dashed #e2e8f0',
+                  p: 4,
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                  '&:hover': {
+                    borderColor: '#3b82f6',
+                    backgroundColor: '#eff6ff'
+                  }
+                }}
+              >
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvFileSelect}
+                  style={{ display: 'none' }}
+                  id="csv-input"
+                />
+                <label htmlFor="csv-input" style={{ cursor: 'pointer', display: 'block' }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <FileUploadIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 2 }} />
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
+                      Click to select CSV file
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b' }}>
+                      or drag and drop
+                    </Typography>
+                  </Box>
+                </label>
+              </Box>
+            </Box>
+          ) : csvErrors.length > 0 ? (
+            <Box>
+              <Alert 
+                severity="error" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: '10px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca'
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b' }}>
+                  {csvErrors.length} error(s) found in CSV file
                 </Typography>
-                <Box sx={{ border: '2px dashed #ccc', p: 3, textAlign: 'center', borderRadius: 1, cursor: 'pointer', '&:hover': { backgroundColor: '#f5f5f5' } }}>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleCsvFileSelect}
-                    style={{ display: 'none' }}
-                    id="csv-input"
-                  />
-                  <label htmlFor="csv-input" style={{ cursor: 'pointer', display: 'block' }}>
-                    <Typography variant="h6">Click to select CSV file</Typography>
-                    <Typography variant="body2" color="textSecondary">or drag and drop</Typography>
-                  </label>
-                </Box>
-              </>
-            )}
-
-            {csvErrors.length > 0 && (
-              <Box sx={{ backgroundColor: '#ffebee', p: 2, borderRadius: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#d32f2f', mb: 1 }}>
-                  Errors found:
-                </Typography>
+              </Alert>
+              <Box sx={{ maxHeight: 200, overflowY: 'auto', p: 2, backgroundColor: '#f8fafc', borderRadius: '10px' }}>
                 {csvErrors.map((error, idx) => (
-                  <Typography key={idx} variant="body2" color="error">
+                  <Typography key={idx} variant="body2" sx={{ color: '#ef4444', mb: 0.5 }}>
                     • {error}
                   </Typography>
                 ))}
               </Box>
-            )}
-
-            {csvPreview.length > 0 && (
-              <>
-                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                  Preview: {csvPreview.length} parts ready to import
+            </Box>
+          ) : csvPreview.length > 0 ? (
+            <>
+              <Alert 
+                severity="success" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: '10px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0'
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534' }}>
+                  Ready to import {csvPreview.length} part(s)
                 </Typography>
-                <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                  <Table size="small">
-                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                      <TableRow>
-                        <TableCell>SAP #</TableCell>
-                        <TableCell>Internal Ref</TableCell>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Category</TableCell>
-                        <TableCell>Safety Level</TableCell>
-                        <TableCell>Replenish Qty</TableCell>
+              </Alert>
+              <Typography variant="subtitle2" sx={{ color: '#64748b', mb: 2, fontWeight: 600 }}>
+                Preview:
+              </Typography>
+              <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                <Table size="small">
+                  <TableHead sx={{ backgroundColor: '#f8fafc', position: 'sticky', top: 0 }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>SAP #</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Internal Ref</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Safety Level</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Replenish Qty</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {csvPreview.slice(0, 10).map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{row.sapNumber}</TableCell>
+                        <TableCell>{row.internalRef}</TableCell>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>{row.category}</TableCell>
+                        <TableCell>{row.safetyLevel}</TableCell>
+                        <TableCell>{row.replenishQty}</TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {csvPreview.map((row, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell>{row.sapNumber}</TableCell>
-                          <TableCell>{row.internalRef}</TableCell>
-                          <TableCell>{row.name}</TableCell>
-                          <TableCell>{row.category}</TableCell>
-                          <TableCell>{row.safetyLevel}</TableCell>
-                          <TableCell>{row.replenishQty}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Box>
-              </>
-            )}
-          </Box>
+                    ))}
+                    {csvPreview.length > 10 && (
+                      <TableRow>
+                        <TableCell colSpan={6} sx={{ textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>
+                          ... and {csvPreview.length - 10} more rows
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
+            </>
+          ) : null}
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
           <Button 
             onClick={() => {
               setCsvImportDialogOpen(false);
               setCsvFile(null);
               setCsvPreview([]);
               setCsvErrors([]);
-            }} 
+            }}
             variant="outlined"
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b',
+              textTransform: 'none'
+            }}
           >
-            CLOSE
+            Cancel
           </Button>
-          {csvPreview.length > 0 && (
+          {csvPreview.length > 0 && csvErrors.length === 0 && (
             <Button 
-              onClick={handleBulkImport} 
+              onClick={handleBulkImport}
               variant="contained"
               color="success"
+              sx={{ 
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
             >
-              IMPORT {csvPreview.length} PARTS
+              Import {csvPreview.length} Parts
             </Button>
           )}
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar(s => ({ ...s, open: false }))} message={snackbar.message} />
+      {/* Snackbar Notification */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ 
+            width: '100%',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
