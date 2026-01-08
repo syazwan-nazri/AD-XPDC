@@ -5,7 +5,6 @@ import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
-import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -41,8 +40,20 @@ const dataInputMasterLinks = [
   { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' },
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartGroupMaster' },
+<<<<<<< Updated upstream
   { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
   { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+=======
+  {
+    text: 'Storage Master',
+    icon: <StorageIcon />,
+    permission: 'canAccessStorageLocations',
+    subItems: [
+      { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+      { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+    ]
+  },
+>>>>>>> Stashed changes
   { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, permission: 'canAccessSupplierManagement' },
   { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, permission: 'canAccessAssetRegistry' },
 ];
@@ -70,13 +81,12 @@ const reportLinks = [
 
 const Sidebar = ({ open, onToggle }) => {
   const location = useLocation();
-  const [dataMasterOpen, setDataMasterOpen] = useState(true);
-  const [stockMovementOpen, setStockMovementOpen] = useState(true);
-  const [purchasingOpen, setPurchasingOpen] = useState(true);
+  // Single state to track which section is open. Default is empty string (all closed).
+  const [openSection, setOpenSection] = useState('');
 
-  const toggleDataMaster = () => setDataMasterOpen((prev) => !prev);
-  const toggleStockMovement = () => setStockMovementOpen((prev) => !prev);
-  const togglePurchasing = () => setPurchasingOpen((prev) => !prev);
+  const handleToggle = (section) => {
+    setOpenSection((prev) => (prev === section ? '' : section));
+  };
 
   const user = useSelector((state) => state.auth.user);
   const userRole = user ? getRoleByGroupId(user.groupId) : null;
@@ -93,11 +103,17 @@ const Sidebar = ({ open, onToggle }) => {
 
   if (!user) return null;
 
+<<<<<<< Updated upstream
   const renderSection = (title, icon, links, isOpen, toggleOpen, sectionColor) => {
+=======
+  const renderSection = (title, icon, links, sectionId) => {
+>>>>>>> Stashed changes
     if (links.length === 0) return null;
+    const isOpen = openSection === sectionId;
     return (
       <Box sx={{ mb: 1 }}>
         <List>
+<<<<<<< Updated upstream
           <ListItem 
             button 
             onClick={toggleOpen} 
@@ -120,6 +136,10 @@ const Sidebar = ({ open, onToggle }) => {
               color: sectionColor,
               fontSize: 22
             }}>
+=======
+          <ListItem button onClick={() => handleToggle(sectionId)} sx={{ justifyContent: open ? 'initial' : 'center', px: open ? 2 : 0 }}>
+            <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+>>>>>>> Stashed changes
               {icon}
             </ListItemIcon>
             {open && (
@@ -265,6 +285,7 @@ const Sidebar = ({ open, onToggle }) => {
         </IconButton>
       </Box>
 
+<<<<<<< Updated upstream
       {/* Navigation Sections */}
       <Box sx={{ py: 2, px: open ? 0 : 1 }}>
         {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster, '#8b5cf6')}
@@ -340,6 +361,12 @@ const Sidebar = ({ open, onToggle }) => {
           </Box>
         )}
       </Box>
+=======
+      {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, 'dataMaster')}
+      {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, 'stockMovement')}
+      {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, 'purchasing')}
+      {renderSection("Reports", <ReceiptLongIcon />, filteredReportLinks, 'reports')}
+>>>>>>> Stashed changes
     </Drawer>
   );
 };
