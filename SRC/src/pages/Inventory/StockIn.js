@@ -18,7 +18,11 @@ import {
   InputAdornment,
   Chip,
   IconButton,
-  Tooltip
+  Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import { 
   LocalShipping, 
@@ -31,7 +35,8 @@ import {
   Receipt,
   TrendingUp,
   Refresh,
-  ArrowUpward
+  ArrowUpward,
+  CurrencyExchange
 } from '@mui/icons-material';
 
 const StockIn = () => {
@@ -44,9 +49,24 @@ const StockIn = () => {
   const [deliveryOrderNumber, setDeliveryOrderNumber] = useState('');
   const [dateOfReceipt, setDateOfReceipt] = useState('');
   const [costPerUnit, setCostPerUnit] = useState('');
+  const [currency, setCurrency] = useState('USD'); // Default currency
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Common currencies used in inventory management
+  const currencyOptions = [
+    { code: 'USD', name: 'US Dollar', symbol: '$' },
+    { code: 'EUR', name: 'Euro', symbol: '€' },
+    { code: 'GBP', name: 'British Pound', symbol: '£' },
+    { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+    { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+    { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+    { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+    { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
+    { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+    { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+  ];
 
   useEffect(() => {
     const fetchParts = async () => {
@@ -88,7 +108,7 @@ const StockIn = () => {
         updatedAt: new Date().toISOString()
       });
 
-      // Create Movement Log
+      // Create Movement Log with currency
       await addDoc(collection(db, 'movement_logs'), {
         partId: selectedPart.id,
         partName: selectedPart.name,
@@ -103,6 +123,7 @@ const StockIn = () => {
         deliveryOrderNumber: deliveryOrderNumber,
         dateOfReceipt: dateOfReceipt,
         costPerUnit: costPerUnit ? Number(costPerUnit) : null,
+        currency: currency, // Added currency field
         totalCost: totalCost
       });
 
@@ -112,7 +133,7 @@ const StockIn = () => {
         severity: 'success' 
       });
       
-      // Reset form
+      // Reset form (but keep currency as default)
       setSelectedPart(null);
       setQuantity('');
       setRemarks('');
@@ -120,6 +141,7 @@ const StockIn = () => {
       setDeliveryOrderNumber('');
       setDateOfReceipt('');
       setCostPerUnit('');
+      // Note: We don't reset currency to keep user preference
       
       // Refresh data
       const updatedParts = parts.map(p => p.id === selectedPart.id ? { ...p, currentStock: newStock } : p);
@@ -150,6 +172,12 @@ const StockIn = () => {
     const qty = Number(quantity);
     const cost = Number(costPerUnit);
     return (qty * cost).toFixed(2);
+  };
+
+  // Get currency symbol for display
+  const getCurrencySymbol = () => {
+    const selectedCurrency = currencyOptions.find(c => c.code === currency);
+    return selectedCurrency ? selectedCurrency.symbol : '$';
   };
 
   return (
@@ -464,7 +492,55 @@ const StockIn = () => {
                 />
               </Box>
               
-              {/* Cost per Unit - Full Width */}
+              {/* Currency Selection - Full Width */}
+              <Box sx={{ mb: 3 }}>
+                <FormControl fullWidth>
+                  <TextField
+                    label="Currency"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    select
+                    SelectProps={{
+                      native: false,
+                      MenuProps: {
+                        PaperProps: {
+                          style: {
+                            maxHeight: 300,
+                          },
+                        },
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CurrencyExchange sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  >
+                    {currencyOptions.map((option) => (
+                      <MenuItem key={option.code} value={option.code}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography sx={{ fontWeight: 500, minWidth: 40 }}>
+                            {option.symbol}
+                          </Typography>
+                          <Typography>
+                            {option.code} - {option.name}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </FormControl>
+              </Box>
+              
+              {/* Cost per Unit - Full Width (No $ sign) */}
               <Box sx={{ mb: 2 }}>
                 <TextField
                   label="Cost per Unit"
@@ -472,15 +548,12 @@ const StockIn = () => {
                   fullWidth
                   value={costPerUnit}
                   onChange={(e) => setCostPerUnit(e.target.value)}
-                  inputProps={{ step: '0.01' }}
-                  placeholder="0.00"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <AttachMoney sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
+                  inputProps={{ 
+                    step: '0.01',
+                    min: '0'
                   }}
+                  placeholder="0.00"
+                  helperText={`Enter amount in ${currency}`}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
@@ -505,11 +578,11 @@ const StockIn = () => {
                           Total Value
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#0c4a6e' }}>
-                          {quantity} units × ${Number(costPerUnit).toFixed(2)} each
+                          {quantity} units × {Number(costPerUnit).toFixed(2)} {currency} each
                         </Typography>
                       </Box>
                       <Typography variant="h6" sx={{ color: '#0369a1', fontWeight: 700 }}>
-                        ${totalValue()}
+                        {getCurrencySymbol()}{totalValue()} {currency}
                       </Typography>
                     </Box>
                   </CardContent>
@@ -718,10 +791,12 @@ const StockIn = () => {
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
-                            Cost per Unit
+                            {transaction.currency ? `Cost (${transaction.currency})` : 'Cost per Unit'}
                           </Typography>
                           <Typography variant="body1" sx={{ fontWeight: 500, color: '#334155' }}>
-                            {transaction.costPerUnit ? `$${transaction.costPerUnit.toFixed(2)}` : 'N/A'}
+                            {transaction.costPerUnit ? 
+                              `${transaction.currency || 'USD'} ${transaction.costPerUnit.toFixed(2)}` : 
+                              'N/A'}
                           </Typography>
                         </Grid>
                       </Grid>
