@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { db } from '../../firebase/config';
-import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
 import {
   Box,
   Paper,
@@ -16,24 +16,50 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Checkbox,
+  Chip,
   FormControl,
-  FormControlLabel,
-  RadioGroup,
-  Radio,
-  Select,
-  MenuItem,
-  InputLabel,
   IconButton,
   Tooltip,
   Typography,
   Snackbar,
   Alert,
+  Grid,
+  Card,
+  CardContent,
+  InputAdornment,
+  MenuItem,
+  Select,
+  InputLabel,
+  Divider,
+  Stack,
+  TablePagination,
+  CircularProgress,
+  Badge,
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SearchIcon from '@mui/icons-material/Search';
-import AddIcon from '@mui/icons-material/Add';
+import {
+  Description,
+  Add,
+  Search,
+  FilterList,
+  Refresh,
+  Download,
+  Edit,
+  Delete,
+  CheckCircle,
+  Cancel,
+  PendingActions,
+  Inventory,
+  Person,
+  CalendarToday,
+  Business,
+  Assignment,
+  TrendingUp,
+  ArrowUpward,
+  ArrowDownward,
+  Clear,
+  Visibility,
+  LocalShipping,
+} from '@mui/icons-material';
 
 const MRF = () => {
   const parts = useSelector(state => state.parts.parts || []);
@@ -48,7 +74,7 @@ const MRF = () => {
     requestedBy: '',
     department: '',
     project: '',
-    priority: '',
+    priority: 'MEDIUM',
     requiredDate: '',
   });
 
@@ -71,8 +97,14 @@ const MRF = () => {
   });
 
   const [mrfList, setMrfList] = useState([]);
-  const [pageStart, setPageStart] = useState(0);
-  const pageSize = 20;
+  const [filteredMRFs, setFilteredMRFs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterPriority, setFilterPriority] = useState('ALL');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [stats, setStats] = useState({ total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 });
 
   // Fetch MRF data from Firestore
   useEffect(() => {
@@ -80,15 +112,46 @@ const MRF = () => {
       setLoading(true);
       try {
         const mrfSnapshot = await getDocs(collection(db, 'mrf'));
-        const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        const mrfData = mrfSnapshot.docs.map(doc => {
+          const data = doc.data();
+          // Handle date conversion safely
+          let createdAtDate;
+          if (data.createdAt) {
+            if (data.createdAt.toDate) {
+              // If it's a Firestore Timestamp
+              createdAtDate = data.createdAt.toDate();
+            } else if (typeof data.createdAt === 'string') {
+              // If it's stored as ISO string
+              createdAtDate = new Date(data.createdAt);
+            } else if (data.createdAt.seconds) {
+              // If it's stored as {seconds, nanoseconds}
+              createdAtDate = new Date(data.createdAt.seconds * 1000);
+            } else {
+              createdAtDate = new Date();
+            }
+          } else {
+            createdAtDate = new Date();
+          }
+          
+          return { 
+            ...data, 
+            id: doc.id,
+            createdAt: createdAtDate
+          };
+        });
         setMrfList(mrfData);
+        calculateStats(mrfData);
 
         // Generate MRF number if new
         if (mrfData.length === 0) {
-          setMrfHeader(prev => ({ ...prev, mrfNumber: 'MRF-2024-001' }));
+          const year = new Date().getFullYear();
+          setMrfHeader(prev => ({ ...prev, mrfNumber: `MRF-${year}-001` }));
         } else {
-          const lastMRF = mrfData[mrfData.length - 1];
-          const newNumber = `MRF-${new Date().getFullYear()}-${String(mrfData.length + 1).padStart(3, '0')}`;
+          const year = new Date().getFullYear();
+          const currentYearMRFs = mrfData.filter(mrf => 
+            mrf.mrfNumber && mrf.mrfNumber.includes(`MRF-${year}-`)
+          ).length;
+          const newNumber = `MRF-${year}-${String(currentYearMRFs + 1).padStart(3, '0')}`;
           setMrfHeader(prev => ({ ...prev, mrfNumber: newNumber }));
         }
       } catch (error) {
@@ -101,15 +164,92 @@ const MRF = () => {
     fetchMRFData();
   }, []);
 
-  // Fetch Parts data from Firestore or Redux
+  // Apply filters whenever filter criteria change
+  useEffect(() => {
+    applyFilters();
+  }, [mrfList, searchTerm, filterStatus, filterPriority, dateRange]);
+
+  // Calculate stats
+  const calculateStats = (data) => {
+    const stats = {
+      total: data.length,
+      draft: data.filter(mrf => mrf.status === 'Draft').length,
+      pending: data.filter(mrf => mrf.status === 'Pending' || mrf.status === 'Submitted').length,
+      approved: data.filter(mrf => mrf.status === 'Approved').length,
+      rejected: data.filter(mrf => mrf.status === 'Rejected').length,
+    };
+    setStats(stats);
+  };
+
+  // Apply filters
+  const applyFilters = () => {
+    let filtered = [...mrfList];
+
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(mrf => 
+        (mrf.mrfNumber && mrf.mrfNumber.toLowerCase().includes(term)) ||
+        (mrf.requestedBy && mrf.requestedBy.toLowerCase().includes(term)) ||
+        (mrf.department && mrf.department.toLowerCase().includes(term)) ||
+        (mrf.project && mrf.project.toLowerCase().includes(term)) ||
+        (mrf.justification && mrf.justification.toLowerCase().includes(term))
+      );
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'ALL') {
+      filtered = filtered.filter(mrf => mrf.status === filterStatus);
+    }
+
+    // Apply priority filter
+    if (filterPriority !== 'ALL') {
+      filtered = filtered.filter(mrf => mrf.priority === filterPriority);
+    }
+
+    // Apply date range filter
+    if (dateRange.start) {
+      const startDate = new Date(dateRange.start);
+      startDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(mrf => {
+        const mrfDate = mrf.createdAt instanceof Date ? mrf.createdAt : new Date(mrf.createdAt);
+        return mrfDate >= startDate;
+      });
+    }
+    if (dateRange.end) {
+      const endDate = new Date(dateRange.end);
+      endDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(mrf => {
+        const mrfDate = mrf.createdAt instanceof Date ? mrf.createdAt : new Date(mrf.createdAt);
+        return mrfDate <= endDate;
+      });
+    }
+
+    // Sort by creation date (newest first)
+    filtered.sort((a, b) => {
+      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+      return dateB - dateA;
+    });
+    
+    setFilteredMRFs(filtered);
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('ALL');
+    setFilterPriority('ALL');
+    setDateRange({ start: '', end: '' });
+  };
+
+  // Fetch Parts data
   useEffect(() => {
     const fetchParts = async () => {
       try {
-        // First, try to use parts from Redux
         if (parts && parts.length > 0) {
           setAvailableParts(parts);
         } else {
-          // If Redux doesn't have parts, fetch from Firestore directly
           const partsSnapshot = await getDocs(collection(db, 'parts'));
           const partsData = partsSnapshot.docs.map(doc => ({ 
             ...doc.data(), 
@@ -142,7 +282,7 @@ const MRF = () => {
       id: Date.now(),
       sapNumber: newItem.sapNumber,
       partName: selectedPart.name,
-      quantity: newItem.quantity,
+      quantity: Number(newItem.quantity),
       unit: selectedPart.unit || 'PCS',
       stockAvailable: selectedPart.currentStock || 0,
       urgent: newItem.urgent,
@@ -151,26 +291,12 @@ const MRF = () => {
     setMrfItems([...mrfItems, item]);
     setNewItem({ sapNumber: '', partName: '', quantity: '', unit: '', stockAvailable: 0, urgent: false });
     setAddItemDialogOpen(false);
-    setSnackbar({ open: true, message: 'Item added', severity: 'success' });
+    setSnackbar({ open: true, message: 'Item added successfully', severity: 'success' });
   };
 
   // Handle remove item
   const handleRemoveItem = (itemId) => {
     setMrfItems(mrfItems.filter(item => item.id !== itemId));
-  };
-
-  // Handle SAP# search
-  const handleSapSearch = (sapNumber) => {
-    const selectedPart = parts.find(p => p.sapNumber === sapNumber);
-    if (selectedPart) {
-      setNewItem(prev => ({
-        ...prev,
-        sapNumber,
-        partName: selectedPart.name,
-        unit: selectedPart.unit || 'PCS',
-        stockAvailable: selectedPart.currentStock || 0,
-      }));
-    }
   };
 
   // Handle save MRF
@@ -191,24 +317,17 @@ const MRF = () => {
         items: mrfItems,
         justification,
         status,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(), // Use ISO string instead of Timestamp
+        totalItems: mrfItems.length,
+        totalQuantity: mrfItems.reduce((sum, item) => sum + Number(item.quantity), 0),
       };
 
       await addDoc(collection(db, 'mrf'), mrfData);
       setSnackbar({ open: true, message: `MRF ${status} saved successfully`, severity: 'success' });
 
-      // Reset form
-      setMrfHeader({
-        mrfNumber: '',
-        date: new Date().toISOString().split('T')[0],
-        requestedBy: '',
-        department: '',
-        project: '',
-        priority: '',
-        requiredDate: '',
-      });
-      setMrfItems([]);
-      setJustification('');
+      // Reset form and refresh list
+      resetForm();
+      await refreshData();
     } catch (error) {
       console.error('Error saving MRF:', error);
       setSnackbar({ open: true, message: 'Error saving MRF', severity: 'error' });
@@ -224,7 +343,7 @@ const MRF = () => {
         status: 'Approved',
         approvedBy: 'Current User',
         approvalComments: approvalComments,
-        approvalDate: new Date().toISOString(),
+        approvalDate: new Date().toISOString(), // Use ISO string
       });
 
       setSnackbar({ open: true, message: 'MRF Approved successfully', severity: 'success' });
@@ -232,10 +351,7 @@ const MRF = () => {
       setApprovalComments('');
       setSelectedMRF(null);
 
-      // Refresh MRF list
-      const mrfSnapshot = await getDocs(collection(db, 'mrf'));
-      const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setMrfList(mrfData);
+      await refreshData();
     } catch (error) {
       console.error('Error approving MRF:', error);
       setSnackbar({ open: true, message: 'Error approving MRF', severity: 'error' });
@@ -251,7 +367,7 @@ const MRF = () => {
         status: 'Rejected',
         rejectedBy: 'Current User',
         rejectionComments: approvalComments,
-        rejectionDate: new Date().toISOString(),
+        rejectionDate: new Date().toISOString(), // Use ISO string
       });
 
       setSnackbar({ open: true, message: 'MRF Rejected', severity: 'warning' });
@@ -259,423 +375,1167 @@ const MRF = () => {
       setApprovalComments('');
       setSelectedMRF(null);
 
-      // Refresh MRF list
-      const mrfSnapshot = await getDocs(collection(db, 'mrf'));
-      const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setMrfList(mrfData);
+      await refreshData();
     } catch (error) {
       console.error('Error rejecting MRF:', error);
       setSnackbar({ open: true, message: 'Error rejecting MRF', severity: 'error' });
     }
   };
 
-  // Pagination for MRF list
-  const pageEnd = Math.min(pageStart + pageSize, mrfList.length);
-  const mrfPaginated = mrfList.slice(pageStart, pageEnd);
+  const resetForm = () => {
+    const year = new Date().getFullYear();
+    const currentYearMRFs = mrfList.filter(mrf => 
+      mrf.mrfNumber && mrf.mrfNumber.includes(`MRF-${year}-`)
+    ).length;
+    const newNumber = `MRF-${year}-${String(currentYearMRFs + 1).padStart(3, '0')}`;
+    
+    setMrfHeader({
+      mrfNumber: newNumber,
+      date: new Date().toISOString().split('T')[0],
+      requestedBy: '',
+      department: '',
+      project: '',
+      priority: 'MEDIUM',
+      requiredDate: '',
+    });
+    setMrfItems([]);
+    setJustification('');
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const mrfSnapshot = await getDocs(collection(db, 'mrf'));
+      const mrfData = mrfSnapshot.docs.map(doc => {
+        const data = doc.data();
+        let createdAtDate;
+        if (data.createdAt) {
+          if (data.createdAt.toDate) {
+            createdAtDate = data.createdAt.toDate();
+          } else if (typeof data.createdAt === 'string') {
+            createdAtDate = new Date(data.createdAt);
+          } else if (data.createdAt.seconds) {
+            createdAtDate = new Date(data.createdAt.seconds * 1000);
+          } else {
+            createdAtDate = new Date();
+          }
+        } else {
+          createdAtDate = new Date();
+        }
+        
+        return { 
+          ...data, 
+          id: doc.id,
+          createdAt: createdAtDate
+        };
+      });
+      setMrfList(mrfData);
+      calculateStats(mrfData);
+    } catch (error) {
+      console.error('Error refreshing MRF data:', error);
+      setSnackbar({ open: true, message: 'Error refreshing data', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Draft': return 'default';
+      case 'Submitted':
+      case 'Pending': return 'warning';
+      case 'Approved': return 'success';
+      case 'Rejected': return 'error';
+      default: return 'default';
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'HIGH': return 'error';
+      case 'MEDIUM': return 'warning';
+      case 'LOW': return 'success';
+      default: return 'default';
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    try {
+      const dateObj = date instanceof Date ? date : new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        return 'N/A';
+      }
+      return dateObj.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const exportToCSV = () => {
+    const headers = ['MRF#', 'Date', 'Requested By', 'Department', 'Project', 'Priority', 'Status', 'Items', 'Total Quantity'];
+    const csvData = filteredMRFs.map(mrf => [
+      mrf.mrfNumber || 'N/A',
+      formatDate(mrf.createdAt),
+      mrf.requestedBy || 'N/A',
+      mrf.department || '—',
+      mrf.project || '—',
+      mrf.priority || 'MEDIUM',
+      mrf.status || 'Draft',
+      mrf.items?.length || 0,
+      mrf.items?.reduce((sum, item) => sum + Number(item.quantity), 0) || 0
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mrf-history-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
 
   if (loading) {
-    return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 'calc(100vh - 64px)',
+        backgroundColor: '#f8fafc'
+      }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
-    <Box sx={{ m: 0, p: 0 }}>
-      {/* Title */}
-      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <h2 style={{ margin: 0 }}>MRF - MATERIAL REQUISITION FORM</h2>
-        </Box>
-      </Paper>
-
-      {/* MRF Header Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          MRF HEADER
-        </Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-          <TextField
-            label="MRF #"
-            value={mrfHeader.mrfNumber}
-            disabled
-            fullWidth
-            size="small"
-          />
-          <TextField
-            label="Date"
-            type="date"
-            value={mrfHeader.date}
-            disabled
-            fullWidth
-            size="small"
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Requested By"
-            value={mrfHeader.requestedBy}
-            onChange={(e) => setMrfHeader({ ...mrfHeader, requestedBy: e.target.value })}
-            fullWidth
-            size="small"
-            required
-          />
-          <TextField
-            label="Department"
-            value={mrfHeader.department}
-            onChange={(e) => setMrfHeader({ ...mrfHeader, department: e.target.value })}
-            fullWidth
-            size="small"
-          />
-          <TextField
-            label="Project"
-            value={mrfHeader.project}
-            onChange={(e) => setMrfHeader({ ...mrfHeader, project: e.target.value })}
-            fullWidth
-            size="small"
-          />
-          <TextField
-            label="Required Date"
-            type="date"
-            value={mrfHeader.requiredDate}
-            onChange={(e) => setMrfHeader({ ...mrfHeader, requiredDate: e.target.value })}
-            fullWidth
-            size="small"
-            InputLabelProps={{ shrink: true }}
-          />
-        </Box>
-
-
-      </Paper>
-
-      {/* Requested Items Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            REQUESTED ITEMS ({mrfItems.length} ITEMS)
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setAddItemDialogOpen(true)}
-            size="small"
-          >
-            ADD ITEM
-          </Button>
-        </Box>
-
-        {/* Items Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small">
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Part Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Quantity</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Unit</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Stock Available</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {mrfItems.length > 0 ? (
-                mrfItems.map((item) => (
-                  <TableRow key={item.id} hover>
-                    <TableCell>{item.sapNumber}</TableCell>
-                    <TableCell>{item.partName}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell>{item.unit}</TableCell>
-                    <TableCell>{item.stockAvailable}</TableCell>
-                    <TableCell>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleRemoveItem(item.id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: '#999' }}>
-                    No items added. Click ADD ITEM to add requested parts.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Box>
-      </Paper>
-
-      {/* Justification Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          JUSTIFICATION
-        </Typography>
-        <TextField
-          label="Reason / Comments"
-          multiline
-          rows={4}
-          value={justification}
-          onChange={(e) => setJustification(e.target.value)}
-          fullWidth
-          placeholder="Enter reason for this requisition..."
-        />
-      </Paper>
-
-      {/* Actions Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          ACTIONS
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="contained" onClick={() => handleSaveMRF('Submitted')}>
-            SUBMIT
-          </Button>
-          <Button variant="outlined" onClick={() => {
-            setMrfHeader({
-              mrfNumber: '',
-              date: new Date().toISOString().split('T')[0],
-              requestedBy: '',
-              department: '',
-              project: '',
-              priority: '',
-              requiredDate: '',
-            });
-            setMrfItems([]);
-            setJustification('');
-          }}>
-            CLEAR
-          </Button>
-          <Button variant="outlined" color="error">
-            CANCEL
-          </Button>
-        </Box>
-      </Paper>
-
-      {/* MRF History & Status Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          MRF HISTORY & STATUS ({mrfList.length} MRFs)
-        </Typography>
-
-        {/* History Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small">
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>MRF#</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Date</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Requested By</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {mrfPaginated.length > 0 ? (
-                mrfPaginated.map((mrf) => (
-                  <TableRow key={mrf.id} hover>
-                    <TableCell>{mrf.mrfNumber}</TableCell>
-                    <TableCell>{mrf.date}</TableCell>
-                    <TableCell>{mrf.requestedBy}</TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          backgroundColor:
-                            mrf.status === 'Draft'
-                              ? '#e3f2fd'
-                              : mrf.status === 'Approved'
-                              ? '#c8e6c9'
-                              : mrf.status === 'Rejected'
-                              ? '#ffcdd2'
-                              : '#fff9c4',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          display: 'inline-block',
-                        }}
-                      >
-                        {mrf.status}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="Approve">
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="success"
-                          onClick={async () => {
-                            setSelectedMRF(mrf);
-                            try {
-                              const mrfRef = doc(db, 'mrf', mrf.id);
-                              await updateDoc(mrfRef, {
-                                status: 'Approved',
-                                approvedBy: 'Current User',
-                                approvalDate: new Date().toISOString(),
-                              });
-                              setSnackbar({ open: true, message: 'MRF Approved successfully', severity: 'success' });
-                              const mrfSnapshot = await getDocs(collection(db, 'mrf'));
-                              const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                              setMrfList(mrfData);
-                            } catch (error) {
-                              console.error('Error approving MRF:', error);
-                              setSnackbar({ open: true, message: 'Error approving MRF', severity: 'error' });
-                            }
-                          }}
-                          sx={{ mr: 1, textTransform: 'none' }}
-                        >
-                          Approve
-                        </Button>
-                      </Tooltip>
-                      <Tooltip title="Reject">
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="error"
-                          onClick={async () => {
-                            setSelectedMRF(mrf);
-                            try {
-                              const mrfRef = doc(db, 'mrf', mrf.id);
-                              await updateDoc(mrfRef, {
-                                status: 'Rejected',
-                                rejectedBy: 'Current User',
-                                rejectionDate: new Date().toISOString(),
-                              });
-                              setSnackbar({ open: true, message: 'MRF Rejected', severity: 'warning' });
-                              const mrfSnapshot = await getDocs(collection(db, 'mrf'));
-                              const mrfData = mrfSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                              setMrfList(mrfData);
-                            } catch (error) {
-                              console.error('Error rejecting MRF:', error);
-                              setSnackbar({ open: true, message: 'Error rejecting MRF', severity: 'error' });
-                            }
-                          }}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Reject
-                        </Button>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 3, color: '#999' }}>
-                    No MRF records found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Box>
-
-        {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Box>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPageStart(Math.max(0, pageStart - pageSize))}
-              disabled={pageStart === 0}
-              sx={{ mr: 1 }}
-            >
-              &lt;&lt; Previous
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPageStart(pageStart + pageSize)}
-              disabled={pageEnd >= mrfList.length}
-            >
-              Next &gt;&gt;
-            </Button>
+    <Box sx={{ 
+      minHeight: 'calc(100vh - 64px)',
+      backgroundColor: '#f8fafc',
+      p: 3,
+      width: '100%',
+      ml: 0,
+      mr: 0
+    }}>
+      {/* Main Content Container */}
+      <Box sx={{ 
+        width: '100%',
+        maxWidth: 'none',
+        margin: '0 auto'
+      }}>
+        {/* Header Section */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+            }}>
+              <Description sx={{ fontSize: 28 }} />
+            </Box>
+            <Box>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 700, 
+                color: '#1e293b',
+                mb: 0.5
+              }}>
+                Material Requisition Form (MRF)
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#64748b' }}>
+                Create and manage material requisition requests
+              </Typography>
+            </Box>
           </Box>
-          <Typography variant="body2" sx={{ color: '#666' }}>
-            Showing {mrfList.length > 0 ? pageStart + 1 : 0}-{pageEnd} of {mrfList.length} MRFs
-          </Typography>
+
+          {/* Stats Cards */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Total MRFs
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  {stats.total}
+                </Typography>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PendingActions sx={{ color: '#f59e0b', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Pending
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {stats.pending}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircle sx={{ color: '#10b981', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Approved
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {stats.approved}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Box>
         </Box>
-      </Paper>
+
+        {/* New MRF Form - Stacked Layout */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#fffbeb'
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600,
+              color: '#1e293b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Description sx={{ fontSize: 20, color: '#f59e0b' }} />
+              New Material Requisition Form
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              Fill in the details below to create a new MRF
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 4 }}>
+            {/* MRF Header Section */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="subtitle1" sx={{ 
+                fontWeight: 600, 
+                color: '#334155',
+                mb: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <Assignment sx={{ fontSize: 18, color: '#f59e0b' }} />
+                MRF Header
+              </Typography>
+              
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="MRF Number"
+                    value={mrfHeader.mrfNumber}
+                    disabled
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Description sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Date"
+                    type="date"
+                    value={mrfHeader.date}
+                    disabled
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CalendarToday sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Requested By"
+                    value={mrfHeader.requestedBy}
+                    onChange={(e) => setMrfHeader({ ...mrfHeader, requestedBy: e.target.value })}
+                    fullWidth
+                    required
+                    placeholder="Enter requester name"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Person sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Department"
+                    value={mrfHeader.department}
+                    onChange={(e) => setMrfHeader({ ...mrfHeader, department: e.target.value })}
+                    fullWidth
+                    placeholder="Enter department name"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Business sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Project"
+                    value={mrfHeader.project}
+                    onChange={(e) => setMrfHeader({ ...mrfHeader, project: e.target.value })}
+                    fullWidth
+                    placeholder="Enter project name or code"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Assignment sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Priority"
+                    value={mrfHeader.priority}
+                    onChange={(e) => setMrfHeader({ ...mrfHeader, priority: e.target.value })}
+                    fullWidth
+                    select
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  >
+                    <MenuItem value="HIGH">High</MenuItem>
+                    <MenuItem value="MEDIUM">Medium</MenuItem>
+                    <MenuItem value="LOW">Low</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Required Date"
+                    type="date"
+                    value={mrfHeader.requiredDate}
+                    onChange={(e) => setMrfHeader({ ...mrfHeader, requiredDate: e.target.value })}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CalendarToday sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Requested Items Section */}
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ 
+                  fontWeight: 600, 
+                  color: '#334155',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  <Inventory sx={{ fontSize: 18, color: '#f59e0b' }} />
+                  Requested Items ({mrfItems.length} items)
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => setAddItemDialogOpen(true)}
+                  sx={{
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    borderRadius: '10px',
+                    textTransform: 'none'
+                  }}
+                >
+                  Add Item
+                </Button>
+              </Box>
+
+              {mrfItems.length > 0 ? (
+                <Paper elevation={0} sx={{ 
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  overflow: 'hidden'
+                }}>
+                  <Table>
+                    <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>SAP#</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Part Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Quantity</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Unit</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Stock Available</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {mrfItems.map((item) => (
+                        <TableRow key={item.id} hover>
+                          <TableCell>{item.sapNumber}</TableCell>
+                          <TableCell>{item.partName}</TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={item.quantity}
+                              color="primary"
+                              size="small"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </TableCell>
+                          <TableCell>{item.unit}</TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={item.stockAvailable}
+                              color={item.stockAvailable >= item.quantity ? "success" : "error"}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Tooltip title="Remove item">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemoveItem(item.id)}
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              ) : (
+                <Box sx={{ 
+                  p: 4, 
+                  textAlign: 'center', 
+                  border: '2px dashed #e2e8f0',
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc'
+                }}>
+                  <Inventory sx={{ fontSize: 48, color: '#94a3b8', mb: 2, opacity: 0.5 }} />
+                  <Typography variant="body1" sx={{ color: '#64748b', mb: 1 }}>
+                    No items added yet
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                    Click "Add Item" to start adding requested parts
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Justification Section */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="subtitle1" sx={{ 
+                fontWeight: 600, 
+                color: '#334155',
+                mb: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <Description sx={{ fontSize: 18, color: '#f59e0b' }} />
+                Justification
+              </Typography>
+              
+              <TextField
+                label="Reason / Comments"
+                multiline
+                rows={4}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                fullWidth
+                placeholder="Enter reason for this requisition..."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Actions Section */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              gap: 2,
+              pt: 2
+            }}>
+              <Button 
+                variant="contained"
+                onClick={() => handleSaveMRF('Submitted')}
+                disabled={!mrfHeader.requestedBy || mrfItems.length === 0}
+                startIcon={<CheckCircle />}
+                sx={{ 
+                  minWidth: 200,
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
+                  '&:hover': {
+                    boxShadow: '0 6px 20px rgba(245, 158, 11, 0.6)',
+                    transform: 'translateY(-2px)'
+                  },
+                  '&:disabled': {
+                    background: '#e2e8f0',
+                    color: '#94a3b8'
+                  }
+                }}
+              >
+                Submit MRF
+              </Button>
+              <Button 
+                variant="outlined"
+                onClick={resetForm}
+                sx={{ 
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  borderColor: '#e2e8f0',
+                  color: '#64748b',
+                  '&:hover': {
+                    borderColor: '#f59e0b',
+                    color: '#f59e0b'
+                  }
+                }}
+              >
+                Clear Form
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* MRF History Section with Search & Filter */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#fffbeb',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <PendingActions sx={{ fontSize: 20, color: '#f59e0b' }} />
+                MRF History & Status
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                Track and manage all material requisition forms
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Refresh data">
+                <IconButton 
+                  onClick={refreshData}
+                  sx={{ 
+                    color: '#f59e0b',
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    '&:hover': {
+                      backgroundColor: '#fffbeb'
+                    }
+                  }}
+                >
+                  <Refresh />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Export to CSV">
+                <IconButton 
+                  onClick={exportToCSV}
+                  sx={{ 
+                    backgroundColor: '#f59e0b',
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: '#d97706'
+                    }
+                  }}
+                >
+                  <Download />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+
+          {/* Search and Filter Section */}
+          <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0' }}>
+            <Typography variant="subtitle1" sx={{ 
+              fontWeight: 600, 
+              color: '#334155',
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <FilterList sx={{ fontSize: 18, color: '#f59e0b' }} />
+              Search & Filter
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Search MRFs"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by MRF#, requester, department..."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchTerm && (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setSearchTerm('')} size="small">
+                          <Clear fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="Status"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  fullWidth
+                  select
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                >
+                  <MenuItem value="ALL">All Status</MenuItem>
+                  <MenuItem value="Draft">Draft</MenuItem>
+                  <MenuItem value="Submitted">Submitted</MenuItem>
+                  <MenuItem value="Pending">Pending</MenuItem>
+                  <MenuItem value="Approved">Approved</MenuItem>
+                  <MenuItem value="Rejected">Rejected</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="Priority"
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  fullWidth
+                  select
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                >
+                  <MenuItem value="ALL">All Priority</MenuItem>
+                  <MenuItem value="HIGH">High</MenuItem>
+                  <MenuItem value="MEDIUM">Medium</MenuItem>
+                  <MenuItem value="LOW">Low</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="From Date"
+                  type="date"
+                  fullWidth
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="To Date"
+                  type="date"
+                  fullWidth
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
+
+            {/* Active Filters */}
+            {(searchTerm || filterStatus !== 'ALL' || filterPriority !== 'ALL' || dateRange.start || dateRange.end) && (
+              <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e2e8f0' }}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                  {searchTerm && (
+                    <Chip 
+                      label={`Search: "${searchTerm}"`}
+                      size="small"
+                      onDelete={() => setSearchTerm('')}
+                    />
+                  )}
+                  {filterStatus !== 'ALL' && (
+                    <Chip 
+                      label={`Status: ${filterStatus}`}
+                      size="small"
+                      onDelete={() => setFilterStatus('ALL')}
+                      color={getStatusColor(filterStatus)}
+                    />
+                  )}
+                  {filterPriority !== 'ALL' && (
+                    <Chip 
+                      label={`Priority: ${filterPriority}`}
+                      size="small"
+                      onDelete={() => setFilterPriority('ALL')}
+                      color={getPriorityColor(filterPriority)}
+                    />
+                  )}
+                  {dateRange.start && (
+                    <Chip 
+                      label={`From: ${dateRange.start}`}
+                      size="small"
+                      onDelete={() => setDateRange({...dateRange, start: ''})}
+                    />
+                  )}
+                  {dateRange.end && (
+                    <Chip 
+                      label={`To: ${dateRange.end}`}
+                      size="small"
+                      onDelete={() => setDateRange({...dateRange, end: ''})}
+                    />
+                  )}
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={clearFilters}
+                    startIcon={<Clear />}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Clear All
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+          </Box>
+
+          {/* Results Summary */}
+          <Box sx={{ 
+            p: 2, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#f8fafc',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Showing {filteredMRFs.length} of {mrfList.length} MRFs
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              {filteredMRFs.length > rowsPerPage ? 
+                `Showing ${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredMRFs.length)}` : 
+                ''}
+            </Typography>
+          </Box>
+
+          {/* MRF History Table */}
+          {filteredMRFs.length === 0 ? (
+            <Box sx={{ 
+              p: 6, 
+              textAlign: 'center',
+              color: '#94a3b8'
+            }}>
+              <Description sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                No MRFs found
+              </Typography>
+              <Typography variant="body2">
+                {mrfList.length === 0 ? 
+                  "No MRF records found. Create your first MRF above." :
+                  "No MRFs match your search criteria. Try changing your filters."}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table sx={{ minWidth: 1000 }}>
+                  <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>MRF#</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Requested By</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Project</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Priority</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Items</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredMRFs
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map((mrf) => (
+                      <TableRow key={mrf.id} hover>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                            {mrf.mrfNumber}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: '#64748b' }}>
+                            {formatDate(mrf.createdAt)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{mrf.requestedBy}</TableCell>
+                        <TableCell>{mrf.department || '—'}</TableCell>
+                        <TableCell>{mrf.project || '—'}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={mrf.priority || 'MEDIUM'}
+                            color={getPriorityColor(mrf.priority)}
+                            size="small"
+                            sx={{ fontWeight: 500 }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={mrf.status || 'Draft'}
+                            color={getStatusColor(mrf.status)}
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Badge 
+                              badgeContent={mrf.items?.length || 0} 
+                              color="primary"
+                              sx={{ '& .MuiBadge-badge': { fontWeight: 600 } }}
+                            >
+                              <Inventory fontSize="small" />
+                            </Badge>
+                            <Typography variant="body2" sx={{ color: '#64748b' }}>
+                              {mrf.totalQuantity || mrf.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0} units
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            {(mrf.status === 'Submitted' || mrf.status === 'Pending') && (
+                              <>
+                                <Tooltip title="Approve">
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    onClick={() => {
+                                      setSelectedMRF(mrf);
+                                      handleApproveMRF();
+                                    }}
+                                  >
+                                    <CheckCircle fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Reject">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => {
+                                      setSelectedMRF(mrf);
+                                      handleRejectMRF();
+                                    }}
+                                  >
+                                    <Cancel fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
+                            <Tooltip title="View Details">
+                              <IconButton size="small" color="info">
+                                <Visibility fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              {/* Pagination */}
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={filteredMRFs.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                sx={{ 
+                  borderTop: '1px solid #e2e8f0',
+                  '& .MuiTablePagination-toolbar': {
+                    padding: 2
+                  }
+                }}
+              />
+            </>
+          )}
+        </Paper>
+      </Box>
 
       {/* Add Item Dialog */}
-      <Dialog open={addItemDialogOpen} onClose={() => {
-        setAddItemDialogOpen(false);
-        setPartSearchFilter('');
-      }} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ pb: 1 }}>Add Request Item</DialogTitle>
-        <DialogContent sx={{ py: 1, pt: 3, overflow: 'visible' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'visible' }}>
-            {/* Search Filter for Parts */}
+      <Dialog open={addItemDialogOpen} onClose={() => setAddItemDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #e2e8f0' }}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Add sx={{ color: '#f59e0b' }} />
+            Add Request Item
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Stack spacing={3}>
             <TextField
               label="Search Parts (SAP# or Name)"
               placeholder="Enter part SAP# or name to filter..."
               value={partSearchFilter}
               onChange={(e) => setPartSearchFilter(e.target.value)}
               fullWidth
-              size="small"
-              variant="outlined"
               InputProps={{
-                startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />,
+                startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
               }}
             />
 
-            <FormControl fullWidth size="small">
-              <InputLabel>Select Part (SAP# - Part Name)</InputLabel>
-              <Select
-                value={newItem.sapNumber}
-                onChange={(e) => {
-                  const selectedPart = availableParts.find(p => p.sapNumber === e.target.value);
-                  if (selectedPart) {
-                    setNewItem({
-                      ...newItem,
-                      sapNumber: selectedPart.sapNumber,
-                      partName: selectedPart.name,
-                      unit: selectedPart.unit || 'PCS',
-                      stockAvailable: selectedPart.currentStock || 0,
-                    });
-                  }
-                }}
-                label="Select Part (SAP# - Part Name)"
-              >
-                <MenuItem value="">-- Select a Part --</MenuItem>
-                {availableParts
-                  .filter(part => 
-                    partSearchFilter === '' ||
-                    part.sapNumber.toLowerCase().includes(partSearchFilter.toLowerCase()) ||
-                    part.name.toLowerCase().includes(partSearchFilter.toLowerCase())
-                  )
-                  .map((part) => (
-                  <MenuItem key={part.id} value={part.sapNumber}>
-                    {part.sapNumber} - {part.name} (Stock: {part.currentStock || 0} {part.unit || 'PCS'})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
             <TextField
-              label="Part Name"
-              value={newItem.partName}
-              disabled
+              label="Select Part"
+              value={newItem.sapNumber}
+              onChange={(e) => {
+                const selectedPart = availableParts.find(p => p.sapNumber === e.target.value);
+                if (selectedPart) {
+                  setNewItem({
+                    ...newItem,
+                    sapNumber: selectedPart.sapNumber,
+                    partName: selectedPart.name,
+                    unit: selectedPart.unit || 'PCS',
+                    stockAvailable: selectedPart.currentStock || 0,
+                  });
+                }
+              }}
               fullWidth
-              size="small"
-            />
+              select
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
+            >
+              <MenuItem value="">-- Select a Part --</MenuItem>
+              {availableParts
+                .filter(part => 
+                  partSearchFilter === '' ||
+                  (part.sapNumber && part.sapNumber.toLowerCase().includes(partSearchFilter.toLowerCase())) ||
+                  (part.name && part.name.toLowerCase().includes(partSearchFilter.toLowerCase()))
+                )
+                .map((part) => (
+                <MenuItem key={part.id} value={part.sapNumber}>
+                  {part.sapNumber} - {part.name} (Stock: {part.currentStock || 0} {part.unit || 'PCS'})
+                </MenuItem>
+              ))}
+            </TextField>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField
-                label="Current Stock"
-                value={newItem.stockAvailable}
-                disabled
-                fullWidth
-                size="small"
-                type="number"
-              />
-              <TextField
-                label="Unit"
-                value={newItem.unit}
-                disabled
-                fullWidth
-                size="small"
-              />
-            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Current Stock"
+                  value={newItem.stockAvailable}
+                  disabled
+                  fullWidth
+                  type="number"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Unit"
+                  value={newItem.unit}
+                  disabled
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
 
             <TextField
               label="Quantity Required"
@@ -683,105 +1543,60 @@ const MRF = () => {
               value={newItem.quantity}
               onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
               fullWidth
-              size="small"
               required
               inputProps={{ min: 1 }}
+              helperText={newItem.stockAvailable > 0 && newItem.quantity > newItem.stockAvailable ? 
+                `Warning: Requested quantity exceeds available stock by ${newItem.quantity - newItem.stockAvailable}` : ''}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
-          </Box>
+          </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => {
-            setAddItemDialogOpen(false);
-            setPartSearchFilter('');
-          }} variant="outlined">
-            CANCEL
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Button 
+            onClick={() => setAddItemDialogOpen(false)}
+            variant="outlined"
+            sx={{ 
+              borderRadius: '10px',
+              borderColor: '#e2e8f0',
+              color: '#64748b'
+            }}
+          >
+            Cancel
           </Button>
-          <Button onClick={handleAddItem} variant="contained">
-            ADD ITEM
+          <Button 
+            onClick={handleAddItem} 
+            variant="contained"
+            sx={{ 
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+            }}
+          >
+            Add Item
           </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Approval Dialog */}
-      <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedMRF?.status === 'Pending' ? 'Approve/Reject MRF' : 'Approve MRF'}
-        </DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="MRF Number"
-              disabled
-              value={selectedMRF?.mrfNumber || ''}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Requested By"
-              disabled
-              value={selectedMRF?.requestedBy || ''}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Department"
-              disabled
-              value={selectedMRF?.department || ''}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Total Items"
-              disabled
-              value={selectedMRF?.items?.length || 0}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Comments"
-              multiline
-              rows={3}
-              fullWidth
-              size="small"
-              placeholder="Add your comments here..."
-              value={approvalComments}
-              onChange={(e) => setApprovalComments(e.target.value)}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setApprovalDialogOpen(false)} variant="outlined">
-            CANCEL
-          </Button>
-          {selectedMRF?.status === 'Pending' && (
-            <>
-              <Button 
-                onClick={handleRejectMRF} 
-                variant="contained" 
-                color="error"
-              >
-                REJECT
-              </Button>
-              <Button 
-                onClick={handleApproveMRF} 
-                variant="contained" 
-                color="success"
-              >
-                APPROVE
-              </Button>
-            </>
-          )}
         </DialogActions>
       </Dialog>
 
       {/* Snackbar Notification */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ 
+            width: '100%',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
