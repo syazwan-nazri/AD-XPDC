@@ -44,9 +44,12 @@ const dataInputMasterLinks = [
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
   { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -116,7 +119,11 @@ const Sidebar = ({ open, onToggle }) => {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const renderSection = (title, icon, links, isOpen, toggleOpen, sectionColor) => {
+=======
+  const renderSection = (title, icon, links, sectionId) => {
+>>>>>>> Stashed changes
 =======
   const renderSection = (title, icon, links, sectionId) => {
 >>>>>>> Stashed changes
@@ -134,6 +141,7 @@ const Sidebar = ({ open, onToggle }) => {
     return (
       <Box sx={{ mb: 1 }}>
         <List>
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
@@ -161,6 +169,8 @@ const Sidebar = ({ open, onToggle }) => {
               fontSize: 22
             }}>
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -319,6 +329,7 @@ const Sidebar = ({ open, onToggle }) => {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Navigation Sections */}
       <Box sx={{ py: 2, px: open ? 0 : 1 }}>
         {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster, '#8b5cf6')}
@@ -401,6 +412,8 @@ const Sidebar = ({ open, onToggle }) => {
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, 'dataMaster')}
       {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, 'stockMovement')}
       {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, 'purchasing')}
@@ -408,6 +421,9 @@ const Sidebar = ({ open, onToggle }) => {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
