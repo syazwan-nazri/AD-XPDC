@@ -18,8 +18,7 @@ import {
   InputAdornment,
   Chip,
   IconButton,
-  Tooltip,
-  Container
+  Tooltip
 } from '@mui/material';
 import { 
   LocalShipping, 
@@ -157,10 +156,18 @@ const StockIn = () => {
     <Box sx={{ 
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3
+      p: 3,
+      width: '100%',
+      ml: 0,
+      mr: 0
     }}>
-      {/* Header Section */}
-      <Container maxWidth="lg" sx={{ mb: 4 }}>
+      {/* Main Content Container - Full width */}
+      <Box sx={{ 
+        width: '100%',
+        maxWidth: 'none',
+        margin: '0 auto'
+      }}>
+        {/* Header Section */}
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -220,13 +227,14 @@ const StockIn = () => {
           </Card>
         </Box>
 
-        {/* New Stock Entry Form - STACKED LAYOUT */}
+        {/* New Stock Entry Form - Stacked Layout */}
         <Paper elevation={0} sx={{ 
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
           backgroundColor: 'white',
-          mb: 4
+          mb: 4,
+          width: '100%'
         }}>
           <Box sx={{ 
             p: 3, 
@@ -249,7 +257,7 @@ const StockIn = () => {
           </Box>
 
           <Box sx={{ p: 4 }}>
-            {/* ITEM DETAILS SECTION - Stacked */}
+            {/* ITEM DETAILS SECTION */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="subtitle1" sx={{ 
                 fontWeight: 600, 
@@ -261,9 +269,6 @@ const StockIn = () => {
               }}>
                 <Inventory sx={{ fontSize: 18, color: '#1976d2' }} />
                 Item Details
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
-                Select the item and specify quantity received
               </Typography>
               
               {/* Autocomplete - Full Width */}
@@ -355,6 +360,9 @@ const StockIn = () => {
                         <Typography variant="body1" sx={{ fontWeight: 600 }}>
                           {selectedPart.name}
                         </Typography>
+                        <Typography variant="caption" sx={{ color: '#0c4a6e' }}>
+                          SAP: {selectedPart.sapNumber || 'N/A'} • Current Stock: {selectedPart.currentStock || 0}
+                        </Typography>
                       </Box>
                       <Chip 
                         label={`Current: ${selectedPart.currentStock || 0}`}
@@ -369,7 +377,7 @@ const StockIn = () => {
 
             <Divider sx={{ my: 4 }} />
 
-            {/* DELIVERY INFORMATION SECTION - Stacked */}
+            {/* DELIVERY INFORMATION SECTION */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="subtitle1" sx={{ 
                 fontWeight: 600, 
@@ -381,9 +389,6 @@ const StockIn = () => {
               }}>
                 <LocalShipping sx={{ fontSize: 18, color: '#1976d2' }} />
                 Delivery Information
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
-                Supplier and delivery details
               </Typography>
               
               {/* Supplier - Full Width */}
@@ -514,7 +519,7 @@ const StockIn = () => {
 
             <Divider sx={{ my: 4 }} />
 
-            {/* ADDITIONAL NOTES SECTION - Stacked */}
+            {/* ADDITIONAL NOTES SECTION */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="subtitle1" sx={{ 
                 fontWeight: 600, 
@@ -526,9 +531,6 @@ const StockIn = () => {
               }}>
                 <Description sx={{ fontSize: 18, color: '#1976d2' }} />
                 Additional Notes
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
-                Add any special notes or conditions
               </Typography>
               
               <TextField
@@ -590,12 +592,13 @@ const StockIn = () => {
           </Box>
         </Paper>
 
-        {/* Recent Stock Ins Section */}
+        {/* Recent Stock Ins Section - Stacked Below */}
         <Paper elevation={0} sx={{ 
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
-          backgroundColor: 'white'
+          backgroundColor: 'white',
+          width: '100%'
         }}>
           <Box sx={{ 
             p: 3, 
@@ -740,7 +743,7 @@ const StockIn = () => {
             )}
           </Box>
         </Paper>
-      </Container>
+      </Box>
 
       <Snackbar 
         open={snackbar.open} 
