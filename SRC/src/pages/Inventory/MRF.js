@@ -35,6 +35,7 @@ import {
   TablePagination,
   CircularProgress,
   Badge,
+  Autocomplete,
 } from '@mui/material';
 import {
   Description,
@@ -94,6 +95,7 @@ const MRF = () => {
     unit: '',
     stockAvailable: 0,
     urgent: false,
+    notes: '', // Added for enhanced dialog
   });
 
   const [mrfList, setMrfList] = useState([]);
@@ -286,10 +288,19 @@ const MRF = () => {
       unit: selectedPart.unit || 'PCS',
       stockAvailable: selectedPart.currentStock || 0,
       urgent: newItem.urgent,
+      notes: newItem.notes || '', // Include notes if present
     };
 
     setMrfItems([...mrfItems, item]);
-    setNewItem({ sapNumber: '', partName: '', quantity: '', unit: '', stockAvailable: 0, urgent: false });
+    setNewItem({ 
+      sapNumber: '', 
+      partName: '', 
+      quantity: '', 
+      unit: '', 
+      stockAvailable: 0, 
+      urgent: false,
+      notes: '' 
+    });
     setAddItemDialogOpen(false);
     setSnackbar({ open: true, message: 'Item added successfully', severity: 'success' });
   };
@@ -1440,79 +1451,79 @@ const MRF = () => {
         </Paper>
       </Box>
 
-      {/* Add Item Dialog */}
-      <Dialog open={addItemDialogOpen} onClose={() => setAddItemDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {/* Enhanced Add Item Dialog */}
+      <Dialog 
+        open={addItemDialogOpen} 
+        onClose={() => setAddItemDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1, 
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#fffbeb'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Add sx={{ color: '#f59e0b' }} />
-            Add Request Item
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              Add Request Item
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+            Search and select a part to add to your MRF
           </Typography>
         </DialogTitle>
+        
         <DialogContent sx={{ py: 3 }}>
           <Stack spacing={3}>
-            <TextField
-              label="Search Parts (SAP# or Name)"
-              placeholder="Enter part SAP# or name to filter..."
-              value={partSearchFilter}
-              onChange={(e) => setPartSearchFilter(e.target.value)}
-              fullWidth
-              InputProps={{
-                startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '10px',
-                  backgroundColor: '#f8fafc',
-                }
-              }}
-            />
-
-            <TextField
-              label="Select Part"
-              value={newItem.sapNumber}
-              onChange={(e) => {
-                const selectedPart = availableParts.find(p => p.sapNumber === e.target.value);
-                if (selectedPart) {
+            {/* Search Autocomplete */}
+            <Autocomplete
+              options={availableParts}
+              getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
+              value={availableParts.find(p => p.sapNumber === newItem.sapNumber) || null}
+              onChange={(event, newValue) => {
+                if (newValue) {
                   setNewItem({
-                    ...newItem,
-                    sapNumber: selectedPart.sapNumber,
-                    partName: selectedPart.name,
-                    unit: selectedPart.unit || 'PCS',
-                    stockAvailable: selectedPart.currentStock || 0,
+                    sapNumber: newValue.sapNumber,
+                    partName: newValue.name,
+                    quantity: '',
+                    unit: newValue.unit || 'PCS',
+                    stockAvailable: newValue.currentStock || 0,
+                    urgent: false,
+                    notes: '',
+                  });
+                } else {
+                  setNewItem({
+                    sapNumber: '',
+                    partName: '',
+                    quantity: '',
+                    unit: '',
+                    stockAvailable: 0,
+                    urgent: false,
+                    notes: '',
                   });
                 }
               }}
-              fullWidth
-              select
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '10px',
-                  backgroundColor: '#f8fafc',
-                }
-              }}
-            >
-              <MenuItem value="">-- Select a Part --</MenuItem>
-              {availableParts
-                .filter(part => 
-                  partSearchFilter === '' ||
-                  (part.sapNumber && part.sapNumber.toLowerCase().includes(partSearchFilter.toLowerCase())) ||
-                  (part.name && part.name.toLowerCase().includes(partSearchFilter.toLowerCase()))
-                )
-                .map((part) => (
-                <MenuItem key={part.id} value={part.sapNumber}>
-                  {part.sapNumber} - {part.name} (Stock: {part.currentStock || 0} {part.unit || 'PCS'})
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+              renderInput={(params) => (
                 <TextField
-                  label="Current Stock"
-                  value={newItem.stockAvailable}
-                  disabled
-                  fullWidth
-                  type="number"
+                  {...params}
+                  label="Search and Select Part"
+                  placeholder="Type SAP number or part name to search..."
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <>
+                        <Search sx={{ color: '#64748b', mr: 1 }} />
+                        {params.InputProps.startAdornment}
+                      </>
+                    ),
+                  }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
@@ -1520,63 +1531,312 @@ const MRF = () => {
                     }
                   }}
                 />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Unit"
-                  value={newItem.unit}
-                  disabled
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-            </Grid>
-
-            <TextField
-              label="Quantity Required"
-              type="number"
-              value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-              fullWidth
-              required
-              inputProps={{ min: 1 }}
-              helperText={newItem.stockAvailable > 0 && newItem.quantity > newItem.stockAvailable ? 
-                `Warning: Requested quantity exceeds available stock by ${newItem.quantity - newItem.stockAvailable}` : ''}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '10px',
-                  backgroundColor: '#f8fafc',
-                }
-              }}
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props} sx={{ py: 1.5 }}>
+                  <Box sx={{ width: '100%' }}>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {option.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                      <Chip 
+                        label={`SAP: ${option.sapNumber || 'N/A'}`} 
+                        size="small" 
+                        sx={{ height: 20, fontSize: '0.75rem' }}
+                      />
+                      <Chip 
+                        label={`Stock: ${option.currentStock || 0}`} 
+                        size="small"
+                        color={option.currentStock > 0 ? "success" : "error"}
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: '0.75rem' }}
+                      />
+                      <Chip 
+                        label={`Unit: ${option.unit || 'PCS'}`} 
+                        size="small"
+                        color="default"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: '0.75rem' }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+              noOptionsText={
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Inventory sx={{ fontSize: 32, color: '#94a3b8', mb: 1, opacity: 0.5 }} />
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    No parts found. Try a different search term.
+                  </Typography>
+                </Box>
+              }
             />
+
+            {/* Selected Part Details Card */}
+            {newItem.sapNumber && (
+              <Paper elevation={0} sx={{ 
+                p: 2, 
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                backgroundColor: '#f8fafc'
+              }}>
+                <Typography variant="subtitle2" sx={{ 
+                  fontWeight: 600, 
+                  color: '#334155',
+                  mb: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5
+                }}>
+                  <Inventory fontSize="small" />
+                  Selected Part Details
+                </Typography>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                        Part Name
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500, color: '#1e293b' }}>
+                        {newItem.partName}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                        Current Stock
+                      </Typography>
+                      <Chip 
+                        label={newItem.stockAvailable}
+                        color={newItem.stockAvailable > 0 ? "success" : "error"}
+                        size="small"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                        Unit
+                      </Typography>
+                      <Chip 
+                        label={newItem.unit}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            )}
+
+            {/* Quantity Input with Stock Check */}
+            <Box>
+              <TextField
+                label="Quantity Required"
+                type="number"
+                value={newItem.quantity}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || (Number(value) >= 0 && Number(value) <= 99999)) {
+                    setNewItem({ ...newItem, quantity: value });
+                  }
+                }}
+                fullWidth
+                required
+                inputProps={{ 
+                  min: 1,
+                  max: 99999
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <TrendingUp sx={{ color: '#64748b' }} />
+                    </InputAdornment>
+                  ),
+                }}
+                disabled={!newItem.sapNumber}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              />
+              
+              {/* Stock Availability Helper Text */}
+              {newItem.sapNumber && newItem.quantity && (
+                <Box sx={{ mt: 1 }}>
+                  {Number(newItem.quantity) > Number(newItem.stockAvailable) ? (
+                    <Alert 
+                      severity="warning" 
+                      icon={<ArrowUpward fontSize="small" />}
+                      sx={{ 
+                        borderRadius: '8px',
+                        py: 0.5,
+                        backgroundColor: '#fffbeb',
+                        border: '1px solid #fde68a'
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#92400e' }}>
+                          Request exceeds available stock
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#92400e', display: 'block' }}>
+                          Available: {newItem.stockAvailable} • Requested: {newItem.quantity} • 
+                          Shortage: {Number(newItem.quantity) - Number(newItem.stockAvailable)}
+                        </Typography>
+                      </Box>
+                    </Alert>
+                  ) : (
+                    <Alert 
+                      severity="success" 
+                      icon={<CheckCircle fontSize="small" />}
+                      sx={{ 
+                        borderRadius: '8px',
+                        py: 0.5,
+                        backgroundColor: '#f0fdf4',
+                        border: '1px solid #bbf7d0'
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#166534' }}>
+                          Stock available
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#166534', display: 'block' }}>
+                          Available: {newItem.stockAvailable} • Requested: {newItem.quantity} • 
+                          Remaining: {Number(newItem.stockAvailable) - Number(newItem.quantity)}
+                        </Typography>
+                      </Box>
+                    </Alert>
+                  )}
+                </Box>
+              )}
+
+              {/* Stock Level Indicator */}
+              {newItem.sapNumber && newItem.quantity && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      Stock Level
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: '#64748b' }}>
+                      {newItem.stockAvailable} / {newItem.quantity}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    height: 6, 
+                    backgroundColor: '#e2e8f0', 
+                    borderRadius: '3px',
+                    overflow: 'hidden'
+                  }}>
+                    <Box sx={{ 
+                      height: '100%',
+                      width: `${Math.min(100, (Number(newItem.stockAvailable) / Number(newItem.quantity)) * 100)}%`,
+                      backgroundColor: Number(newItem.stockAvailable) >= Number(newItem.quantity) ? '#10b981' : '#f59e0b',
+                      borderRadius: '3px'
+                    }} />
+                  </Box>
+                </Box>
+              )}
+            </Box>
+
+            {/* Additional Options */}
+            {newItem.sapNumber && (
+              <Box sx={{ 
+                p: 2, 
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                backgroundColor: '#f8fafc'
+              }}>
+                <Typography variant="subtitle2" sx={{ 
+                  fontWeight: 600, 
+                  color: '#334155',
+                  mb: 1
+                }}>
+                  Additional Options
+                </Typography>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Additional Notes (Optional)"
+                      value={newItem.notes}
+                      onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
+                      multiline
+                      rows={2}
+                      placeholder="Add any special notes about this item request..."
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: 'white',
+                        }
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
+        
+        <DialogActions sx={{ 
+          p: 2, 
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#f8fafc'
+        }}>
           <Button 
-            onClick={() => setAddItemDialogOpen(false)}
+            onClick={() => {
+              setAddItemDialogOpen(false);
+              setNewItem({
+                sapNumber: '',
+                partName: '',
+                quantity: '',
+                unit: '',
+                stockAvailable: 0,
+                urgent: false,
+                notes: '',
+              });
+            }}
             variant="outlined"
+            startIcon={<Clear />}
             sx={{ 
               borderRadius: '10px',
               borderColor: '#e2e8f0',
-              color: '#64748b'
+              color: '#64748b',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#f59e0b',
+                color: '#f59e0b'
+              }
             }}
           >
             Cancel
           </Button>
           <Button 
-            onClick={handleAddItem} 
+            onClick={handleAddItem}
             variant="contained"
+            disabled={!newItem.sapNumber || !newItem.quantity}
+            startIcon={<Add />}
             sx={{ 
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              '&:hover': {
+                background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+              },
+              '&:disabled': {
+                background: '#e2e8f0',
+                color: '#94a3b8'
+              }
             }}
           >
-            Add Item
+            Add to MRF
           </Button>
         </DialogActions>
       </Dialog>
