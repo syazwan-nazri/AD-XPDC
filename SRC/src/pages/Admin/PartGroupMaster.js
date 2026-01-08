@@ -1,11 +1,48 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
-import { Button, Snackbar, TextField, Table, TableHead, TableRow, TableCell, TableBody, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip, Typography, Card, CardContent, Grid, InputAdornment, MenuItem } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SearchIcon from '@mui/icons-material/Search';
-import Alert from '@mui/material/Alert';
+import {
+  Box,
+  Paper,
+  TextField,
+  Button,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Tooltip,
+  Typography,
+  MenuItem,
+  Grid,
+  Card,
+  CardContent,
+  Divider,
+  Stack,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Chip,
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Add as AddIcon,
+  Clear as ClearIcon,
+  Category as CategoryIcon,
+  Refresh as RefreshIcon,
+  Layers as LayersIcon,
+  Warning as WarningIcon,
+  Inventory as InventoryIcon,
+  CheckCircle as CheckCircleIcon,
+  Info as InfoIcon,
+} from '@mui/icons-material';
 
 // Main Part Group Master Page
 const PartGroupMaster = () => {
@@ -42,6 +79,7 @@ const PartGroupMaster = () => {
   const [pageStartParts, setPageStartParts] = useState(0);
   const [pageStartPartsWithGroup, setPageStartPartsWithGroup] = useState(0);
   const pageSize = 50;
+  const pageSizePendingParts = 10; // 10 items per page for parts awaiting assignment
 
   // Material Group List states
   const [searchQueryGroups, setSearchQueryGroups] = useState('');
@@ -419,7 +457,7 @@ const PartGroupMaster = () => {
   };
 
   // Pagination for parts
-  const partPageEnd = Math.min(pageStartParts + pageSize, filteredPartsPending.length);
+  const partPageEnd = Math.min(pageStartParts + pageSizePendingParts, filteredPartsPending.length);
   const partsPaginated = filteredPartsPending.slice(pageStartParts, partPageEnd);
 
   // Pagination for parts with group
@@ -431,429 +469,871 @@ const PartGroupMaster = () => {
   const groupsPaginated = filteredGroups.slice(pageStartGroups, groupPageEnd);
 
   if (loading) {
-    return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 'calc(100vh - 64px)',
+        backgroundColor: '#f8fafc'
+      }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
-    <Box sx={{ m: 0, p: 0 }}>
-      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <h2 style={{ margin: 0 }}>PART GROUP MASTER - ENGINEERING STORE SPARE PART</h2>
-        </Box>
-      </Paper>
-
-      {/* Part List Without Material Group */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3, mx: 0 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          PART LIST WITHOUT MATERIAL GROUP ({filteredPartsPending.length} ITEMS)
-        </Typography>
-
-        {/* Search Box */}
-        <Box sx={{ mb: 2 }}>
-          <TextField
-            label="Search (SAP#, Int.Ref, Name)"
-            placeholder="Search..."
-            value={searchQueryParts}
-            onChange={(e) => {
-              setSearchQueryParts(e.target.value);
-              setPageStartParts(0);
-            }}
-            size="small"
-            fullWidth
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1 }} />,
-            }}
-          />
-        </Box>
-
-        {/* Parts Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small">
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Int.Ref</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Category</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Material Group</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '13%' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {partsPaginated.length > 0 ? (
-                partsPaginated.map((part) => (
-                  <TableRow key={part.id} hover>
-                    <TableCell>{part.sapNumber}</TableCell>
-                    <TableCell>{part.internalRef}</TableCell>
-                    <TableCell>{part.name}</TableCell>
-                    <TableCell>{part.category}</TableCell>
-                    <TableCell>
-                      {part.materialGroupId ? (
-                        materialGroups.find(g => g.id === part.materialGroupId)?.materialGroup || 'N/A'
-                      ) : (
-                        <Typography variant="body2" sx={{ color: '#999', fontStyle: 'italic' }}>
-                          Not assigned
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="Edit Material Group">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditPart(part)}
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeletePart(part)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#999' }}>
-                    No parts found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Box>
-
-        {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Box>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPageStartParts(Math.max(0, pageStartParts - pageSize))}
-              disabled={pageStartParts === 0}
-              sx={{ mr: 1 }}
-            >
-              &lt;&lt; Previous
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPageStartParts(pageStartParts + pageSize)}
-              disabled={partPageEnd >= filteredPartsPending.length}
-            >
-              Next &gt;&gt;
-            </Button>
-          </Box>
-          <Typography variant="body2" sx={{ color: '#666' }}>
-            Showing {filteredPartsPending.length > 0 ? pageStartParts + 1 : 0}-{partPageEnd} of {filteredPartsPending.length} items
-          </Typography>
-        </Box>
-      </Paper>
-
-      {/* Part List with Material Group */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3, mx: 0 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          PART LIST WITH MATERIAL GROUP ({filteredPartsWithGroup.length} ITEMS)
-        </Typography>
-
-        {/* Parts Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small">
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>SAP#</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Int.Ref</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Category</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Material Group</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: '13%' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {partsWithGroupPaginated.length > 0 ? (
-                partsWithGroupPaginated.map((part) => (
-                  <TableRow key={part.id} hover>
-                    <TableCell>{part.sapNumber}</TableCell>
-                    <TableCell>{part.internalRef}</TableCell>
-                    <TableCell>{part.name}</TableCell>
-                    <TableCell>{part.category}</TableCell>
-                    <TableCell>
-                      {materialGroups.find(g => g.id === part.materialGroupId)?.materialGroup || 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="Edit Material Group">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditPart(part)}
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeletePart(part)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#999' }}>
-                    No parts found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Box>
-
-        {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Box>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPageStartPartsWithGroup(Math.max(0, pageStartPartsWithGroup - pageSize))}
-              disabled={pageStartPartsWithGroup === 0}
-              sx={{ mr: 1 }}
-            >
-              &lt;&lt; Previous
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPageStartPartsWithGroup(pageStartPartsWithGroup + pageSize)}
-              disabled={partWithGroupPageEnd >= filteredPartsWithGroup.length}
-            >
-              Next &gt;&gt;
-            </Button>
-          </Box>
-          <Typography variant="body2" sx={{ color: '#666' }}>
-            Showing {filteredPartsWithGroup.length > 0 ? pageStartPartsWithGroup + 1 : 0}-{partWithGroupPageEnd} of {filteredPartsWithGroup.length} items
-          </Typography>
-        </Box>
-      </Paper>
-
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          MATERIAL GROUP LIST ({filteredGroups.length} ITEMS)
-        </Typography>
-
-            {/* Search Box */}
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                label="Search (Group ID, Material Group, Description)"
-                placeholder="Search..."
-                value={searchQueryGroups}
-                onChange={(e) => {
-                  setSearchQueryGroups(e.target.value);
-                  setPageStartGroups(0);
-                }}
-                size="small"
-                fullWidth
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1 }} />,
-                }}
-              />
+    <Box sx={{ 
+      minHeight: 'calc(100vh - 64px)',
+      backgroundColor: '#f8fafc',
+      p: 3,
+      width: '100%'
+    }}>
+      {/* Main Content Container */}
+      <Box sx={{ 
+        width: '100%',
+        maxWidth: 'none',
+        margin: '0 auto'
+      }}>
+        {/* Header Section */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+            }}>
+              <LayersIcon sx={{ fontSize: 28 }} />
             </Box>
+            <Box>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 700, 
+                color: '#1e293b',
+                mb: 0.5
+              }}>
+                Part Group Master
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#64748b' }}>
+                Material Group & Part Assignment Management
+              </Typography>
+            </Box>
+          </Box>
 
-            {/* Groups Table */}
-            <Box sx={{ overflowX: 'auto' }}>
-              <Table size="small">
-                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Group ID</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Material Group</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '35%' }}>Description</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {groupsPaginated.length > 0 ? (
-                    groupsPaginated.map((group) => (
-                      <TableRow key={group.id} hover>
-                        <TableCell>{group.groupId}</TableCell>
-                          <TableCell>{group.materialGroup}</TableCell>
-                          <TableCell>{group.description}</TableCell>
-                          <TableCell>
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleEditGroup(group)}
-                                sx={{ mr: 1 }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleDeleteGroup(group)}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center" sx={{ py: 3, color: '#999' }}>
-                          No material groups found
+          {/* Stats Cards */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Total Groups
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  {materialGroups.length}
+                </Typography>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <InventoryIcon sx={{ color: '#3b82f6', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Assigned
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {filteredPartsWithGroup.length}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+            <Card sx={{ 
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              px: 2,
+              py: 1.5,
+              minWidth: 120
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <WarningIcon sx={{ color: '#f59e0b', fontSize: 18 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Pending
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    {filteredPartsPending.length}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Box>
+        </Box>
+
+        {/* Material Group Form Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#f3e8ff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <AddIcon sx={{ fontSize: 20, color: '#8b5cf6' }} />
+                Add New Material Group
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                Create a new material group for spare parts classification
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ p: 3 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  label="Group ID"
+                  placeholder="e.g., BEAR"
+                  value={groupForm.groupId}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+                    setGroupForm({ ...groupForm, groupId: value });
+                    setGroupIdError(false);
+                  }}
+                  error={groupIdError}
+                  helperText={groupIdError ? 'Must be 4 letters' : `${groupForm.groupId.length}/4`}
+                  fullWidth
+                  required
+                  size="small"
+                  inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                {!groupFormShowOther ? (
+                  <TextField
+                    select
+                    label="Material Group"
+                    value={groupForm.materialGroup}
+                    onChange={(e) => {
+                      if (e.target.value === 'OTHER') {
+                        setGroupFormShowOther(true);
+                        setGroupForm({ ...groupForm, materialGroup: '' });
+                      } else {
+                        setGroupForm({ ...groupForm, materialGroup: e.target.value });
+                      }
+                      setMaterialGroupError(false);
+                    }}
+                    error={materialGroupError}
+                    helperText={materialGroupError ? 'Required' : ''}
+                    fullWidth
+                    required
+                    size="small"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  >
+                    <MenuItem value="">-- Select Material Group --</MenuItem>
+                    {materialGroupOptions.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                    <MenuItem value="OTHER">Other (Custom)</MenuItem>
+                  </TextField>
+                ) : (
+                  <TextField
+                    label="Material Group"
+                    placeholder="Enter custom group name"
+                    value={groupForm.materialGroup}
+                    onChange={(e) => {
+                      setGroupForm({ ...groupForm, materialGroup: e.target.value });
+                      setMaterialGroupError(false);
+                    }}
+                    onBlur={() => {
+                      if (!groupForm.materialGroup.trim()) {
+                        setGroupFormShowOther(false);
+                        setGroupForm({ ...groupForm, materialGroup: '' });
+                      }
+                    }}
+                    error={materialGroupError}
+                    helperText={materialGroupError ? 'Required or clear to go back' : 'Clear to go back to list'}
+                    fullWidth
+                    required
+                    size="small"
+                    autoFocus
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                )}
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Description"
+                  placeholder="Brief description of this group"
+                  value={groupForm.description}
+                  onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                  fullWidth
+                  multiline
+                  rows={1}
+                  size="small"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ClearIcon />}
+                  onClick={handleClearGroupForm}
+                  fullWidth
+                  sx={{
+                    borderRadius: '10px',
+                    borderColor: '#e2e8f0',
+                    color: '#64748b',
+                    textTransform: 'none',
+                    '&:hover': {
+                      borderColor: '#64748b'
+                    }
+                  }}
+                >
+                  Clear
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddGroup}
+                  fullWidth
+                  sx={{
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                    textTransform: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  Add Group
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
+
+        {/* Material Groups List Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#f3e8ff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <CategoryIcon sx={{ fontSize: 20, color: '#8b5cf6' }} />
+                Material Groups List
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                {filteredGroups.length} groups found
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Search Box */}
+          <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0', backgroundColor: 'white' }}>
+            <TextField
+              label="Search groups"
+              placeholder="Search by Group ID, Material Group, or Description"
+              value={searchQueryGroups}
+              onChange={(e) => {
+                setSearchQueryGroups(e.target.value);
+                setPageStartGroups(0);
+              }}
+              fullWidth
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <SearchIcon sx={{ mr: 1, color: '#94a3b8' }} />
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
+            />
+          </Box>
+
+          {/* Groups Table */}
+          {filteredGroups.length === 0 ? (
+            <Box sx={{ 
+              p: 6, 
+              textAlign: 'center',
+              color: '#94a3b8'
+            }}>
+              <CategoryIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                No material groups found
+              </Typography>
+              <Typography variant="body2">
+                {materialGroups.length === 0 ? 
+                  "No groups yet. Create your first group above." :
+                  "No groups match your search criteria."}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table sx={{ minWidth: 900 }}>
+                  <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Group ID</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Material Group</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Description</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }} align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {groupsPaginated.map((group) => (
+                      <TableRow key={group.id} hover sx={{ 
+                        '&:hover': {
+                          backgroundColor: '#f8fafc'
+                        }
+                      }}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                            {group.groupId}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={group.materialGroup}
+                            sx={{
+                              backgroundColor: '#f3e8ff',
+                              color: '#6d28d9',
+                              fontWeight: 600
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: '#64748b' }}>
+                            {group.description || '—'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Edit Group">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEditGroup(group)}
+                              sx={{ 
+                                color: '#8b5cf6',
+                                '&:hover': { backgroundColor: '#f3e8ff' }
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Group">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteGroup(group)}
+                              sx={{ 
+                                color: '#ef4444',
+                                '&:hover': { backgroundColor: '#fee2e2' }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
-                    )}
+                    ))}
                   </TableBody>
                 </Table>
               </Box>
 
               {/* Pagination */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                p: 2,
+                borderTop: '1px solid #e2e8f0'
+              }}>
                 <Box>
                   <Button
                     variant="outlined"
                     size="small"
                     onClick={() => setPageStartGroups(Math.max(0, pageStartGroups - pageSize))}
                     disabled={pageStartGroups === 0}
-                    sx={{ mr: 1 }}
+                    sx={{ mr: 1, borderRadius: '8px' }}
                   >
-                    &lt;&lt; Previous
+                    ← Previous
                   </Button>
                   <Button
                     variant="outlined"
                     size="small"
                     onClick={() => setPageStartGroups(pageStartGroups + pageSize)}
                     disabled={groupPageEnd >= filteredGroups.length}
+                    sx={{ borderRadius: '8px' }}
                   >
-                    Next &gt;&gt;
+                    Next →
                   </Button>
                 </Box>
-                <Typography variant="body2" sx={{ color: '#666' }}>
-                  Showing {filteredGroups.length > 0 ? pageStartGroups + 1 : 0}-{groupPageEnd} of {filteredGroups.length} items
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Showing {filteredGroups.length > 0 ? pageStartGroups + 1 : 0}–{groupPageEnd} of {filteredGroups.length}
                 </Typography>
               </Box>
-            </Paper>
+            </>
+          )}
+        </Paper>
 
-      <Paper elevation={1} sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
-          NEW MATERIAL GROUP ENTRY
-        </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Group ID"
-                placeholder="Enter Group ID (4 alphabets)"
-                value={groupForm.groupId}
-                onChange={(e) => {
-                  const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-                  setGroupForm({ ...groupForm, groupId: value });
-                  setGroupIdError(false);
-                }}
-                error={groupIdError}
-                helperText={groupIdError ? 'Must be exactly 4 alphabets only' : `${groupForm.groupId.length}/4`}
-                fullWidth
-                required
-                size="small"
-                inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
-              />
-
-              {!groupFormShowOther ? (
-                <TextField
-                  select
-                  label="Material Group"
-                  value={groupForm.materialGroup}
-                  onChange={(e) => {
-                    if (e.target.value === 'OTHER') {
-                      setGroupFormShowOther(true);
-                      setGroupForm({ ...groupForm, materialGroup: '' });
-                    } else {
-                      setGroupForm({ ...groupForm, materialGroup: e.target.value });
-                    }
-                    setMaterialGroupError(false);
-                  }}
-                  error={materialGroupError}
-                  helperText={materialGroupError ? 'Required' : ''}
-                  fullWidth
-                  required
-                  size="small"
-                >
-                  <MenuItem value="">-- Select Material Group --</MenuItem>
-                  {materialGroupOptions.map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                  <MenuItem value="OTHER">Other (Please specify)</MenuItem>
-                </TextField>
-              ) : (
-                <TextField
-                  label="Material Group"
-                  placeholder="Enter custom material group name"
-                  value={groupForm.materialGroup}
-                  onChange={(e) => {
-                    setGroupForm({ ...groupForm, materialGroup: e.target.value });
-                    setMaterialGroupError(false);
-                  }}
-                  onBlur={() => {
-                    // Allow user to go back to dropdown if they clear the field
-                    if (!groupForm.materialGroup.trim()) {
-                      setGroupFormShowOther(false);
-                      setGroupForm({ ...groupForm, materialGroup: '' });
-                    }
-                  }}
-                  error={materialGroupError}
-                  helperText={materialGroupError ? 'Required or click back to select from list' : 'Type custom value or clear to go back'}
-                  fullWidth
-                  required
-                  size="small"
-                  autoFocus
-                />
-              )}
-
-              <TextField
-                label="Description"
-                placeholder="Enter Description"
-                value={groupForm.description}
-                onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
-                fullWidth
-                multiline
-                rows={3}
-                size="small"
-              />
-
-              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleClearGroupForm}
-                >
-                  CLEAR
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleAddGroup}
-                >
-                  ADD GROUP
-                </Button>
-              </Box>
+        {/* Parts Without Group Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#fef3c7',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <WarningIcon sx={{ fontSize: 20, color: '#f59e0b' }} />
+                Parts Awaiting Group Assignment
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                {filteredPartsPending.length} parts need to be assigned to a material group
+              </Typography>
             </Box>
-          </Paper>
+          </Box>
 
-      {/* Edit Material Group Dialog */}
+          {/* Search Box */}
+          <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0', backgroundColor: 'white' }}>
+            <TextField
+              label="Search parts"
+              placeholder="Search by SAP#, Int.Ref, or Part Name"
+              value={searchQueryParts}
+              onChange={(e) => {
+                setSearchQueryParts(e.target.value);
+                setPageStartParts(0);
+              }}
+              fullWidth
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <SearchIcon sx={{ mr: 1, color: '#94a3b8' }} />
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
+            />
+          </Box>
+
+          {/* Parts Table */}
+          {filteredPartsPending.length === 0 ? (
+            <Box sx={{ 
+              p: 6, 
+              textAlign: 'center',
+              color: '#94a3b8'
+            }}>
+              <CheckCircleIcon sx={{ fontSize: 64, mb: 2, color: '#10b981', opacity: 0.8 }} />
+              <Typography variant="h6" sx={{ mb: 1, color: '#10b981' }}>
+                All Parts Assigned
+              </Typography>
+              <Typography variant="body2">
+                All parts have been assigned to material groups!
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table sx={{ minWidth: 1000 }}>
+                  <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>SAP#</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Int.Ref</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Part Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Category</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }} align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {partsPaginated.map((part) => (
+                      <TableRow key={part.id} hover sx={{ 
+                        backgroundColor: '#fffbeb',
+                        '&:hover': {
+                          backgroundColor: '#fef3c7'
+                        }
+                      }}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                            {part.sapNumber}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: '#64748b' }}>
+                            {part.internalRef}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: '#64748b' }}>
+                            {part.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={part.category || 'N/A'}
+                            variant="outlined"
+                            size="small"
+                            sx={{
+                              borderColor: '#f59e0b',
+                              color: '#f59e0b'
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Assign Material Group">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEditPart(part)}
+                              sx={{ 
+                                color: '#f59e0b',
+                                '&:hover': { backgroundColor: '#fef3c7' }
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Part">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeletePart(part)}
+                              sx={{ 
+                                color: '#ef4444',
+                                '&:hover': { backgroundColor: '#fee2e2' }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              {/* Pagination */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                p: 2,
+                borderTop: '1px solid #e2e8f0'
+              }}>
+                <Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setPageStartParts(Math.max(0, pageStartParts - pageSizePendingParts))}
+                    disabled={pageStartParts === 0}
+                    sx={{ mr: 1, borderRadius: '8px' }}
+                  >
+                    ← Previous
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setPageStartParts(pageStartParts + pageSizePendingParts)}
+                    disabled={partPageEnd >= filteredPartsPending.length}
+                    sx={{ borderRadius: '8px' }}
+                  >
+                    Next →
+                  </Button>
+                </Box>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Showing {filteredPartsPending.length > 0 ? pageStartParts + 1 : 0}–{partPageEnd} of {filteredPartsPending.length}
+                </Typography>
+              </Box>
+            </>
+          )}
+        </Paper>
+
+        {/* Parts With Group Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4,
+          width: '100%'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#dbeafe',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <CheckCircleIcon sx={{ fontSize: 20, color: '#3b82f6' }} />
+                Parts With Material Group Assigned
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                {filteredPartsWithGroup.length} parts are properly assigned
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Parts Table */}
+          {filteredPartsWithGroup.length === 0 ? (
+            <Box sx={{ 
+              p: 6, 
+              textAlign: 'center',
+              color: '#94a3b8'
+            }}>
+              <InfoIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                No parts assigned yet
+              </Typography>
+              <Typography variant="body2">
+                Parts will appear here once they are assigned to a material group
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table sx={{ minWidth: 1000 }}>
+                  <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>SAP#</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Int.Ref</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Part Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Category</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Material Group</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#475569' }} align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {partsWithGroupPaginated.map((part) => {
+                      const group = materialGroups.find(g => g.id === part.materialGroupId);
+                      return (
+                        <TableRow key={part.id} hover sx={{ 
+                          '&:hover': {
+                            backgroundColor: '#f0f9ff'
+                          }
+                        }}>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                              {part.sapNumber}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: '#64748b' }}>
+                              {part.internalRef}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: '#64748b' }}>
+                              {part.name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={part.category || 'N/A'}
+                              variant="outlined"
+                              size="small"
+                              sx={{
+                                borderColor: '#3b82f6',
+                                color: '#3b82f6'
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={group?.materialGroup || 'N/A'}
+                              sx={{
+                                backgroundColor: '#dbeafe',
+                                color: '#0c4a6e',
+                                fontWeight: 600
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Tooltip title="Edit Material Group">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleEditPart(part)}
+                                sx={{ 
+                                  color: '#3b82f6',
+                                  '&:hover': { backgroundColor: '#dbeafe' }
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete Part">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeletePart(part)}
+                                sx={{ 
+                                  color: '#ef4444',
+                                  '&:hover': { backgroundColor: '#fee2e2' }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              {/* Pagination */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                p: 2,
+                borderTop: '1px solid #e2e8f0'
+              }}>
+                <Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setPageStartPartsWithGroup(Math.max(0, pageStartPartsWithGroup - pageSize))}
+                    disabled={pageStartPartsWithGroup === 0}
+                    sx={{ mr: 1, borderRadius: '8px' }}
+                  >
+                    ← Previous
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setPageStartPartsWithGroup(pageStartPartsWithGroup + pageSize)}
+                    disabled={partWithGroupPageEnd >= filteredPartsWithGroup.length}
+                    sx={{ borderRadius: '8px' }}
+                  >
+                    Next →
+                  </Button>
+                </Box>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Showing {filteredPartsWithGroup.length > 0 ? pageStartPartsWithGroup + 1 : 0}–{partWithGroupPageEnd} of {filteredPartsWithGroup.length}
+                </Typography>
+              </Box>
+            </>
+          )}
+        </Paper>
+      </Box>
+
+      {/* Edit Group Dialog */}
       <Dialog open={editGroupDialogOpen} onClose={() => setEditGroupDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Material Group Details</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          Edit Material Group Details
+        </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
@@ -870,6 +1350,12 @@ const PartGroupMaster = () => {
               disabled
               size="small"
               inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
 
             {!editGroupFormShowOther ? (
@@ -890,6 +1376,12 @@ const PartGroupMaster = () => {
                 helperText={editMaterialGroupError ? 'Required' : ''}
                 fullWidth
                 size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
               >
                 <MenuItem value="">-- Select Material Group --</MenuItem>
                 {materialGroupOptions.map((option) => (
@@ -909,7 +1401,6 @@ const PartGroupMaster = () => {
                   setEditMaterialGroupError(false);
                 }}
                 onBlur={() => {
-                  // Allow user to go back to dropdown if they clear the field
                   if (!editGroupForm.materialGroup.trim()) {
                     setEditGroupFormShowOther(false);
                     setEditGroupForm({ ...editGroupForm, materialGroup: '' });
@@ -920,6 +1411,12 @@ const PartGroupMaster = () => {
                 fullWidth
                 size="small"
                 autoFocus
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
               />
             )}
 
@@ -931,47 +1428,75 @@ const PartGroupMaster = () => {
               multiline
               rows={3}
               size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setEditGroupDialogOpen(false)} variant="outlined">
-            CANCEL
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setEditGroupDialogOpen(false)} variant="outlined" sx={{ borderRadius: '8px' }}>
+            Cancel
           </Button>
-          <Button onClick={handleSaveGroupChanges} variant="contained">
-            SAVE CHANGES
+          <Button 
+            onClick={handleSaveGroupChanges} 
+            variant="contained"
+            sx={{ 
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+            }}
+          >
+            Save Changes
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Delete Material Group Confirmation Dialog */}
+      {/* Delete Group Dialog */}
       <Dialog open={deleteGroupDialogOpen} onClose={handleDeleteGroupClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete {deleteGroupTarget?.materialGroup}?</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#fee2e2', borderBottom: '1px solid #fecaca' }}>
+          Delete {deleteGroupTarget?.materialGroup}?
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
           <Box sx={{ py: 2 }}>
-            <p style={{ marginTop: 0 }}>Are you sure you want to delete this material group?</p>
-            <Box sx={{ my: 2 }}>
-              <p><strong>Group ID:</strong> {deleteGroupTarget?.groupId}</p>
-              <p><strong>Material Group:</strong> {deleteGroupTarget?.materialGroup}</p>
+            <Typography variant="body2" sx={{ mb: 2, color: '#64748b' }}>
+              Are you sure you want to delete this material group?
+            </Typography>
+            <Box sx={{ my: 2, p: 2, backgroundColor: '#fef2f2', borderRadius: '10px', borderLeft: '4px solid #ef4444' }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Group ID:</strong> {deleteGroupTarget?.groupId}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Material Group:</strong> {deleteGroupTarget?.materialGroup}
+              </Typography>
             </Box>
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              This action cannot be undone.
+            <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
+              This action cannot be undone. All parts assigned to this group will be unassigned.
             </Alert>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleDeleteGroupClose} variant="outlined">
-            CANCEL
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={handleDeleteGroupClose} variant="outlined" sx={{ borderRadius: '8px' }}>
+            Cancel
           </Button>
-          <Button onClick={handleConfirmDeleteGroup} variant="contained" color="error">
-            CONFIRM DELETE
+          <Button 
+            onClick={handleConfirmDeleteGroup} 
+            variant="contained" 
+            color="error"
+            sx={{ borderRadius: '8px' }}
+          >
+            Confirm Delete
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Edit Part Material Group Dialog */}
+      {/* Edit Part Dialog */}
       <Dialog open={editPartDialogOpen} onClose={() => setEditPartDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Part Material Group</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          Assign Material Group to Part
+        </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
@@ -980,6 +1505,12 @@ const PartGroupMaster = () => {
               fullWidth
               disabled
               size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
 
             <TextField
@@ -988,6 +1519,12 @@ const PartGroupMaster = () => {
               fullWidth
               disabled
               size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
 
             <TextField
@@ -996,6 +1533,12 @@ const PartGroupMaster = () => {
               fullWidth
               disabled
               size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
 
             <TextField
@@ -1004,7 +1547,15 @@ const PartGroupMaster = () => {
               fullWidth
               disabled
               size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             />
+
+            <Divider sx={{ my: 1 }} />
 
             <TextField
               select
@@ -1013,48 +1564,81 @@ const PartGroupMaster = () => {
               onChange={(e) => setEditPartForm({ ...editPartForm, materialGroupId: e.target.value })}
               fullWidth
               size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  backgroundColor: '#f8fafc',
+                }
+              }}
             >
               <MenuItem value="">-- Select Group --</MenuItem>
               {materialGroups.map(group => (
                 <MenuItem key={group.id} value={group.id}>
-                  {group.materialGroup}
+                  <Box>
+                    <Typography variant="body2">{group.materialGroup}</Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      ({group.groupId})
+                    </Typography>
+                  </Box>
                 </MenuItem>
               ))}
             </TextField>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setEditPartDialogOpen(false)} variant="outlined">
-            CANCEL
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setEditPartDialogOpen(false)} variant="outlined" sx={{ borderRadius: '8px' }}>
+            Cancel
           </Button>
-          <Button onClick={handleSavePartChanges} variant="contained">
-            SAVE CHANGES
+          <Button 
+            onClick={handleSavePartChanges} 
+            variant="contained"
+            sx={{ 
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+            }}
+          >
+            Save Changes
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Delete Part Confirmation Dialog */}
+      {/* Delete Part Dialog */}
       <Dialog open={deletePartDialogOpen} onClose={handleDeletePartClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete {deletePartTarget?.name}?</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#fee2e2', borderBottom: '1px solid #fecaca' }}>
+          Delete {deletePartTarget?.name}?
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
           <Box sx={{ py: 2 }}>
-            <p style={{ marginTop: 0 }}>Are you sure you want to delete this part?</p>
-            <Box sx={{ my: 2 }}>
-              <p><strong>SAP#:</strong> {deletePartTarget?.sapNumber}</p>
-              <p><strong>Int.Ref:</strong> {deletePartTarget?.internalRef}</p>
-              <p><strong>Name:</strong> {deletePartTarget?.name}</p>
+            <Typography variant="body2" sx={{ mb: 2, color: '#64748b' }}>
+              Are you sure you want to delete this part?
+            </Typography>
+            <Box sx={{ my: 2, p: 2, backgroundColor: '#fef2f2', borderRadius: '10px', borderLeft: '4px solid #ef4444' }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>SAP#:</strong> {deletePartTarget?.sapNumber}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Int.Ref:</strong> {deletePartTarget?.internalRef}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Name:</strong> {deletePartTarget?.name}
+              </Typography>
             </Box>
-            <Alert severity="warning" sx={{ mt: 2 }}>
+            <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
               This action cannot be undone.
             </Alert>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleDeletePartClose} variant="outlined">
-            CANCEL
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={handleDeletePartClose} variant="outlined" sx={{ borderRadius: '8px' }}>
+            Cancel
           </Button>
-          <Button onClick={handleConfirmDeletePart} variant="contained" color="error">
-            CONFIRM DELETE
+          <Button 
+            onClick={handleConfirmDeletePart} 
+            variant="contained" 
+            color="error"
+            sx={{ borderRadius: '8px' }}
+          >
+            Confirm Delete
           </Button>
         </DialogActions>
       </Dialog>
@@ -1062,11 +1646,19 @@ const PartGroupMaster = () => {
       {/* Snackbar Notification */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ 
+            width: '100%',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
