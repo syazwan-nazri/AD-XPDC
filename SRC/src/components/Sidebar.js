@@ -41,15 +41,8 @@ const dataInputMasterLinks = [
   { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' },
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartGroupMaster' },
-  { 
-    text: 'Storage Master', 
-    icon: <StorageIcon />, 
-    permission: 'canAccessStorageLocations',
-    subItems: [
-      { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
-      { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
-    ]
-  },
+  { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+  { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
   { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, permission: 'canAccessSupplierManagement' },
   { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, permission: 'canAccessAssetRegistry' },
 ];
@@ -151,110 +144,53 @@ const Sidebar = ({ open, onToggle }) => {
           </ListItem>
           <Collapse in={isOpen && open} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {links.map((item) => {
-                // Check if item has subItems (nested menu)
-                if (item.subItems) {
-                  return (
-                    <Box key={item.text}>
-                      {item.subItems.map((subItem) => (
-                        <ListItem
-                          button
-                          key={subItem.path}
-                          component={NavLink}
-                          to={subItem.path}
-                          selected={location.pathname === subItem.path}
-                          sx={{
-                            pl: open ? 5.5 : 2,
-                            pr: 2,
-                            py: 1,
-                            minHeight: 44,
-                            borderRadius: open ? '0 8px 8px 0' : '8px',
-                            mx: open ? '12px 8px' : '6px',
-                            backgroundColor: location.pathname === subItem.path ? `${sectionColor}20` : 'transparent',
-                            borderLeft: location.pathname === subItem.path ? `3px solid ${sectionColor}` : 'none',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              backgroundColor: `${sectionColor}15`,
-                            },
-                            justifyContent: open ? 'initial' : 'center',
-                          }}
-                        >
-                          <ListItemIcon sx={{ 
-                            minWidth: 0, 
-                            mr: open ? 2 : 'auto', 
-                            justifyContent: 'center',
-                            color: location.pathname === subItem.path ? sectionColor : '#94a3b8',
-                            fontSize: 18
-                          }}>
-                            {subItem.icon}
-                          </ListItemIcon>
-                          {open && (
-                            <ListItemText 
-                              primary={subItem.text}
-                              sx={{
-                                m: 0,
-                                '& .MuiListItemText-primary': {
-                                  fontSize: '0.9rem',
-                                  color: location.pathname === subItem.path ? sectionColor : '#475569',
-                                  fontWeight: location.pathname === subItem.path ? 600 : 500,
-                                }
-                              }}
-                            />
-                          )}
-                        </ListItem>
-                      ))}
-                    </Box>
-                  );
-                }
-                // Regular menu item
-                return (
-                  <ListItem
-                    button
-                    key={item.path}
-                    component={NavLink}
-                    to={item.path}
-                    selected={location.pathname === item.path}
-                    sx={{
-                      pl: open ? 4 : 2,
-                      pr: 2,
-                      py: 1,
-                      minHeight: 44,
-                      borderRadius: open ? '0 8px 8px 0' : '8px',
-                      mx: open ? '12px 8px' : '6px',
-                      backgroundColor: location.pathname === item.path ? `${sectionColor}20` : 'transparent',
-                      borderLeft: location.pathname === item.path ? `3px solid ${sectionColor}` : 'none',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        backgroundColor: `${sectionColor}15`,
-                      },
-                      justifyContent: open ? 'initial' : 'center',
-                    }}
-                  >
-                    <ListItemIcon sx={{ 
-                      minWidth: 0, 
-                      mr: open ? 2 : 'auto', 
-                      justifyContent: 'center',
-                      color: location.pathname === item.path ? sectionColor : '#94a3b8',
-                      fontSize: 18
-                    }}>
-                      {item.icon}
-                    </ListItemIcon>
-                    {open && (
-                      <ListItemText 
-                        primary={item.text}
-                        sx={{
-                          m: 0,
-                          '& .MuiListItemText-primary': {
-                            fontSize: '0.9rem',
-                            color: location.pathname === item.path ? sectionColor : '#475569',
-                            fontWeight: location.pathname === item.path ? 600 : 500,
-                          }
-                        }}
-                      />
-                    )}
-                  </ListItem>
-                );
-              })}
+              {links.map((item) => (
+                <ListItem
+                  button
+                  key={item.path}
+                  component={NavLink}
+                  to={item.path}
+                  selected={location.pathname === item.path}
+                  sx={{
+                    pl: open ? 4 : 2,
+                    pr: 2,
+                    py: 1,
+                    minHeight: 44,
+                    borderRadius: open ? '0 8px 8px 0' : '8px',
+                    mx: open ? '12px 8px' : '6px',
+                    backgroundColor: location.pathname === item.path ? `${sectionColor}20` : 'transparent',
+                    borderLeft: location.pathname === item.path ? `3px solid ${sectionColor}` : 'none',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      backgroundColor: `${sectionColor}15`,
+                    },
+                    justifyContent: open ? 'initial' : 'center',
+                  }}
+                >
+                  <ListItemIcon sx={{ 
+                    minWidth: 0, 
+                    mr: open ? 2 : 'auto', 
+                    justifyContent: 'center',
+                    color: location.pathname === item.path ? sectionColor : '#94a3b8',
+                    fontSize: 18
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  {open && (
+                    <ListItemText 
+                      primary={item.text}
+                      sx={{
+                        m: 0,
+                        '& .MuiListItemText-primary': {
+                          fontSize: '0.9rem',
+                          color: location.pathname === item.path ? sectionColor : '#475569',
+                          fontWeight: location.pathname === item.path ? 600 : 500,
+                        }
+                      }}
+                    />
+                  )}
+                </ListItem>
+              ))}
             </List>
           </Collapse>
         </List>
