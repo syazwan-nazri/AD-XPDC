@@ -32,8 +32,8 @@ import Collapse from '@mui/material/Collapse';
 import { useSelector } from 'react-redux';
 import { getRoleByGroupId, hasPermission } from '../utils/roles';
 
-const drawerWidth = 260;
-const collapsedWidth = 64;
+const drawerWidth = 280;
+const collapsedWidth = 80;
 
 // Define links with their required permission key
 const dataInputMasterLinks = [
@@ -71,7 +71,6 @@ const reportLinks = [
   { path: '/reports/dashboard-kpis', text: 'Dashboard', icon: <DashboardIcon />, permission: 'canAccessReports' },
   { path: '/reports/stock-inquiry', text: 'Stock Inquiry', icon: <Inventory2Icon />, permission: 'canAccessReports' },
   { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <ReceiptLongIcon />, permission: 'canAccessStockValuation' },
-
   { path: '/reports/stock-movement', text: 'Movement History', icon: <SwapHorizIcon />, permission: 'canAccessReports' },
   { path: '/reports/low-stock', text: 'Low Stock Alert', icon: <WarningIcon />, permission: 'canAccessReports' },
 ];
@@ -101,20 +100,51 @@ const Sidebar = ({ open, onToggle }) => {
 
   if (!user) return null;
 
-  const renderSection = (title, icon, links, isOpen, toggleOpen) => {
+  const renderSection = (title, icon, links, isOpen, toggleOpen, sectionColor) => {
     if (links.length === 0) return null;
     return (
-      <>
+      <Box sx={{ mb: 1 }}>
         <List>
-          <ListItem button onClick={toggleOpen} sx={{ justifyContent: open ? 'initial' : 'center', px: open ? 2 : 0 }}>
-            <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+          <ListItem 
+            button 
+            onClick={toggleOpen} 
+            sx={{ 
+              justifyContent: open ? 'initial' : 'center', 
+              px: open ? 2.5 : 1,
+              py: 1.5,
+              borderLeft: open && isOpen ? `4px solid ${sectionColor}` : 'none',
+              backgroundColor: isOpen && open ? `${sectionColor}08` : 'transparent',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                backgroundColor: open ? `${sectionColor}12` : 'transparent',
+              }
+            }}
+          >
+            <ListItemIcon sx={{ 
+              minWidth: 0, 
+              mr: open ? 2.5 : 'auto', 
+              justifyContent: 'center',
+              color: sectionColor,
+              fontSize: 22
+            }}>
               {icon}
             </ListItemIcon>
             {open && (
               <>
-                <ListItemText primary={title} />
-                <Box sx={{ ml: 'auto', pl: 1, display: 'flex', alignItems: 'center' }}>
-                  {isOpen ? <ExpandLess /> : <ExpandMore />}
+                <ListItemText 
+                  primary={title} 
+                  sx={{ 
+                    m: 0,
+                    '& .MuiListItemText-primary': {
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      color: '#1e293b',
+                      letterSpacing: '0.3px'
+                    }
+                  }}
+                />
+                <Box sx={{ ml: 'auto', pl: 1, display: 'flex', alignItems: 'center', color: sectionColor }}>
+                  {isOpen ? <ExpandLess sx={{ fontSize: 20 }} /> : <ExpandMore sx={{ fontSize: 20 }} />}
                 </Box>
               </>
             )}
@@ -134,13 +164,43 @@ const Sidebar = ({ open, onToggle }) => {
                           to={subItem.path}
                           selected={location.pathname === subItem.path}
                           sx={{
-                            pl: open ? 8 : 2,
+                            pl: open ? 5.5 : 2,
+                            pr: 2,
+                            py: 1,
+                            minHeight: 44,
+                            borderRadius: open ? '0 8px 8px 0' : '8px',
+                            mx: open ? '12px 8px' : '6px',
+                            backgroundColor: location.pathname === subItem.path ? `${sectionColor}20` : 'transparent',
+                            borderLeft: location.pathname === subItem.path ? `3px solid ${sectionColor}` : 'none',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              backgroundColor: `${sectionColor}15`,
+                            },
                             justifyContent: open ? 'initial' : 'center',
-                            minHeight: 40
                           }}
                         >
-                          <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{subItem.icon}</ListItemIcon>
-                          {open && <ListItemText primary={subItem.text} />}
+                          <ListItemIcon sx={{ 
+                            minWidth: 0, 
+                            mr: open ? 2 : 'auto', 
+                            justifyContent: 'center',
+                            color: location.pathname === subItem.path ? sectionColor : '#94a3b8',
+                            fontSize: 18
+                          }}>
+                            {subItem.icon}
+                          </ListItemIcon>
+                          {open && (
+                            <ListItemText 
+                              primary={subItem.text}
+                              sx={{
+                                m: 0,
+                                '& .MuiListItemText-primary': {
+                                  fontSize: '0.9rem',
+                                  color: location.pathname === subItem.path ? sectionColor : '#475569',
+                                  fontWeight: location.pathname === subItem.path ? 600 : 500,
+                                }
+                              }}
+                            />
+                          )}
                         </ListItem>
                       ))}
                     </Box>
@@ -155,21 +215,50 @@ const Sidebar = ({ open, onToggle }) => {
                     to={item.path}
                     selected={location.pathname === item.path}
                     sx={{
-                      pl: open ? 6 : 2,
+                      pl: open ? 4 : 2,
+                      pr: 2,
+                      py: 1,
+                      minHeight: 44,
+                      borderRadius: open ? '0 8px 8px 0' : '8px',
+                      mx: open ? '12px 8px' : '6px',
+                      backgroundColor: location.pathname === item.path ? `${sectionColor}20` : 'transparent',
+                      borderLeft: location.pathname === item.path ? `3px solid ${sectionColor}` : 'none',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        backgroundColor: `${sectionColor}15`,
+                      },
                       justifyContent: open ? 'initial' : 'center',
-                      minHeight: 40
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
-                    {open && <ListItemText primary={item.text} />}
+                    <ListItemIcon sx={{ 
+                      minWidth: 0, 
+                      mr: open ? 2 : 'auto', 
+                      justifyContent: 'center',
+                      color: location.pathname === item.path ? sectionColor : '#94a3b8',
+                      fontSize: 18
+                    }}>
+                      {item.icon}
+                    </ListItemIcon>
+                    {open && (
+                      <ListItemText 
+                        primary={item.text}
+                        sx={{
+                          m: 0,
+                          '& .MuiListItemText-primary': {
+                            fontSize: '0.9rem',
+                            color: location.pathname === item.path ? sectionColor : '#475569',
+                            fontWeight: location.pathname === item.path ? 600 : 500,
+                          }
+                        }}
+                      />
+                    )}
                   </ListItem>
                 );
               })}
             </List>
           </Collapse>
         </List>
-        <Divider />
-      </>
+      </Box>
     );
   };
 
@@ -185,44 +274,136 @@ const Sidebar = ({ open, onToggle }) => {
           width: open ? drawerWidth : collapsedWidth,
           boxSizing: 'border-box',
           overflowX: 'hidden',
-          transition: 'width 0.2s',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          backgroundColor: '#f8fafc',
+          borderRight: '1px solid #e2e8f0',
+          overflowY: 'auto',
+          '&::-webkit-scrollbar': {
+            width: '6px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#cbd5e1',
+            borderRadius: '3px',
+            '&:hover': {
+              background: '#94a3b8',
+            }
+          }
         },
       }}
     >
-      <List sx={{ mt: 1, mb: 1, display: 'flex', flexDirection: 'row', justifyContent: open ? 'flex-end' : 'center' }}>
-        <IconButton onClick={onToggle}>{open ? <ChevronLeftIcon /> : <ChevronRightIcon />}</IconButton>
-      </List>
-      <Divider />
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        px: open ? 2 : 1,
+        py: 2,
+        borderBottom: '1px solid #e2e8f0',
+        backgroundColor: 'white'
+      }}>
+        {open && (
+          <Typography variant="h6" sx={{ 
+            fontWeight: 700, 
+            color: '#1e293b',
+            fontSize: '1rem',
+            letterSpacing: '0.5px'
+          }}>
+            Menu
+          </Typography>
+        )}
+        <IconButton 
+          onClick={onToggle}
+          sx={{
+            color: '#64748b',
+            ml: open ? 'auto' : 0,
+            '&:hover': {
+              backgroundColor: '#dbeafe',
+              color: '#3b82f6'
+            }
+          }}
+        >
+          {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+        </IconButton>
+      </Box>
 
-      {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster)}
-      {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, stockMovementOpen, toggleStockMovement)}
-      {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, purchasingOpen, togglePurchasing)}
+      {/* Navigation Sections */}
+      <Box sx={{ py: 2, px: open ? 0 : 1 }}>
+        {renderSection("Data Input Master", <SettingsIcon />, filteredDataMasterLinks, dataMasterOpen, toggleDataMaster, '#8b5cf6')}
+        {renderSection("Stock Movement", <SwapHorizIcon />, filteredStockMovementLinks, stockMovementOpen, toggleStockMovement, '#06b6d4')}
+        {renderSection("Purchasing", <ShoppingCartIcon />, filteredPurchasingLinks, purchasingOpen, togglePurchasing, '#f59e0b')}
 
-      {/* Reports section */}
-      {filteredReportLinks.length > 0 && (
-        <List>
-          {open ? (
-            <Typography variant="subtitle2" sx={{ px: 2, pt: 2, color: 'primary.main' }}>Reports</Typography>
-          ) : null}
-          {filteredReportLinks.map((item) => (
-            <ListItem
-              key={item.path}
-              button
-              component={NavLink}
-              to={item.path}
-              selected={location.pathname === item.path}
-              sx={{
-                justifyContent: open ? 'initial' : 'center',
-                px: open ? 2 : 0,
-                minHeight: 48
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
-              {open && <ListItemText primary={item.text} />}
-            </ListItem>
-          ))}
-        </List>
-      )}
+        {/* Reports section */}
+        {filteredReportLinks.length > 0 && (
+          <Box sx={{ mb: 1 }}>
+            <List>
+              {open && (
+                <Typography variant="subtitle2" sx={{ 
+                  px: 3, 
+                  pt: 2, 
+                  pb: 1, 
+                  color: '#3b82f6',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase'
+                }}>
+                  Reports
+                </Typography>
+              )}
+              {filteredReportLinks.map((item) => (
+                <ListItem
+                  key={item.path}
+                  button
+                  component={NavLink}
+                  to={item.path}
+                  selected={location.pathname === item.path}
+                  sx={{
+                    pl: open ? 4 : 2,
+                    pr: 2,
+                    py: 1,
+                    minHeight: 44,
+                    borderRadius: open ? '0 8px 8px 0' : '8px',
+                    mx: open ? '12px 8px' : '6px',
+                    backgroundColor: location.pathname === item.path ? '#dbeafe' : 'transparent',
+                    borderLeft: location.pathname === item.path ? '3px solid #3b82f6' : 'none',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      backgroundColor: '#dbeafe',
+                    },
+                    justifyContent: open ? 'initial' : 'center',
+                  }}
+                >
+                  <ListItemIcon sx={{ 
+                    minWidth: 0, 
+                    mr: open ? 2 : 'auto', 
+                    justifyContent: 'center',
+                    color: location.pathname === item.path ? '#3b82f6' : '#94a3b8',
+                    fontSize: 18
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  {open && (
+                    <ListItemText 
+                      primary={item.text}
+                      sx={{
+                        m: 0,
+                        '& .MuiListItemText-primary': {
+                          fontSize: '0.9rem',
+                          color: location.pathname === item.path ? '#3b82f6' : '#475569',
+                          fontWeight: location.pathname === item.path ? 600 : 500,
+                        }
+                      }}
+                    />
+                  )}
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        )}
+      </Box>
     </Drawer>
   );
 };
