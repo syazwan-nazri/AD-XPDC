@@ -41,7 +41,15 @@ const dataInputMasterLinks = [
   { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' },
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartGroupMaster' },
-  { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+  { 
+    text: 'Storage Master', 
+    icon: <StorageIcon />, 
+    permission: 'canAccessStorageLocations',
+    subItems: [
+      { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+      { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+    ]
+  },
   { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, permission: 'canAccessSupplierManagement' },
   { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, permission: 'canAccessAssetRegistry' },
 ];
@@ -113,23 +121,50 @@ const Sidebar = ({ open, onToggle }) => {
           </ListItem>
           <Collapse in={isOpen && open} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {links.map((item) => (
-                <ListItem
-                  button
-                  key={item.path}
-                  component={NavLink}
-                  to={item.path}
-                  selected={location.pathname === item.path}
-                  sx={{
-                    pl: open ? 6 : 2,
-                    justifyContent: open ? 'initial' : 'center',
-                    minHeight: 40
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
-                  {open && <ListItemText primary={item.text} />}
-                </ListItem>
-              ))}
+              {links.map((item) => {
+                // Check if item has subItems (nested menu)
+                if (item.subItems) {
+                  return (
+                    <Box key={item.text}>
+                      {item.subItems.map((subItem) => (
+                        <ListItem
+                          button
+                          key={subItem.path}
+                          component={NavLink}
+                          to={subItem.path}
+                          selected={location.pathname === subItem.path}
+                          sx={{
+                            pl: open ? 8 : 2,
+                            justifyContent: open ? 'initial' : 'center',
+                            minHeight: 40
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{subItem.icon}</ListItemIcon>
+                          {open && <ListItemText primary={subItem.text} />}
+                        </ListItem>
+                      ))}
+                    </Box>
+                  );
+                }
+                // Regular menu item
+                return (
+                  <ListItem
+                    button
+                    key={item.path}
+                    component={NavLink}
+                    to={item.path}
+                    selected={location.pathname === item.path}
+                    sx={{
+                      pl: open ? 6 : 2,
+                      justifyContent: open ? 'initial' : 'center',
+                      minHeight: 40
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
+                    {open && <ListItemText primary={item.text} />}
+                  </ListItem>
+                );
+              })}
             </List>
           </Collapse>
         </List>

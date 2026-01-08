@@ -22,6 +22,7 @@ import NotFound from "./pages/NotFound";
 import PartMaster from "./pages/Admin/PartMaster";
 import PartGroupMaster from "./pages/Admin/PartGroupMaster";
 import StorageMaster from "./pages/Admin/StorageMaster";
+import StorageLocations from "./pages/Admin/StorageLocations";
 import Login from "./pages/Auth/Login";
 import { Roles } from "./utils/roles";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -276,6 +277,7 @@ function AppShell({ toggleTheme }) {
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER]} />}>
               <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
               <Route path="/admin/bin-master" element={<StorageMaster />} />
+              <Route path="/admin/storage-locations" element={<StorageLocations />} />
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
