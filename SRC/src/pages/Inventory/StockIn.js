@@ -2,8 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { useSelector } from 'react-redux';
-import { Button, Snackbar, TextField, Autocomplete, Paper, Box, Typography, Grid, Card, CardContent, Divider, Stack, Alert } from '@mui/material';
-import { LocalShipping, CheckCircle } from '@mui/icons-material';
+import { 
+  Button, 
+  Snackbar, 
+  TextField, 
+  Autocomplete, 
+  Paper, 
+  Box, 
+  Typography, 
+  Grid, 
+  Card, 
+  CardContent, 
+  Divider, 
+  Alert,
+  InputAdornment,
+  Chip,
+  IconButton,
+  Tooltip,
+  Container
+} from '@mui/material';
+import { 
+  LocalShipping, 
+  CheckCircle, 
+  Inventory, 
+  AttachMoney, 
+  CalendarToday,
+  Description,
+  Person,
+  Receipt,
+  TrendingUp,
+  Refresh,
+  ArrowUpward
+} from '@mui/icons-material';
 
 const StockIn = () => {
   const user = useSelector(state => state.auth.user);
@@ -16,6 +46,8 @@ const StockIn = () => {
   const [dateOfReceipt, setDateOfReceipt] = useState('');
   const [costPerUnit, setCostPerUnit] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchParts = async () => {
@@ -23,15 +55,33 @@ const StockIn = () => {
       setParts(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     };
     fetchParts();
+    fetchRecentTransactions();
   }, []);
+
+  const fetchRecentTransactions = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'movement_logs'));
+      const transactions = querySnapshot.docs
+        .map(doc => ({ ...doc.data(), id: doc.id }))
+        .filter(t => t.type === 'IN')
+        .sort((a, b) => b.date?.toDate() - a.date?.toDate())
+        .slice(0, 5);
+      setRecentTransactions(transactions);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!selectedPart || !quantity || Number(quantity) <= 0) {
       return setSnackbar({ open: true, message: 'Please select a part and valid quantity', severity: 'error' });
     }
 
+    setIsSubmitting(true);
     try {
       const qty = Number(quantity);
+      const totalCost = costPerUnit ? qty * Number(costPerUnit) : null;
+      
       // Update Part Stock
       const newStock = (selectedPart.currentStock || 0) + qty;
       await updateDoc(doc(db, 'parts', selectedPart.id), {
@@ -53,10 +103,17 @@ const StockIn = () => {
         supplier: supplier,
         deliveryOrderNumber: deliveryOrderNumber,
         dateOfReceipt: dateOfReceipt,
-        costPerUnit: costPerUnit ? Number(costPerUnit) : null
+        costPerUnit: costPerUnit ? Number(costPerUnit) : null,
+        totalCost: totalCost
       });
 
-      setSnackbar({ open: true, message: 'Stock In Successful', severity: 'success' });
+      setSnackbar({ 
+        open: true, 
+        message: `Successfully added ${qty} units of ${selectedPart.name}`, 
+        severity: 'success' 
+      });
+      
+      // Reset form
       setSelectedPart(null);
       setQuantity('');
       setRemarks('');
@@ -65,263 +122,613 @@ const StockIn = () => {
       setDateOfReceipt('');
       setCostPerUnit('');
       
-      // Refresh parts locally (optional, or rely on real-time listener if implemented)
+      // Refresh data
       const updatedParts = parts.map(p => p.id === selectedPart.id ? { ...p, currentStock: newStock } : p);
       setParts(updatedParts);
+      await fetchRecentTransactions();
 
     } catch (e) {
       console.error(e);
       setSnackbar({ open: true, message: 'Transaction Failed', severity: 'error' });
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const totalValue = () => {
+    if (!quantity || !costPerUnit) return '0.00';
+    const qty = Number(quantity);
+    const cost = Number(costPerUnit);
+    return (qty * cost).toFixed(2);
   };
 
   return (
     <Box sx={{ 
-      minHeight: '100vh', 
-      background: '#ffffff',
-      py: 4 
+      minHeight: 'calc(100vh - 64px)',
+      backgroundColor: '#f8fafc',
+      p: 3
     }}>
-      <Box sx={{ maxWidth: 700, mx: 'auto', px: 2 }}>
-        {/* Header Card */}
-        <Card sx={{ 
-          mb: 3, 
-          background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-          color: 'white',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+      {/* Header Section */}
+      <Container maxWidth="lg" sx={{ mb: 4 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2
         }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <LocalShipping sx={{ fontSize: 40 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)'
+            }}>
+              <LocalShipping sx={{ fontSize: 28 }} />
+            </Box>
+            <Box>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 700, 
+                color: '#1e293b',
+                mb: 0.5
+              }}>
+                Stock In
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#64748b' }}>
+                Receive new inventory items and update stock levels
+              </Typography>
+            </Box>
+          </Box>
+          
+          {/* Stats Card */}
+          <Card sx={{ 
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            backgroundColor: 'white',
+            px: 3,
+            py: 1.5,
+            minWidth: 200
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <ArrowUpward sx={{ color: '#10b981', fontSize: 20 }} />
               <Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Stock In</Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9 }}>Receive & Log Inventory</Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Recent Stock Ins
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  {recentTransactions.length}
+                </Typography>
               </Box>
             </Box>
-          </CardContent>
-        </Card>
+          </Card>
+        </Box>
 
-        {/* Main Form Card */}
-        <Paper elevation={6} sx={{ 
-          p: 4,
-          borderRadius: 3,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-          backgroundColor: '#ffffff'
+        {/* New Stock Entry Form */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white',
+          mb: 4
         }}>
-          
-          {/* Part Selection Section */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="subtitle1" sx={{ 
-              fontWeight: 600, 
-              mb: 2,
-              color: '#1976d2',
-              textTransform: 'uppercase',
-              fontSize: '0.85rem',
-              letterSpacing: 1
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#f1f5f9'
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600,
+              color: '#1e293b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
             }}>
-              📦 Item Details
+              <Inventory sx={{ fontSize: 20, color: '#1976d2' }} />
+              New Stock Entry
             </Typography>
-            <Autocomplete
-              options={parts}
-              getOptionLabel={(option) => `${option.sapNumber} - ${option.name}`}
-              value={selectedPart}
-              onChange={(event, newValue) => setSelectedPart(newValue)}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  label="Select Part" 
-                  margin="normal"
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                      '&:hover fieldset': {
-                        borderColor: '#1976d2',
-                      },
-                    }
-                  }}
-                />
-              )}
-            />
-            <TextField
-              label="Quantity"
-              type="number"
-              fullWidth
-              margin="normal"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                  '&:hover fieldset': {
-                    borderColor: '#1976d2',
-                  },
-                }
-              }}
-            />
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              Fill in the details below to record new inventory
+            </Typography>
           </Box>
 
-          <Divider sx={{ my: 3 }} />
+          <Box sx={{ p: 4 }}>
+            <Grid container spacing={4}>
+              {/* Item Selection & Quantity */}
+              <Grid item xs={12}>
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ 
+                    fontWeight: 600, 
+                    color: '#334155',
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+                    <Inventory sx={{ fontSize: 18, color: '#1976d2' }} />
+                    Item Details
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={8}>
+                      <Autocomplete
+                        options={parts}
+                        getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
+                        value={selectedPart}
+                        onChange={(event, newValue) => setSelectedPart(newValue)}
+                        renderInput={(params) => (
+                          <TextField 
+                            {...params} 
+                            label="Search and Select Part"
+                            placeholder="Type to search parts..."
+                            size="medium"
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: '10px',
+                                backgroundColor: '#f8fafc',
+                              }
+                            }}
+                          />
+                        )}
+                        renderOption={(props, option) => (
+                          <Box component="li" {...props} sx={{ py: 1.5 }}>
+                            <Box sx={{ width: '100%' }}>
+                              <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                {option.name}
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                                <Chip 
+                                  label={`SAP: ${option.sapNumber || 'N/A'}`} 
+                                  size="small" 
+                                  sx={{ height: 20, fontSize: '0.75rem' }}
+                                />
+                                <Chip 
+                                  label={`Current Stock: ${option.currentStock || 0}`} 
+                                  size="small"
+                                  color="info"
+                                  variant="outlined"
+                                  sx={{ height: 20, fontSize: '0.75rem' }}
+                                />
+                              </Box>
+                            </Box>
+                          </Box>
+                        )}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        label="Quantity"
+                        type="number"
+                        fullWidth
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        size="medium"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <TrendingUp sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px',
+                            backgroundColor: '#f8fafc',
+                          }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Grid>
 
-          {/* Supplier & Delivery Section */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="subtitle1" sx={{ 
-              fontWeight: 600, 
-              mb: 2,
-              color: '#1976d2',
-              textTransform: 'uppercase',
-              fontSize: '0.85rem',
-              letterSpacing: 1
-            }}>
-              🚚 Delivery Information
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Supplier"
-                  fullWidth
-                  margin="normal"
-                  value={supplier}
-                  onChange={(e) => setSupplier(e.target.value)}
-                  variant="outlined"
-                  placeholder="Supplier name"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                      '&:hover fieldset': {
-                        borderColor: '#1976d2',
-                      },
-                    }
-                  }}
-                />
+              {/* Delivery Information */}
+              <Grid item xs={12}>
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ 
+                    fontWeight: 600, 
+                    color: '#334155',
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+                    <LocalShipping sx={{ fontSize: 18, color: '#1976d2' }} />
+                    Delivery Information
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Supplier Name"
+                        fullWidth
+                        value={supplier}
+                        onChange={(e) => setSupplier(e.target.value)}
+                        placeholder="Enter supplier name"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Person sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px',
+                            backgroundColor: '#f8fafc',
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Delivery Order Number"
+                        fullWidth
+                        value={deliveryOrderNumber}
+                        onChange={(e) => setDeliveryOrderNumber(e.target.value)}
+                        placeholder="DO-XXXXX"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Receipt sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px',
+                            backgroundColor: '#f8fafc',
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Date of Receipt"
+                        type="date"
+                        fullWidth
+                        value={dateOfReceipt}
+                        onChange={(e) => setDateOfReceipt(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <CalendarToday sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px',
+                            backgroundColor: '#f8fafc',
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Cost per Unit"
+                        type="number"
+                        fullWidth
+                        value={costPerUnit}
+                        onChange={(e) => setCostPerUnit(e.target.value)}
+                        inputProps={{ step: '0.01' }}
+                        placeholder="0.00"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <AttachMoney sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px',
+                            backgroundColor: '#f8fafc',
+                          }
+                        }}
+                      />
+                    </Grid>
+                    
+                    {/* Total Value Display */}
+                    {quantity && costPerUnit && (
+                      <Grid item xs={12}>
+                        <Card sx={{ 
+                          borderRadius: '10px',
+                          backgroundColor: '#f0f9ff',
+                          border: '1px solid #bae6fd',
+                          p: 2
+                        }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="body1" sx={{ color: '#0369a1', fontWeight: 500 }}>
+                              Total Value
+                            </Typography>
+                            <Typography variant="h6" sx={{ color: '#0369a1', fontWeight: 700 }}>
+                              ${totalValue()}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" sx={{ color: '#0c4a6e', display: 'block', mt: 0.5 }}>
+                            {quantity} units × ${Number(costPerUnit).toFixed(2)} each
+                          </Typography>
+                        </Card>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Delivery Order Number"
-                  fullWidth
-                  margin="normal"
-                  value={deliveryOrderNumber}
-                  onChange={(e) => setDeliveryOrderNumber(e.target.value)}
-                  variant="outlined"
-                  placeholder="DO-XXXXX"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                      '&:hover fieldset': {
-                        borderColor: '#1976d2',
-                      },
-                    }
-                  }}
-                />
+
+              {/* Remarks */}
+              <Grid item xs={12}>
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ 
+                    fontWeight: 600, 
+                    color: '#334155',
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+                    <Description sx={{ fontSize: 18, color: '#1976d2' }} />
+                    Additional Notes
+                  </Typography>
+                  <TextField
+                    label="Remarks"
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Add any special notes, conditions, or observations about this stock in..."
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Date of Receipt"
-                  type="date"
-                  fullWidth
-                  margin="normal"
-                  value={dateOfReceipt}
-                  onChange={(e) => setDateOfReceipt(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                      '&:hover fieldset': {
-                        borderColor: '#1976d2',
+
+              {/* Submit Button */}
+              <Grid item xs={12}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  pt: 2,
+                  borderTop: '1px solid #e2e8f0'
+                }}>
+                  <Button 
+                    variant="contained" 
+                    size="large"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || !selectedPart || !quantity}
+                    startIcon={<CheckCircle />}
+                    sx={{ 
+                      minWidth: 220,
+                      background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                      px: 5,
+                      py: 1.8,
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      borderRadius: '10px',
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px rgba(25, 118, 210, 0.4)',
+                      '&:hover': {
+                        boxShadow: '0 6px 20px rgba(25, 118, 210, 0.6)',
+                        transform: 'translateY(-1px)'
                       },
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Cost per Unit"
-                  type="number"
-                  fullWidth
-                  margin="normal"
-                  value={costPerUnit}
-                  onChange={(e) => setCostPerUnit(e.target.value)}
-                  inputProps={{ step: '0.01' }}
-                  variant="outlined"
-                  placeholder="0.00"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                      '&:hover fieldset': {
-                        borderColor: '#1976d2',
-                      },
-                    }
-                  }}
-                />
+                      '&:disabled': {
+                        background: '#e2e8f0',
+                        color: '#94a3b8'
+                      }
+                    }}
+                  >
+                    {isSubmitting ? 'Processing...' : 'Confirm Stock In'}
+                  </Button>
+                </Box>
               </Grid>
             </Grid>
           </Box>
+        </Paper>
 
-          <Divider sx={{ my: 3 }} />
-
-          {/* Additional Info Section */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="subtitle1" sx={{ 
-              fontWeight: 600, 
-              mb: 2,
-              color: '#1976d2',
-              textTransform: 'uppercase',
-              fontSize: '0.85rem',
-              letterSpacing: 1
-            }}>
-              📝 Additional Notes
-            </Typography>
-            <TextField
-              label="Remarks"
-              fullWidth
-              multiline
-              rows={3}
-              margin="normal"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              variant="outlined"
-              placeholder="Add any special notes or conditions..."
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                  '&:hover fieldset': {
-                    borderColor: '#1976d2',
-                  },
-                }
-              }}
-            />
+        {/* Recent Stock Ins Section */}
+        <Paper elevation={0} sx={{ 
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          backgroundColor: 'white'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#f1f5f9',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Box>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <TrendingUp sx={{ fontSize: 20, color: '#1976d2' }} />
+                Recent Stock In Transactions
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                Last 5 stock in entries
+              </Typography>
+            </Box>
+            <Tooltip title="Refresh transactions">
+              <IconButton 
+                onClick={fetchRecentTransactions} 
+                sx={{ 
+                  color: '#1976d2',
+                  backgroundColor: 'white',
+                  border: '1px solid #e2e8f0',
+                  '&:hover': {
+                    backgroundColor: '#f1f5f9'
+                  }
+                }}
+              >
+                <Refresh />
+              </IconButton>
+            </Tooltip>
           </Box>
 
-          {/* Action Button */}
-          <Button 
-            variant="contained" 
-            fullWidth 
-            size="large" 
-            onClick={handleSubmit}
-            startIcon={<CheckCircle />}
-            sx={{ 
-              mt: 3,
-              background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-              py: 1.8,
-              fontWeight: 600,
-              fontSize: '1rem',
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-              borderRadius: '12px',
-              boxShadow: '0 4px 15px rgba(25, 118, 210, 0.4)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 25px rgba(25, 118, 210, 0.6)',
-                transform: 'translateY(-2px)'
-              }
-            }}
-          >
-            Confirm Stock In
-          </Button>
+          <Box sx={{ p: 3 }}>
+            {recentTransactions.length === 0 ? (
+              <Box sx={{ 
+                textAlign: 'center', 
+                py: 6,
+                color: '#94a3b8'
+              }}>
+                <Description sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  No recent transactions
+                </Typography>
+                <Typography variant="body2">
+                  Stock in transactions will appear here once you start adding items
+                </Typography>
+              </Box>
+            ) : (
+              <Grid container spacing={2}>
+                {recentTransactions.map((transaction) => (
+                  <Grid item xs={12} key={transaction.id}>
+                    <Card 
+                      variant="outlined"
+                      sx={{ 
+                        borderRadius: '10px',
+                        borderColor: '#e2e8f0',
+                        backgroundColor: '#f8fafc',
+                        '&:hover': {
+                          borderColor: '#1976d2',
+                          backgroundColor: '#f1f5f9'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <CardContent sx={{ p: 2.5 }}>
+                        <Grid container alignItems="center" spacing={2}>
+                          <Grid item xs={12} md={4}>
+                            <Box>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
+                                {transaction.partName}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
+                                SAP: {transaction.sapNumber || 'N/A'}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} md={2}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 32,
+                                height: 32,
+                                borderRadius: '8px',
+                                backgroundColor: '#dcfce7',
+                                color: '#166534'
+                              }}>
+                                <ArrowUpward sx={{ fontSize: 16 }} />
+                              </Box>
+                              <Box>
+                                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
+                                  Quantity
+                                </Typography>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#166534' }}>
+                                  +{transaction.quantity}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} md={3}>
+                            <Box>
+                              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
+                                Supplier
+                              </Typography>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#475569' }}>
+                                {transaction.supplier || 'Not specified'}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box>
+                                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
+                                  Date
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                  {formatDate(transaction.date)}
+                                </Typography>
+                              </Box>
+                              {transaction.costPerUnit && (
+                                <Chip 
+                                  label={`$${transaction.costPerUnit.toFixed(2)}/unit`}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                  sx={{ height: 24, fontSize: '0.75rem' }}
+                                />
+                              )}
+                            </Box>
+                          </Grid>
+                        </Grid>
+                        {transaction.remarks && (
+                          <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #e2e8f0' }}>
+                            <Typography variant="caption" sx={{ color: '#64748b', fontStyle: 'italic' }}>
+                              "{transaction.remarks}"
+                            </Typography>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
         </Paper>
-      </Box>
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} severity={snackbar.severity} />
+      </Container>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ 
+            width: '100%',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
