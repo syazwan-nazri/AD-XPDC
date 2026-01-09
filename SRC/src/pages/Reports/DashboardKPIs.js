@@ -169,16 +169,56 @@ const DashboardKPIs = () => {
       { name: 'High', value: stats.highParts, fill: '#3b82f6', description: '> 70% stock' }
     ];
 
-    // 3. Stock Movement Comparison (In vs Out)
+    // 3. Stock Movement Comparison (In vs Out) - APPLY FILTERS
     const movementMap = {};
-    const last30Days = new Date();
-    last30Days.setDate(last30Days.getDate() - 30);
+    let filterStartDate = new Date();
+    let filterEndDate = new Date();
+    let filterLabel = 'Last 30 days';
     
-    console.log('Processing', movements.length, 'movements for chart'); // Debug
+    // Apply time range filter
+    if (timeRange === 'day') {
+      filterStartDate.setDate(filterStartDate.getDate() - 1);
+      filterLabel = 'Today';
+    } else if (timeRange === 'week') {
+      filterStartDate.setDate(filterStartDate.getDate() - 7);
+      filterLabel = 'This Week';
+    } else if (timeRange === 'month') {
+      filterStartDate.setMonth(filterStartDate.getMonth() - 1);
+      filterLabel = 'This Month';
+    } else if (timeRange === 'quarter') {
+      filterStartDate.setMonth(filterStartDate.getMonth() - 3);
+      filterLabel = 'This Quarter';
+    } else if (timeRange === 'year') {
+      filterStartDate.setFullYear(filterStartDate.getFullYear() - 1);
+      filterLabel = 'This Year';
+    } else if (timeRange === 'custom') {
+      // Use selectedYear and selectedMonth
+      filterStartDate = new Date(selectedYear, selectedMonth === 'All' ? 0 : parseInt(selectedMonth) - 1, 1);
+      filterEndDate = selectedMonth === 'All' 
+        ? new Date(selectedYear + 1, 0, 1) 
+        : new Date(selectedYear, parseInt(selectedMonth), 1);
+      filterLabel = selectedMonth === 'All' ? `Year ${selectedYear}` : `${selectedMonth}/${selectedYear}`;
+    }
+    
+    console.log('=== STOCK MOVEMENT ANALYSIS ===');
+    console.log('Total movements in state:', movements.length);
+    console.log('Filter range:', filterStartDate.toLocaleDateString(), 'to', filterEndDate.toLocaleDateString());
+    console.log('Time range selected:', timeRange);
+    console.log('Filter label:', filterLabel);
+    
+    let processedCount = 0;
+    let inTotal = 0, outTotal = 0, transferTotal = 0;
     
     movements.forEach(m => {
       const date = m.date;
-      if (date < last30Days) return;
+      
+      // Apply date range filter
+      if (date < filterStartDate || date > filterEndDate) {
+        console.log('SKIPPED: Movement date', date.toLocaleDateString(), 'is outside filter range');
+        return;
+      }
+      
+      processedCount++;
       
       // Create consistent date key in YYYY-MM-DD format for sorting
       const year = date.getFullYear();
@@ -215,27 +255,35 @@ const DashboardKPIs = () => {
       // Handle multiple possible field names for type
       const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
       
-      console.log('Movement:', { type: movementType, quantity, value, partName: m.partName || m.part_name }); // Debug
+      console.log(`[${dateKey}] Type: ${movementType} | Qty: ${quantity} | Value: $${value.toFixed(2)} | Part: ${m.partName || m.part_name || 'Unknown'}`);
 
       if (movementType === 'IN' || movementType === 'STOCK IN' || movementType === 'INWARD') {
         movementMap[dateKey].StockIn += value;
+        inTotal += value;
       } else if (movementType === 'OUT' || movementType === 'STOCK OUT' || movementType === 'OUTWARD') {
         movementMap[dateKey].StockOut += value;
+        outTotal += value;
       } else if (movementType === 'TRANSFER' || movementType === 'INTERNAL TRANSFER') {
         movementMap[dateKey].Transfers += quantity;
+        transferTotal += quantity;
       }
     });
 
-    // Sort by actual date and calculate net change
+    console.log(`Processed ${processedCount} movements within filter range`);
+    console.log(`Totals - In: $${inTotal.toFixed(2)} | Out: $${outTotal.toFixed(2)} | Transfer: ${transferTotal}`);
+
+    // Sort by actual date and calculate net change - Show last 15 days of data
     const movementComparison = Object.values(movementMap)
       .sort((a, b) => new Date(a.dateKey) - new Date(b.dateKey))
-      .slice(-15) // Last 15 days
+      .slice(-15)
       .map(item => ({
         ...item,
         NetChange: item.StockIn - item.StockOut
       }));
     
-    console.log('Movement Comparison Data:', movementComparison); // Debug
+    console.log('Final chart data points:', movementComparison.length);
+    console.log('Chart data:', movementComparison);
+    console.log('=== END STOCK MOVEMENT ANALYSIS ===');
 
     // 4. Top Moving Items
     const partUsageMap = {};
@@ -249,16 +297,41 @@ const DashboardKPIs = () => {
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
 
-    // 5. Recent Activity
-    const recentActivity = movements.slice(0, 5).map(m => ({
-      id: m.id,
-      type: m.type,
-      part: m.partName || 'Unknown',
-      quantity: m.quantity || 0,
-      date: m.date.toLocaleDateString(),
-      time: m.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      user: m.user || 'System'
-    }));
+    // 5. Recent Activity - Last 5 Stock Transactions (IN, OUT, TRANSFER only)
+    const recentActivity = movements
+      .filter(m => {
+        const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
+        return (
+          movementType === 'IN' || 
+          movementType === 'STOCK IN' || 
+          movementType === 'INWARD' ||
+          movementType === 'OUT' || 
+          movementType === 'STOCK OUT' || 
+          movementType === 'OUTWARD' ||
+          movementType === 'TRANSFER' || 
+          movementType === 'INTERNAL TRANSFER'
+        );
+      })
+      .slice(0, 5)
+      .map(m => {
+        const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
+        let displayType = 'Transfer';
+        if (movementType === 'IN' || movementType === 'STOCK IN' || movementType === 'INWARD') {
+          displayType = 'Stock In';
+        } else if (movementType === 'OUT' || movementType === 'STOCK OUT' || movementType === 'OUTWARD') {
+          displayType = 'Stock Out';
+        }
+        
+        return {
+          id: m.id,
+          type: displayType,
+          part: m.partName || m.part_name || 'Unknown',
+          quantity: m.quantity || 0,
+          date: m.date.toLocaleDateString(),
+          time: m.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          user: m.user || m.createdBy || 'System'
+        };
+      });
 
     // 6. Quick Stats
     const quickStats = [
@@ -275,9 +348,10 @@ const DashboardKPIs = () => {
       inventoryHealthData, 
       movementComparison,
       recentActivity,
-      quickStats
+      quickStats,
+      filterLabel
     };
-  }, [parts, movements, stats]);
+  }, [parts, movements, stats, timeRange, selectedYear, selectedMonth]);
 
   const KPICard = ({ title, value, icon, color, subtitle, trend }) => (
     <Card sx={{
@@ -532,7 +606,7 @@ const DashboardKPIs = () => {
                     Stock Movement Analysis
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Last 30 days - Stock In vs Stock Out
+                    {dashboardData.filterLabel}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
