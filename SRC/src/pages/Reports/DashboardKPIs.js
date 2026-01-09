@@ -54,27 +54,47 @@ const DashboardKPIs = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('🔍 Starting data fetch...');
+        
         // 1. Fetch Parts
         const partsSnapshot = await getDocs(collection(db, 'parts'));
         const partsData = partsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setParts(partsData);
+        console.log('Fetched Parts:', partsData.length);
 
-        // 2. Fetch Movements (all data without limit for debugging)
-        const movementsRef = collection(db, 'movement_logs');
-        const q = query(movementsRef, orderBy('timestamp', 'desc'));
-        const movementsSnapshot = await getDocs(q);
-        const movementsData = movementsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log('Movement Log Entry:', data); // Debug log
-          return {
-            id: doc.id,
-            ...data,
-            // Handle multiple possible timestamp field names
-            date: data.timestamp?.toDate?.() || data.date?.toDate?.() || new Date(data.timestamp) || new Date(data.date) || new Date()
-          };
-        });
-        console.log('Total Movements Fetched:', movementsData.length); // Debug log
-        console.log('Sample Movement:', movementsData[0]); // Debug log
+        // 2. Fetch Movements - Simple query first to test
+        console.log('📦 Attempting to fetch movement_logs...');
+        
+        let movementsData = [];
+        
+        // First try: simple fetch without any query
+        try {
+          const simpleSnapshot = await getDocs(collection(db, 'movement_logs'));
+          console.log('📊 Simple fetch result - Total docs:', simpleSnapshot.size);
+          
+          if (simpleSnapshot.size > 0) {
+            movementsData = simpleSnapshot.docs.map(doc => {
+              const data = doc.data();
+              console.log('📋 Raw document:', data);
+              return {
+                id: doc.id,
+                ...data,
+                date: data.timestamp?.toDate?.() || data.date?.toDate?.() || new Date(data.timestamp) || new Date(data.date) || new Date()
+              };
+            });
+            console.log('✅ Total Movements Fetched:', movementsData.length);
+            if (movementsData.length > 0) {
+              console.log('✅ First Movement:', movementsData[0]);
+            }
+          } else {
+            console.warn('⚠️ movement_logs collection returned 0 documents');
+            movementsData = [];
+          }
+        } catch (fetchError) {
+          console.error('❌ Error fetching movements:', fetchError.message);
+          movementsData = [];
+        }
+        
         setMovements(movementsData);
 
         // 3. Fetch PRs
@@ -171,50 +191,45 @@ const DashboardKPIs = () => {
 
     // 3. Stock Movement Comparison (In vs Out) - APPLY FILTERS
     const movementMap = {};
+    
+    // Calculate filter date range based on timeRange
     let filterStartDate = new Date();
     let filterEndDate = new Date();
-    let filterLabel = 'Last 30 days';
     
-    // Apply time range filter
     if (timeRange === 'day') {
       filterStartDate.setDate(filterStartDate.getDate() - 1);
-      filterLabel = 'Today';
     } else if (timeRange === 'week') {
       filterStartDate.setDate(filterStartDate.getDate() - 7);
-      filterLabel = 'This Week';
     } else if (timeRange === 'month') {
       filterStartDate.setMonth(filterStartDate.getMonth() - 1);
-      filterLabel = 'This Month';
     } else if (timeRange === 'quarter') {
       filterStartDate.setMonth(filterStartDate.getMonth() - 3);
-      filterLabel = 'This Quarter';
     } else if (timeRange === 'year') {
       filterStartDate.setFullYear(filterStartDate.getFullYear() - 1);
-      filterLabel = 'This Year';
-    } else if (timeRange === 'custom') {
-      // Use selectedYear and selectedMonth
-      filterStartDate = new Date(selectedYear, selectedMonth === 'All' ? 0 : parseInt(selectedMonth) - 1, 1);
-      filterEndDate = selectedMonth === 'All' 
-        ? new Date(selectedYear + 1, 0, 1) 
-        : new Date(selectedYear, parseInt(selectedMonth), 1);
-      filterLabel = selectedMonth === 'All' ? `Year ${selectedYear}` : `${selectedMonth}/${selectedYear}`;
     }
     
+    // Set start time to beginning of day
+    filterStartDate.setHours(0, 0, 0, 0);
+    filterEndDate.setHours(23, 59, 59, 999);
+    
     console.log('=== STOCK MOVEMENT ANALYSIS ===');
-    console.log('Total movements in state:', movements.length);
+    console.log('Total movements available:', movements.length);
     console.log('Filter range:', filterStartDate.toLocaleDateString(), 'to', filterEndDate.toLocaleDateString());
     console.log('Time range selected:', timeRange);
-    console.log('Filter label:', filterLabel);
     
     let processedCount = 0;
     let inTotal = 0, outTotal = 0, transferTotal = 0;
     
     movements.forEach(m => {
+      if (!m.date) {
+        console.warn('Movement missing date:', m);
+        return;
+      }
+      
       const date = m.date;
       
       // Apply date range filter
       if (date < filterStartDate || date > filterEndDate) {
-        console.log('SKIPPED: Movement date', date.toLocaleDateString(), 'is outside filter range');
         return;
       }
       
@@ -254,8 +269,6 @@ const DashboardKPIs = () => {
 
       // Handle multiple possible field names for type
       const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
-      
-      console.log(`[${dateKey}] Type: ${movementType} | Qty: ${quantity} | Value: $${value.toFixed(2)} | Part: ${m.partName || m.part_name || 'Unknown'}`);
 
       if (movementType === 'IN' || movementType === 'STOCK IN' || movementType === 'INWARD') {
         movementMap[dateKey].StockIn += value;
@@ -269,13 +282,12 @@ const DashboardKPIs = () => {
       }
     });
 
-    console.log(`Processed ${processedCount} movements within filter range`);
+    console.log(`✅ Processed ${processedCount} movements within filter range`);
     console.log(`Totals - In: $${inTotal.toFixed(2)} | Out: $${outTotal.toFixed(2)} | Transfer: ${transferTotal}`);
 
-    // Sort by actual date and calculate net change - Show last 15 days of data
+    // Sort by actual date and calculate net change - Show all processed data or last 15 days
     const movementComparison = Object.values(movementMap)
       .sort((a, b) => new Date(a.dateKey) - new Date(b.dateKey))
-      .slice(-15)
       .map(item => ({
         ...item,
         NetChange: item.StockIn - item.StockOut
@@ -283,7 +295,7 @@ const DashboardKPIs = () => {
     
     console.log('Final chart data points:', movementComparison.length);
     console.log('Chart data:', movementComparison);
-    console.log('=== END STOCK MOVEMENT ANALYSIS ===');
+    console.log('=== END STOCK MOVEMENT ANALYSIS ===');;
 
     // 4. Top Moving Items
     const partUsageMap = {};
@@ -348,8 +360,7 @@ const DashboardKPIs = () => {
       inventoryHealthData, 
       movementComparison,
       recentActivity,
-      quickStats,
-      filterLabel
+      quickStats
     };
   }, [parts, movements, stats, timeRange, selectedYear, selectedMonth]);
 
@@ -606,7 +617,7 @@ const DashboardKPIs = () => {
                     Stock Movement Analysis
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    {dashboardData.filterLabel}
+                    Stock In vs Stock Out Comparison
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
