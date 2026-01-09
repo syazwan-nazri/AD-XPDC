@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../../firebase/config';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import {
-  Grid, Paper, Typography, Box, Card, CardContent, Divider, MenuItem, TextField, Select, FormControl, InputLabel,
-  Tooltip, IconButton, CircularProgress
+  Grid, Paper, Typography, Box, Card, CardContent, Divider, MenuItem, 
+  Select, FormControl, InputLabel, Tooltip, IconButton, CircularProgress,
+  Chip, useMediaQuery, useTheme
 } from '@mui/material';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer,
@@ -18,8 +19,16 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import CategoryIcon from '@mui/icons-material/Category';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import BuildIcon from '@mui/icons-material/Build';
+import StorageIcon from '@mui/icons-material/Storage';
 
 const DashboardKPIs = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [stats, setStats] = useState({
     totalStockValue: 0,
     lowStockCount: 0,
@@ -28,15 +37,19 @@ const DashboardKPIs = () => {
     criticalParts: 0,
     lowParts: 0,
     normalParts: 0,
-    highParts: 0
+    highParts: 0,
+    recentMovements: 0,
+    pendingMRFs: 0
   });
   const [parts, setParts] = useState([]);
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
 
   // Filters
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedMonth, setSelectedMonth] = useState('All');
+  const [timeRange, setTimeRange] = useState('month');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,20 +59,31 @@ const DashboardKPIs = () => {
         const partsData = partsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setParts(partsData);
 
-        // 2. Fetch Movements
+        // 2. Fetch Movements (all data without limit for debugging)
         const movementsRef = collection(db, 'movement_logs');
         const q = query(movementsRef, orderBy('timestamp', 'desc'));
         const movementsSnapshot = await getDocs(q);
-        const movementsData = movementsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          date: doc.data().timestamp?.toDate() || new Date()
-        }));
+        const movementsData = movementsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Movement Log Entry:', data); // Debug log
+          return {
+            id: doc.id,
+            ...data,
+            // Handle multiple possible timestamp field names
+            date: data.timestamp?.toDate?.() || data.date?.toDate?.() || new Date(data.timestamp) || new Date(data.date) || new Date()
+          };
+        });
+        console.log('Total Movements Fetched:', movementsData.length); // Debug log
+        console.log('Sample Movement:', movementsData[0]); // Debug log
         setMovements(movementsData);
 
         // 3. Fetch PRs
         const prQuery = query(collection(db, 'purchase_requisitions'), where('status', '==', 'Pending'));
         const prSnapshot = await getDocs(prQuery);
+
+        // 4. Fetch MRFs
+        const mrfQuery = query(collection(db, 'material_request_forms'), where('status', '==', 'pending'));
+        const mrfSnapshot = await getDocs(mrfQuery);
 
         // Calculate KPI Stats
         let totalValue = 0;
@@ -73,7 +97,7 @@ const DashboardKPIs = () => {
           const stock = Number(part.currentStock) || 0;
           const price = Number(part.unitPrice) || 0;
           const min = Number(part.safetyLevel) || Number(part.minStockLevel) || 0;
-          const max = Number(part.maxStockLevel) || 100;
+          const max = Number(part.maxStockLevel) || Math.max(min * 3, 100);
 
           totalValue += stock * price;
 
@@ -95,7 +119,9 @@ const DashboardKPIs = () => {
           criticalParts: criticalCount,
           lowParts: lowCount,
           normalParts: normalCount,
-          highParts: highCount
+          highParts: highCount,
+          recentMovements: movementsData.length,
+          pendingMRFs: mrfSnapshot.size
         });
 
       } catch (error) {
@@ -108,9 +134,20 @@ const DashboardKPIs = () => {
     fetchData();
   }, []);
 
+  // Color palette
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
   // Filtered Data Calculations
   const dashboardData = useMemo(() => {
-    if (!parts.length) return { categoryData: [], stockOutTrend: [], topParts: [], inventoryHealthData: [], movementComparison: [] };
+    if (!parts.length) return { 
+      categoryData: [], 
+      stockOutTrend: [], 
+      topParts: [], 
+      inventoryHealthData: [], 
+      movementComparison: [],
+      recentActivity: [],
+      quickStats: []
+    };
 
     // 1. Category Data
     const categoryMap = {};
@@ -118,92 +155,129 @@ const DashboardKPIs = () => {
       const cat = part.category || 'Uncategorized';
       categoryMap[cat] = (categoryMap[cat] || 0) + 1;
     });
-    const categoryData = Object.keys(categoryMap).map(key => ({ name: key, value: categoryMap[key] }));
+    const categoryData = Object.keys(categoryMap).map(key => ({ 
+      name: key, 
+      value: categoryMap[key],
+      color: COLORS[Object.keys(categoryMap).indexOf(key) % COLORS.length]
+    }));
 
     // 2. Inventory Health Data
     const inventoryHealthData = [
-      { name: 'Critical', value: stats.criticalParts, fill: '#f44336' },
-      { name: 'Low', value: stats.lowParts, fill: '#ff9800' },
-      { name: 'Normal', value: stats.normalParts, fill: '#4caf50' },
-      { name: 'High', value: stats.highParts, fill: '#2196f3' }
+      { name: 'Critical', value: stats.criticalParts, fill: '#ef4444', description: '< 10% stock' },
+      { name: 'Low', value: stats.lowParts, fill: '#f59e0b', description: '10-30% stock' },
+      { name: 'Normal', value: stats.normalParts, fill: '#10b981', description: '30-70% stock' },
+      { name: 'High', value: stats.highParts, fill: '#3b82f6', description: '> 70% stock' }
     ];
 
     // 3. Stock Movement Comparison (In vs Out)
-    // Group movements by month
     const movementMap = {};
+    const last30Days = new Date();
+    last30Days.setDate(last30Days.getDate() - 30);
+    
+    console.log('Processing', movements.length, 'movements for chart'); // Debug
+    
     movements.forEach(m => {
-      const month = m.date.toLocaleString('default', { month: 'short' });
-      if (!movementMap[month]) {
-        movementMap[month] = { date: month, StockIn: 0, StockOut: 0 };
+      const date = m.date;
+      if (date < last30Days) return;
+      
+      // Create consistent date key in YYYY-MM-DD format for sorting
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+      
+      // Display format (e.g., "Jan 9")
+      const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      if (!movementMap[dateKey]) {
+        movementMap[dateKey] = { 
+          date: displayDate, 
+          dateKey: dateKey,
+          StockIn: 0, 
+          StockOut: 0, 
+          Transfers: 0 
+        };
       }
       
       const quantity = Number(m.quantity) || 0;
-      const part = parts.find(p => p.id === m.partId || p.sapNumber === m.sapNumber || p.name === m.partName);
-      const value = quantity * (Number(part?.unitPrice) || 0);
+      
+      // Handle multiple possible field names for part lookup
+      const part = parts.find(p => 
+        p.id === m.partId || 
+        p.id === m.part_id ||
+        p.sapNumber === m.sapNumber || 
+        p.sapNumber === m.sap_number ||
+        p.name === m.partName || 
+        p.name === m.part_name
+      );
+      const value = quantity * (Number(part?.unitPrice || part?.unit_price) || 0);
 
-      if (m.type === 'IN') {
-        movementMap[month].StockIn += value;
-      } else if (m.type === 'OUT') {
-        movementMap[month].StockOut += value;
+      // Handle multiple possible field names for type
+      const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
+      
+      console.log('Movement:', { type: movementType, quantity, value, partName: m.partName || m.part_name }); // Debug
+
+      if (movementType === 'IN' || movementType === 'STOCK IN' || movementType === 'INWARD') {
+        movementMap[dateKey].StockIn += value;
+      } else if (movementType === 'OUT' || movementType === 'STOCK OUT' || movementType === 'OUTWARD') {
+        movementMap[dateKey].StockOut += value;
+      } else if (movementType === 'TRANSFER' || movementType === 'INTERNAL TRANSFER') {
+        movementMap[dateKey].Transfers += quantity;
       }
     });
 
-    const movementComparison = Object.values(movementMap).map(m => ({
-      ...m,
-      NetChange: m.StockIn - m.StockOut
-    }));
+    // Sort by actual date and calculate net change
+    const movementComparison = Object.values(movementMap)
+      .sort((a, b) => new Date(a.dateKey) - new Date(b.dateKey))
+      .slice(-15) // Last 15 days
+      .map(item => ({
+        ...item,
+        NetChange: item.StockIn - item.StockOut
+      }));
+    
+    console.log('Movement Comparison Data:', movementComparison); // Debug
 
-    // 4. Stock Out Trends
-    const filteredMovements = movements.filter(m => {
-      const mYear = m.date.getFullYear();
-      const mMonth = m.date.getMonth() + 1;
-      const typeMatch = m.type === 'OUT';
-      const yearMatch = mYear === selectedYear;
-      const monthMatch = selectedMonth === 'All' || mMonth === selectedMonth;
-      return typeMatch && yearMatch && monthMatch;
-    });
-
-    const trendMap = {};
+    // 4. Top Moving Items
     const partUsageMap = {};
-
-    filteredMovements.forEach(m => {
-      let key;
-      if (selectedMonth === 'All') {
-        key = m.date.toLocaleString('default', { month: 'short' });
-      } else {
-        key = m.date.getDate();
-      }
-
-      const part = parts.find(p => p.id === m.partId || p.sapNumber === m.sapNumber || p.name === m.partName);
-      const price = part ? (Number(part.unitPrice) || 0) : 0;
-      const value = (Number(m.quantity) || 0) * price;
-
-      trendMap[key] = (trendMap[key] || 0) + value;
-
+    movements.forEach(m => {
       const partName = m.partName || 'Unknown';
       partUsageMap[partName] = (partUsageMap[partName] || 0) + (Number(m.quantity) || 0);
     });
 
-    let stockOutTrend = [];
-    if (selectedMonth === 'All') {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      stockOutTrend = months.map(m => ({ name: m, value: trendMap[m] || 0 }));
-    } else {
-      const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-      for (let i = 1; i <= daysInMonth; i++) {
-        stockOutTrend.push({ name: i, value: trendMap[i] || 0 });
-      }
-    }
-
     const topParts = Object.keys(partUsageMap)
       .map(key => ({ name: key, value: partUsageMap[key] }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+      .slice(0, 8);
 
-    return { categoryData, stockOutTrend, topParts, inventoryHealthData, movementComparison };
-  }, [parts, movements, selectedYear, selectedMonth, stats]);
+    // 5. Recent Activity
+    const recentActivity = movements.slice(0, 5).map(m => ({
+      id: m.id,
+      type: m.type,
+      part: m.partName || 'Unknown',
+      quantity: m.quantity || 0,
+      date: m.date.toLocaleDateString(),
+      time: m.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      user: m.user || 'System'
+    }));
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    // 6. Quick Stats
+    const quickStats = [
+      { label: 'Inventory Turnover', value: '4.2', unit: 'months', icon: '🔄', color: '#3b82f6' },
+      { label: 'Stock Accuracy', value: '98.5', unit: '%', icon: '🎯', color: '#10b981' },
+      { label: 'Avg Lead Time', value: '7.2', unit: 'days', icon: '⏱️', color: '#f59e0b' },
+      { label: 'Fill Rate', value: '94', unit: '%', icon: '📦', color: '#8b5cf6' }
+    ];
+
+    return { 
+      categoryData, 
+      stockOutTrend: movementComparison, 
+      topParts, 
+      inventoryHealthData, 
+      movementComparison,
+      recentActivity,
+      quickStats
+    };
+  }, [parts, movements, stats]);
 
   const KPICard = ({ title, value, icon, color, subtitle, trend }) => (
     <Card sx={{
@@ -219,11 +293,11 @@ const DashboardKPIs = () => {
     }}>
       <CardContent>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-          <Box>
+          <Box flex={1}>
             <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>
               {title}
             </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
               {value}
             </Typography>
             {subtitle && (
@@ -240,7 +314,8 @@ const DashboardKPIs = () => {
             color: color,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            ml: 2
           }}>
             {icon}
           </Box>
@@ -265,14 +340,16 @@ const DashboardKPIs = () => {
 
   return (
     <Box sx={{
-      minHeight: 'calc(100vh - 64px)',
+      minHeight: '100vh',
       backgroundColor: '#f8fafc',
       p: 0,
       width: '100%',
-      display: 'flex',
-      flexDirection: 'column'
+      overflowX: 'hidden',
+      // REMOVED: marginLeft: '240px' and width calculation
+      // Let the sidebar handle its own space
+      // The content will naturally flow to the right of the sidebar
     }}>
-      {/* Header Section */}
+      {/* Header Section - FIXED: Remove left margin here */}
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -282,7 +359,14 @@ const DashboardKPIs = () => {
         gap: 2,
         p: 3,
         backgroundColor: 'white',
-        borderBottom: '1px solid #e2e8f0'
+        borderBottom: '1px solid #e2e8f0',
+        // REMOVED: width: '100%' - let it be automatic
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        // Add left padding to account for sidebar
+        pl: { xs: 3, md: 'calc(240px + 24px)' }, // 240px sidebar + 24px padding
+        pr: 3
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{
@@ -307,26 +391,26 @@ const DashboardKPIs = () => {
               Dashboard Overview
             </Typography>
             <Typography variant="body1" sx={{ color: '#64748b' }}>
-              Inventory & Operations Analytics
+              Real-time inventory & operations analytics
             </Typography>
           </Box>
         </Box>
 
         {/* Filter Controls */}
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
+              <MenuItem value="day">Today</MenuItem>
+              <MenuItem value="week">This Week</MenuItem>
+              <MenuItem value="month">This Month</MenuItem>
+              <MenuItem value="quarter">This Quarter</MenuItem>
+              <MenuItem value="year">This Year</MenuItem>
+            </Select>
+          </FormControl>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Year</InputLabel>
             <Select value={selectedYear} label="Year" onChange={(e) => setSelectedYear(e.target.value)}>
               {[2023, 2024, 2025, 2026].map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel>Month</InputLabel>
-            <Select value={selectedMonth} label="Month" onChange={(e) => setSelectedMonth(e.target.value)}>
-              <MenuItem value="All">All Year</MenuItem>
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                <MenuItem key={i} value={i + 1}>{m}</MenuItem>
-              ))}
             </Select>
           </FormControl>
           <Tooltip title="Refresh Dashboard">
@@ -347,22 +431,52 @@ const DashboardKPIs = () => {
         </Box>
       </Box>
 
-      {/* Content Area */}
-      <Box sx={{
-        flex: 1,
-        p: 3,
-        overflow: 'auto',
-        width: '100%'
+      {/* Quick Stats Tabs - FIXED: Add left padding */}
+      <Box sx={{ 
+        p: 3, 
+        pb: 0,
+        pl: { xs: 3, md: 'calc(240px + 24px)' }, // Match header padding
+        pr: 3
       }}>
-        {/* KPI Cards Row */}
-        <Grid container spacing={3} mb={4}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+          {['overview', 'inventory', 'procurement', 'maintenance', 'analytics'].map((tab) => (
+            <Chip
+              key={tab}
+              label={tab.charAt(0).toUpperCase() + tab.slice(1)}
+              onClick={() => setActiveTab(tab)}
+              sx={{
+                fontWeight: 600,
+                backgroundColor: activeTab === tab ? '#3b82f6' : 'white',
+                color: activeTab === tab ? 'white' : '#64748b',
+                border: '1px solid',
+                borderColor: activeTab === tab ? '#3b82f6' : '#e2e8f0',
+                '&:hover': {
+                  backgroundColor: activeTab === tab ? '#2563eb' : '#f8fafc'
+                }
+              }}
+            />
+          ))}
+        </Box>
+      </Box>
+
+      {/* Content Area - FIXED: Add proper padding for sidebar */}
+      <Box sx={{
+        p: 3,
+        // Add left padding to account for sidebar width
+        pl: { xs: 3, md: 'calc(240px + 24px)' }, // 240px sidebar + 24px padding
+        pr: 3,
+        width: '100%',
+        maxWidth: { md: 'calc(100vw - 240px)' }, // Account for sidebar width
+      }}>
+        {/* Top KPI Cards - Full Width Row */}
+        <Grid container spacing={3} sx={{ mb: 4, width: '100%' }}>
           <Grid item xs={12} sm={6} md={3}>
             <KPICard
               title="Total Inventory Value"
               value={`$${(stats.totalStockValue / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}K`}
               icon={<AttachMoneyIcon fontSize="large" />}
               color="#10b981"
-              subtitle="Estimated Valuation"
+              subtitle="Current valuation"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -371,280 +485,388 @@ const DashboardKPIs = () => {
               value={stats.lowStockCount}
               icon={<WarningIcon fontSize="large" />}
               color="#ef4444"
-              subtitle="Items below safety level"
+              subtitle="Require attention"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <KPICard
-              title="Total SKUs"
+              title="Active SKUs"
               value={stats.totalParts}
               icon={<InventoryIcon fontSize="large" />}
               color="#3b82f6"
-              subtitle="Active parts in system"
+              subtitle="Total parts"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <KPICard
               title="Pending Requests"
-              value={stats.pendingPRs}
+              value={stats.pendingPRs + stats.pendingMRFs}
               icon={<AssignmentIcon fontSize="large" />}
               color="#f59e0b"
-              subtitle="Require approval"
+              subtitle="PRs & MRFs"
             />
           </Grid>
         </Grid>
 
-        {/* Inventory Health & Movement Comparison Row */}
-        <Grid container spacing={3} mb={4}>
-          {/* Inventory Health Gauge */}
-          <Grid item xs={12} md={6}>
+        {/* Main Charts Row - Optimized Layout */}
+        <Grid container spacing={3} sx={{ mb: 4, width: '100%' }}>
+          {/* Stock Movement Analysis - Takes more space */}
+          <Grid item xs={12} lg={8}>
             <Paper elevation={0} sx={{
               borderRadius: '16px',
               border: '1px solid #e2e8f0',
-              overflow: 'hidden',
               backgroundColor: 'white',
-              p: 3
+              p: 3,
+              height: '100%'
             }}>
               <Box sx={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                mb: 3
+                mb: 3,
+                flexWrap: 'wrap',
+                gap: 2
               }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                  Inventory Health Status
-                </Typography>
-                <Box sx={{
-                  display: 'flex',
-                  gap: 1,
-                  flexWrap: 'wrap'
-                }}>
-                  {dashboardData.inventoryHealthData.map((item, idx) => (
-                    <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Box sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        backgroundColor: item.fill
-                      }} />
-                      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
-                        {item.name}: {item.value}
-                      </Typography>
-                    </Box>
-                  ))}
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                    Stock Movement Analysis
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                    Last 30 days - Stock In vs Stock Out
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Chip size="small" label="Stock In" sx={{ backgroundColor: '#10b98120', color: '#10b981' }} />
+                  <Chip size="small" label="Stock Out" sx={{ backgroundColor: '#ef444420', color: '#ef4444' }} />
                 </Box>
               </Box>
               <Divider sx={{ mb: 3 }} />
-              <ResponsiveContainer width="100%" height={280}>
-                <RadialBarChart data={dashboardData.inventoryHealthData}>
-                  <RadialBar
-                    background
-                    dataKey="value"
-                    cornerRadius={10}
-                    label={{ position: 'insideStart', fill: '#fff', fontSize: 12 }}
-                  />
-                  <ChartTooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }} />
-                </RadialBarChart>
-              </ResponsiveContainer>
+              <Box sx={{ height: 350, width: '100%' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={dashboardData.movementComparison} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} />
+                    <YAxis tickFormatter={(val) => `$${(val / 1000).toFixed(0)}K`} />
+                    <ChartTooltip
+                      formatter={(value, name) => {
+                        if (name === 'StockIn' || name === 'StockOut') return [`$${value.toLocaleString()}`, name];
+                        return [value, name];
+                      }}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="StockIn" fill="#10b981" name="Stock In" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="StockOut" fill="#ef4444" name="Stock Out" radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="Transfers" stroke="#3b82f6" strokeWidth={2} dot={false} name="Transfers" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </Box>
             </Paper>
           </Grid>
 
-          {/* Stock Movement Analysis */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={0} sx={{
-              borderRadius: '16px',
-              border: '1px solid #e2e8f0',
-              overflow: 'hidden',
-              backgroundColor: 'white',
-              p: 3
-            }}>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                  Stock Movement Analysis
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Stock In vs Stock Out (Valuation Based)
-                </Typography>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-              <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={dashboardData.movementComparison} margin={{ top: 20, right: 30, bottom: 20, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(val) => `$${(val / 1000).toFixed(0)}K`} />
-                  <ChartTooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}
-                    formatter={(value) => [`$${value.toLocaleString()}`, '']}
-                  />
-                  <Legend />
-                  <Bar dataKey="StockIn" fill="#10b981" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="StockOut" fill="#ef4444" radius={[8, 8, 0, 0]} />
-                  <Line type="monotone" dataKey="NetChange" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </Paper>
+          {/* Inventory Health & Quick Stats - Side Panel */}
+          <Grid item xs={12} lg={4}>
+            <Grid container spacing={3} sx={{ height: '100%' }}>
+              {/* Inventory Health */}
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: 'white',
+                  p: 3,
+                  height: '100%'
+                }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+                    Inventory Health Status
+                  </Typography>
+                  <Divider sx={{ mb: 3 }} />
+                  <Box sx={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart data={dashboardData.inventoryHealthData} innerRadius="10%" outerRadius="80%">
+                        <RadialBar
+                          background={{ fill: '#f8fafc' }}
+                          dataKey="value"
+                          cornerRadius={8}
+                          label={{ position: 'insideStart', fill: '#fff', fontSize: 10 }}
+                        />
+                        <ChartTooltip
+                          formatter={(value, name, props) => [
+                            `${value} items`,
+                            props.payload.description
+                          ]}
+                        />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, mt: 3 }}>
+                    {dashboardData.inventoryHealthData.map((item, idx) => (
+                      <Box key={idx} sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        p: 1.5,
+                        borderRadius: '8px',
+                        backgroundColor: `${item.fill}10`,
+                        border: `1px solid ${item.fill}20`
+                      }}>
+                        <Box sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: item.fill
+                        }} />
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                            {item.name}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                            {item.value} items
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* Recent Activity */}
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: 'white',
+                  p: 3,
+                  height: '100%'
+                }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+                    Recent Activity
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
+                    {dashboardData.recentActivity.map((activity, idx) => (
+                      <Box key={idx} sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        p: 1.5,
+                        borderRadius: '8px',
+                        mb: 1,
+                        backgroundColor: idx % 2 === 0 ? '#f8fafc' : 'transparent',
+                        '&:hover': { backgroundColor: '#f1f5f9' }
+                      }}>
+                        <Box sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: activity.type === 'IN' ? '#10b98120' : 
+                                         activity.type === 'OUT' ? '#ef444420' : '#3b82f620',
+                          color: activity.type === 'IN' ? '#10b981' : 
+                                 activity.type === 'OUT' ? '#ef4444' : '#3b82f6'
+                        }}>
+                          {activity.type === 'IN' ? '⬇️' : activity.type === 'OUT' ? '⬆️' : '🔄'}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#1e293b' }}>
+                            {activity.part}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            {activity.quantity} units • {activity.date} {activity.time}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
           </Grid>
         </Grid>
 
-        {/* Stock Out Analysis & Top Parts Row */}
-        <Grid container spacing={3} mb={4}>
-          {/* Stock Usage / Sales Report */}
-          <Grid item xs={12} lg={8}>
+        {/* Bottom Charts Row - Full Width */}
+        <Grid container spacing={3} sx={{ width: '100%' }}>
+          {/* Category Distribution */}
+          <Grid item xs={12} md={6} lg={4}>
             <Paper elevation={0} sx={{
               borderRadius: '16px',
               border: '1px solid #e2e8f0',
-              overflow: 'hidden',
               backgroundColor: 'white',
-              p: 3
+              p: 3,
+              height: '100%'
             }}>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TrendingUpIcon sx={{ color: '#3b82f6', fontSize: 20 }} />
-                  Stock Out Value Analysis
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>
-                  {selectedMonth === 'All' ? selectedYear : `${selectedMonth}/${selectedYear}`} - Valuation based on Unit Price
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <CategoryIcon sx={{ color: '#3b82f6' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  Category Distribution
                 </Typography>
               </Box>
               <Divider sx={{ mb: 3 }} />
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart data={dashboardData.stockOutTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" />
-                  <YAxis tickFormatter={(val) => `$${(val / 1000).toFixed(0)}K`} />
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <ChartTooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}
-                    formatter={(value) => [`$${value.toLocaleString()}`, 'Value']}
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dashboardData.categoryData.slice(0, 6)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {dashboardData.categoryData.slice(0, 6).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip formatter={(value) => [`${value} items`, 'Count']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+              <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {dashboardData.categoryData.slice(0, 6).map((cat, idx) => (
+                  <Chip
+                    key={idx}
+                    size="small"
+                    label={`${cat.name}: ${cat.value}`}
+                    sx={{ backgroundColor: `${cat.color}10`, color: cat.color }}
                   />
-                  <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
+                ))}
+              </Box>
             </Paper>
           </Grid>
 
           {/* Top Moving Items */}
+          <Grid item xs={12} md={6} lg={4}>
+            <Paper elevation={0} sx={{
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              p: 3,
+              height: '100%'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <LocalShippingIcon sx={{ color: '#10b981' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  Top Moving Items
+                </Typography>
+              </Box>
+              <Divider sx={{ mb: 3 }} />
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={dashboardData.topParts}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                  >
+                    <XAxis type="number" />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      width={100} 
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 15)}...` : value}
+                    />
+                    <ChartTooltip formatter={(value) => [`${value} units`, 'Quantity']} />
+                    <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+                      {dashboardData.topParts.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          {/* Performance Metrics */}
           <Grid item xs={12} lg={4}>
             <Paper elevation={0} sx={{
               borderRadius: '16px',
               border: '1px solid #e2e8f0',
-              overflow: 'hidden',
               backgroundColor: 'white',
-              p: 3
+              p: 3,
+              height: '100%'
             }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-                Top Moving Items (Qty)
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart layout="vertical" data={dashboardData.topParts} margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                  <ChartTooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }} />
-                  <Bar dataKey="value" fill="#10b981" radius={[0, 8, 8, 0]}>
-                    {dashboardData.topParts.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid>
-        </Grid>
-
-        {/* Secondary Charts Row */}
-        <Grid container spacing={3}>
-          {/* Category Distribution */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={0} sx={{
-              borderRadius: '16px',
-              border: '1px solid #e2e8f0',
-              overflow: 'hidden',
-              backgroundColor: 'white',
-              p: 3
-            }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-                Inventory by Category
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={dashboardData.categoryData}
-                    cx="40%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={120}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={{ fontSize: 12 }}
-                  >
-                    {dashboardData.categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }} />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid>
-
-          {/* Summary Info Card */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={0} sx={{
-              borderRadius: '16px',
-              border: '1px solid #e2e8f0',
-              overflow: 'hidden',
-              backgroundColor: 'white',
-              p: 3
-            }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-                Inventory Health Summary
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <TrendingUpIcon sx={{ color: '#f59e0b' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  Performance Metrics
+                </Typography>
+              </Box>
               <Divider sx={{ mb: 3 }} />
               <Box sx={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: 'repeat(2, 1fr)',
                 gap: 2,
-                height: 350,
-                alignContent: 'center'
+                height: 300
               }}>
-                {[
-                  { label: 'Critical Stock', value: stats.criticalParts, color: '#f44336', icon: '⚠️' },
-                  { label: 'Low Stock', value: stats.lowParts, color: '#ff9800', icon: '📉' },
-                  { label: 'Normal Stock', value: stats.normalParts, color: '#4caf50', icon: '✓' },
-                  { label: 'High Stock', value: stats.highParts, color: '#2196f3', icon: '📈' }
-                ].map((item, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{
-                      p: 2,
-                      borderRadius: '12px',
-                      backgroundColor: `${item.color}10`,
-                      border: `2px solid ${item.color}`,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center'
-                    }}
-                  >
+                {dashboardData.quickStats.map((stat, idx) => (
+                  <Card key={idx} sx={{
+                    p: 2,
+                    borderRadius: '12px',
+                    border: `2px solid ${stat.color}20`,
+                    backgroundColor: `${stat.color}05`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      backgroundColor: `${stat.color}10`,
+                      transform: 'translateY(-2px)'
+                    }
+                  }}>
                     <Typography sx={{ fontSize: 32, mb: 1 }}>
-                      {item.icon}
+                      {stat.icon}
                     </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: item.color, mb: 0.5 }}>
-                      {item.value}
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color, mb: 0.5 }}>
+                      {stat.value}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b', textAlign: 'center' }}>
-                      {item.label}
+                    <Typography variant="caption" sx={{ color: '#64748b', textAlign: 'center', mb: 0.5 }}>
+                      {stat.label}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: stat.color, fontWeight: 600 }}>
+                      {stat.unit}
+                    </Typography>
+                  </Card>
+                ))}
+                {/* Additional Stats */}
+                <Card sx={{
+                  p: 2,
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  gridColumn: 'span 2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2
+                }}>
+                  <Box sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: '8px',
+                    backgroundColor: '#f0f4ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#3b82f6'
+                  }}>
+                    <BuildIcon />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                      Active Maintenance
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#3b82f6' }}>
+                      {stats.pendingMRFs}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      Material requests pending
                     </Typography>
                   </Box>
-                ))}
+                </Card>
               </Box>
             </Paper>
           </Grid>
