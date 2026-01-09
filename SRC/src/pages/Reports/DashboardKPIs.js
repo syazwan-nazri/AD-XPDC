@@ -642,17 +642,26 @@ const DashboardKPIs = () => {
               <Divider sx={{ mb: 3 }} />
               <Box sx={{ height: 350, width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dashboardData.movementComparison} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                  <LineChart data={dashboardData.movementComparison} margin={{ top: 10, right: 30, left: 70, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} />
-                    <YAxis tickFormatter={(val) => val.toLocaleString()} />
+                    <XAxis 
+                      dataKey="date" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={60}
+                      label={{ value: 'Date', position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis 
+                      tickFormatter={(val) => val.toLocaleString()}
+                      tickMargin={12}
+                      label={{ value: 'Total Transaction', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle' } }}
+                    />
                     <ChartTooltip
                       formatter={(value, name) => {
                         return [`${value} transaction(s)`, name];
                       }}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
                     />
-                    <Legend />
                     <Line type="monotone" dataKey="StockIn" stroke="#10b981" strokeWidth={2} dot={false} name="Stock In" />
                     <Line type="monotone" dataKey="StockOut" stroke="#ef4444" strokeWidth={2} dot={false} name="Stock Out" />
                     <Line type="monotone" dataKey="Transfers" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Internal Transfer" />
