@@ -44,11 +44,9 @@ const DashboardKPIs = () => {
   const [parts, setParts] = useState([]);
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
 
   // Filters
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState('All');
   const [timeRange, setTimeRange] = useState('month');
 
   useEffect(() => {
@@ -75,16 +73,46 @@ const DashboardKPIs = () => {
           if (simpleSnapshot.size > 0) {
             movementsData = simpleSnapshot.docs.map(doc => {
               const data = doc.data();
-              console.log('📋 Raw document:', data);
+              let parsedDate = null;
+              
+              // Try multiple ways to parse the date
+              if (data.timestamp && typeof data.timestamp.toDate === 'function') {
+                parsedDate = data.timestamp.toDate();
+              } else if (data.date && typeof data.date.toDate === 'function') {
+                parsedDate = data.date.toDate();
+              } else if (data.timestamp instanceof Date) {
+                parsedDate = data.timestamp;
+              } else if (data.date instanceof Date) {
+                parsedDate = data.date;
+              } else if (typeof data.timestamp === 'string') {
+                parsedDate = new Date(data.timestamp);
+              } else if (typeof data.date === 'string') {
+                parsedDate = new Date(data.date);
+              } else if (typeof data.timestamp === 'number') {
+                parsedDate = new Date(data.timestamp);
+              } else if (typeof data.date === 'number') {
+                parsedDate = new Date(data.date);
+              }
+              
+              // Fallback to current date if nothing works
+              if (!parsedDate || isNaN(parsedDate.getTime())) {
+                console.warn('⚠️ Could not parse date for document:', doc.id, data);
+                parsedDate = new Date();
+              }
+              
               return {
                 id: doc.id,
                 ...data,
-                date: data.timestamp?.toDate?.() || data.date?.toDate?.() || new Date(data.timestamp) || new Date(data.date) || new Date()
+                date: parsedDate
               };
             });
             console.log('✅ Total Movements Fetched:', movementsData.length);
             if (movementsData.length > 0) {
               console.log('✅ First Movement:', movementsData[0]);
+              // Show date range of movements
+              const dates = movementsData.map(m => m.date.toLocaleDateString());
+              const uniqueDates = [...new Set(dates)];
+              console.log('📅 Movement dates available:', uniqueDates.sort());
             }
           } else {
             console.warn('⚠️ movement_logs collection returned 0 documents');
@@ -196,16 +224,29 @@ const DashboardKPIs = () => {
     let filterStartDate = new Date();
     let filterEndDate = new Date();
     
+    // For past years, we need to adjust the end date to be the end of that year
+    const isCurrentYear = selectedYear === new Date().getFullYear();
+    const referenceDate = isCurrentYear ? new Date() : new Date(selectedYear, 11, 31);
+    
     if (timeRange === 'day') {
+      filterStartDate = new Date(referenceDate);
       filterStartDate.setDate(filterStartDate.getDate() - 1);
+      filterEndDate = new Date(referenceDate);
     } else if (timeRange === 'week') {
+      filterStartDate = new Date(referenceDate);
       filterStartDate.setDate(filterStartDate.getDate() - 7);
+      filterEndDate = new Date(referenceDate);
     } else if (timeRange === 'month') {
+      filterStartDate = new Date(referenceDate);
       filterStartDate.setMonth(filterStartDate.getMonth() - 1);
+      filterEndDate = new Date(referenceDate);
     } else if (timeRange === 'quarter') {
+      filterStartDate = new Date(referenceDate);
       filterStartDate.setMonth(filterStartDate.getMonth() - 3);
+      filterEndDate = new Date(referenceDate);
     } else if (timeRange === 'year') {
-      filterStartDate.setFullYear(filterStartDate.getFullYear() - 1);
+      filterStartDate = new Date(selectedYear, 0, 1); // Jan 1 of selected year
+      filterEndDate = new Date(selectedYear, 11, 31); // Dec 31 of selected year
     }
     
     // Set start time to beginning of day
@@ -216,6 +257,7 @@ const DashboardKPIs = () => {
     console.log('Total movements available:', movements.length);
     console.log('Filter range:', filterStartDate.toLocaleDateString(), 'to', filterEndDate.toLocaleDateString());
     console.log('Time range selected:', timeRange);
+    console.log('Selected Year:', selectedYear);
     
     let processedCount = 0;
     let inTotal = 0, outTotal = 0, transferTotal = 0;
@@ -227,8 +269,14 @@ const DashboardKPIs = () => {
       }
       
       const date = m.date;
+      const dateYear = date.getFullYear();
       
-      // Apply date range filter
+      // First apply year filter
+      if (dateYear !== selectedYear) {
+        return;
+      }
+      
+      // Then apply time range filter (within selected year only)
       if (date < filterStartDate || date > filterEndDate) {
         return;
       }
@@ -255,35 +303,25 @@ const DashboardKPIs = () => {
       }
       
       const quantity = Number(m.quantity) || 0;
-      
-      // Handle multiple possible field names for part lookup
-      const part = parts.find(p => 
-        p.id === m.partId || 
-        p.id === m.part_id ||
-        p.sapNumber === m.sapNumber || 
-        p.sapNumber === m.sap_number ||
-        p.name === m.partName || 
-        p.name === m.part_name
-      );
-      const value = quantity * (Number(part?.unitPrice || part?.unit_price) || 0);
 
       // Handle multiple possible field names for type
       const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
 
+      // Count number of transactions (each movement record = 1 transaction)
       if (movementType === 'IN' || movementType === 'STOCK IN' || movementType === 'INWARD') {
-        movementMap[dateKey].StockIn += value;
-        inTotal += value;
+        movementMap[dateKey].StockIn += 1;
+        inTotal += 1;
       } else if (movementType === 'OUT' || movementType === 'STOCK OUT' || movementType === 'OUTWARD') {
-        movementMap[dateKey].StockOut += value;
-        outTotal += value;
+        movementMap[dateKey].StockOut += 1;
+        outTotal += 1;
       } else if (movementType === 'TRANSFER' || movementType === 'INTERNAL TRANSFER') {
-        movementMap[dateKey].Transfers += quantity;
-        transferTotal += quantity;
+        movementMap[dateKey].Transfers += 1;
+        transferTotal += 1;
       }
     });
 
     console.log(`✅ Processed ${processedCount} movements within filter range`);
-    console.log(`Totals - In: $${inTotal.toFixed(2)} | Out: $${outTotal.toFixed(2)} | Transfer: ${transferTotal}`);
+    console.log(`Totals - Stock In: ${inTotal} transactions | Stock Out: ${outTotal} transactions | Transfers: ${transferTotal} transactions`);
 
     // Sort by actual date and calculate net change - Show all processed data or last 15 days
     const movementComparison = Object.values(movementMap)
@@ -324,6 +362,7 @@ const DashboardKPIs = () => {
           movementType === 'INTERNAL TRANSFER'
         );
       })
+      .sort((a, b) => b.date - a.date) // Sort by date descending (most recent first)
       .slice(0, 5)
       .map(m => {
         const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
@@ -362,7 +401,7 @@ const DashboardKPIs = () => {
       recentActivity,
       quickStats
     };
-  }, [parts, movements, stats, timeRange, selectedYear, selectedMonth]);
+  }, [parts, movements, stats, timeRange, selectedYear]);
 
   const KPICard = ({ title, value, icon, color, subtitle, trend }) => (
     <Card sx={{
@@ -516,33 +555,7 @@ const DashboardKPIs = () => {
         </Box>
       </Box>
 
-      {/* Quick Stats Tabs - FIXED: Add left padding */}
-      <Box sx={{ 
-        p: 3, 
-        pb: 0,
-        pl: { xs: 3, md: 'calc(240px + 24px)' }, // Match header padding
-        pr: 3
-      }}>
-        <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-          {['overview', 'inventory', 'procurement', 'maintenance', 'analytics'].map((tab) => (
-            <Chip
-              key={tab}
-              label={tab.charAt(0).toUpperCase() + tab.slice(1)}
-              onClick={() => setActiveTab(tab)}
-              sx={{
-                fontWeight: 600,
-                backgroundColor: activeTab === tab ? '#3b82f6' : 'white',
-                color: activeTab === tab ? 'white' : '#64748b',
-                border: '1px solid',
-                borderColor: activeTab === tab ? '#3b82f6' : '#e2e8f0',
-                '&:hover': {
-                  backgroundColor: activeTab === tab ? '#2563eb' : '#f8fafc'
-                }
-              }}
-            />
-          ))}
-        </Box>
-      </Box>
+
 
       {/* Content Area - FIXED: Add proper padding for sidebar */}
       <Box sx={{
@@ -623,27 +636,27 @@ const DashboardKPIs = () => {
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Chip size="small" label="Stock In" sx={{ backgroundColor: '#10b98120', color: '#10b981' }} />
                   <Chip size="small" label="Stock Out" sx={{ backgroundColor: '#ef444420', color: '#ef4444' }} />
+                  <Chip size="small" label="Internal Transfer" sx={{ backgroundColor: '#8b5cf620', color: '#8b5cf6' }} />
                 </Box>
               </Box>
               <Divider sx={{ mb: 3 }} />
               <Box sx={{ height: 350, width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={dashboardData.movementComparison} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                  <LineChart data={dashboardData.movementComparison} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} />
-                    <YAxis tickFormatter={(val) => `$${(val / 1000).toFixed(0)}K`} />
+                    <YAxis tickFormatter={(val) => val.toLocaleString()} />
                     <ChartTooltip
                       formatter={(value, name) => {
-                        if (name === 'StockIn' || name === 'StockOut') return [`$${value.toLocaleString()}`, name];
-                        return [value, name];
+                        return [`${value} transaction(s)`, name];
                       }}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
                     />
                     <Legend />
-                    <Bar dataKey="StockIn" fill="#10b981" name="Stock In" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="StockOut" fill="#ef4444" name="Stock Out" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="Transfers" stroke="#3b82f6" strokeWidth={2} dot={false} name="Transfers" />
-                  </ComposedChart>
+                    <Line type="monotone" dataKey="StockIn" stroke="#10b981" strokeWidth={2} dot={false} name="Stock In" />
+                    <Line type="monotone" dataKey="StockOut" stroke="#ef4444" strokeWidth={2} dot={false} name="Stock Out" />
+                    <Line type="monotone" dataKey="Transfers" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Internal Transfer" />
+                  </LineChart>
                 </ResponsiveContainer>
               </Box>
             </Paper>
@@ -724,10 +737,10 @@ const DashboardKPIs = () => {
                   height: '100%'
                 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-                    Recent Activity
+                    Past Transactions
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
+                  <Box sx={{ maxHeight: '100%', overflowY: 'auto' }}>
                     {dashboardData.recentActivity.map((activity, idx) => (
                       <Box key={idx} sx={{
                         display: 'flex',
@@ -746,12 +759,14 @@ const DashboardKPIs = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: activity.type === 'IN' ? '#10b98120' : 
-                                         activity.type === 'OUT' ? '#ef444420' : '#3b82f620',
-                          color: activity.type === 'IN' ? '#10b981' : 
-                                 activity.type === 'OUT' ? '#ef4444' : '#3b82f6'
+                          backgroundColor: activity.type === 'Stock In' ? '#10b98120' : 
+                                         activity.type === 'Stock Out' ? '#ef444420' : '#8b5cf620',
+                          color: activity.type === 'Stock In' ? '#10b981' : 
+                                 activity.type === 'Stock Out' ? '#ef4444' : '#8b5cf6',
+                          fontSize: '18px',
+                          fontWeight: 700
                         }}>
-                          {activity.type === 'IN' ? '⬇️' : activity.type === 'OUT' ? '⬆️' : '🔄'}
+                          {activity.type === 'Stock In' ? '📥' : activity.type === 'Stock Out' ? '📤' : '🔁'}
                         </Box>
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="body2" sx={{ fontWeight: 500, color: '#1e293b' }}>
