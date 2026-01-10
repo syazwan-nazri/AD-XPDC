@@ -119,7 +119,10 @@ function AppShell({ toggleTheme }) {
 
   // Effect: After login, close the sidebar by default
   useEffect(() => {
-    if (user) setSidebarOpen(false);
+    if (user) {
+      setSidebarOpen(false);
+      setSidebarTempOpen(false);
+    }
   }, [user]);
 
   // Listen to Firebase Auth state & set authReady
@@ -175,7 +178,7 @@ function AppShell({ toggleTheme }) {
 
   // Sidebar logic
   const handleSidebarMenu = () =>
-    isMobile ? setSidebarTempOpen(true) : setSidebarOpen((v) => !v);
+    isMobile ? setSidebarTempOpen((v) => !v) : setSidebarOpen((v) => !v);
   const handleSidebarClose = () => setSidebarTempOpen(false);
   const sideBarActualOpen = isMobile ? sidebarTempOpen : sidebarOpen;
 
