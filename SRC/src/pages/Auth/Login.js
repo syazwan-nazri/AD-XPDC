@@ -34,12 +34,12 @@ const Login = () => {
         })
       );
       setLoading(false);
-      navigate("/"); // Redirect to homepage/dashboard after login
+      navigate("/reports/dashboard-kpis"); // Redirect to dashboard-kpis after login
     } catch (err) {
       setLoading(false);
       // Handle specific Firebase authentication errors with user-friendly messages
       let errorMessage = "An error occurred during login. Please try again.";
-      
+
       switch (err.code) {
         case "auth/invalid-credential":
         case "auth/wrong-password":
@@ -66,7 +66,7 @@ const Login = () => {
             errorMessage = err.message;
           }
       }
-      
+
       setError(errorMessage);
     }
   };

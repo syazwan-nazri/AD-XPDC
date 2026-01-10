@@ -91,7 +91,7 @@ function AuthGuard({ authReady, children }) {
       if (user.mustChangePassword) {
         navigate("/change-password");
       } else {
-        navigate("/");
+        navigate("/reports/dashboard-kpis");
       }
     }
   }, [user, location.pathname, navigate, authReady]);

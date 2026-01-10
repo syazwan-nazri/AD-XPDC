@@ -86,6 +86,8 @@ const MachineMaster = () => {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   const [form, setForm] = useState({
     name: '',
@@ -175,6 +177,7 @@ const MachineMaster = () => {
       return setSnackbar({ open: true, message: 'You do not have permission to add machines', severity: 'error' });
     }
     const trimmedName = (form.name || '').trim();
+    const trimmedSerial = (form.serialNumber || '').trim();
 
     if (!trimmedName) {
       setNameError(true);
@@ -257,6 +260,7 @@ const MachineMaster = () => {
       return setSnackbar({ open: true, message: 'You do not have permission to edit machines', severity: 'error' });
     }
     const trimmedName = (editForm.name || '').trim();
+    const trimmedSerial = (editForm.serialNumber || '').trim();
 
     if (!trimmedName) {
       setEditNameError(true);
