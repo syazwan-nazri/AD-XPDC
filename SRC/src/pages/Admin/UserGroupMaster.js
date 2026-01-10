@@ -28,6 +28,10 @@ import {
   Tooltip,
   Typography,
   Alert,
+  Divider,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -43,18 +47,7 @@ const defaultForm = {
   groupName: '',
   description: '',
   department: '',
-  permissions: {
-    inventory: false,
-    procurement: false,
-    maintenance: false,
-    admin: false,
-    canAccessUserManagement: false,
-    canAccessPartMaster: false,
-    canAccessAssetRegistry: false,
-    canAccessStorageLocations: false,
-    canAccessSupplierManagement: false,
-    canAccessReports: false
-  }
+  permissions: {}
 };
 
 // Convert Roles to array for predefined groups
@@ -80,6 +73,40 @@ function getGroupDescription(roleName) {
   }
 }
 
+const Resources = [
+  { id: 'user_master', name: 'User Master', category: 'Admin' },
+  { id: 'user_group_master', name: 'User Group Master', category: 'Admin' },
+  { id: 'part_master', name: 'Part Master', category: 'Data Master' },
+  { id: 'part_group_master', name: 'Part Group Master', category: 'Data Master' },
+  { id: 'storage_master', name: 'Storage Master', category: 'Data Master' },
+  { id: 'supplier_master', name: 'Supplier Master', category: 'Data Master' },
+  { id: 'machine_master', name: 'Machine Master', category: 'Data Master' },
+  { id: 'stock_in', name: 'Stock In', category: 'Inventory' },
+  { id: 'stock_out', name: 'Stock Out', category: 'Inventory' },
+  { id: 'internal_transfer', name: 'Internal Transfer', category: 'Inventory' },
+  { id: 'movement_logs', name: 'Movement Logs', category: 'Inventory' },
+  { id: 'mrf', name: 'Material Requisition (MRF)', category: 'Inventory', hasActions: true },
+  { id: 'stock_take', name: 'Stock Take', category: 'Inventory' },
+  { id: 'purchase_requisition', name: 'Purchase Requisition', category: 'Procurement', hasActions: true },
+  { id: 'dashboard', name: 'Dashboard', category: 'Reports' },
+  { id: 'stock_inquiry', name: 'Stock Inquiry Report', category: 'Reports' },
+  { id: 'stock_valuation', name: 'Stock Valuation Report', category: 'Reports' },
+  { id: 'movement_history', name: 'Movement History Report', category: 'Reports' },
+  { id: 'low_stock', name: 'Low Stock Report', category: 'Reports' },
+];
+
+const AccessLevels = [
+  { value: 'no_access', label: 'No Access' },
+  { value: 'view', label: 'View Only' },
+  { value: 'edit', label: 'Edit (View & Edit)' },
+  { value: 'add', label: 'Full Access (Add/Edit/Delete)' },
+];
+
+const ApprovalActions = [
+  { value: 'requestor', label: 'Requestor' },
+  { value: 'approver', label: 'Approver' },
+];
+
 const UserGroupMaster = () => {
   const currentUser = useSelector((state) => state.auth.user);
   const isAdmin = currentUser?.groupId === 'A';
@@ -89,13 +116,24 @@ const UserGroupMaster = () => {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [stats, setStats] = useState({ total: 0, active: 0 });
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState({ open: false, edit: false, data: defaultForm });
+
+  // Updated modal state to handle granular permissions
+  const [modal, setModal] = useState({
+    open: false,
+    edit: false,
+    data: {
+      ...defaultForm,
+      permissions: {}, // Granular map: { resourceId: { access: 'view', actions: [] } }
+    }
+  });
+
   const [snackbar, setSnackbar] = useState({ open: false, msg: '', severity: 'success' });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [groupIdError, setGroupIdError] = useState(false);
   const [groupNameError, setGroupNameError] = useState(false);
 
+  // Stats calculation
   const calculateStats = (data) => {
     setStats({
       total: data.length,
@@ -116,6 +154,8 @@ const UserGroupMaster = () => {
           groupName: data.name || data.groupName || doc.id || '',
           description: data.description || '',
           department: data.department || '',
+          // Ensure permissions object exists
+          permissions: data.permissions || {},
         };
       });
       setGroups(groupsData);
@@ -134,21 +174,21 @@ const UserGroupMaster = () => {
   const filteredGroups = useMemo(() => {
     const q = (search || '').trim().toLowerCase();
     return groups.filter((group) => {
-      const matchesSearch = !q ? true : [
+      return !q ? true : [
         group.groupId,
         group.groupName,
         group.description,
         group.department,
-      ]
-        .map((x) => (x || '').toString().toLowerCase())
-        .join(' | ')
-        .includes(q);
-      return matchesSearch;
+      ].map((x) => (x || '').toString().toLowerCase()).join(' | ').includes(q);
     });
   }, [groups, search]);
 
   const openAdd = () => {
-    setModal({ open: true, edit: false, data: defaultForm });
+    setModal({
+      open: true,
+      edit: false,
+      data: { ...defaultForm, permissions: {} }
+    });
     setGroupIdError(false);
     setGroupNameError(false);
   };
@@ -160,6 +200,7 @@ const UserGroupMaster = () => {
       data: {
         ...row,
         groupName: row.groupName || row.name || row.groupId,
+        permissions: row.permissions || {},
       },
     });
     setGroupIdError(false);
@@ -172,93 +213,91 @@ const UserGroupMaster = () => {
     setGroupNameError(false);
   };
 
+  const handlePermissionChange = (resourceId, accessLevel) => {
+    setModal(prev => ({
+      ...prev,
+      data: {
+        ...prev.data,
+        permissions: {
+          ...prev.data.permissions,
+          [resourceId]: {
+            ...(prev.data.permissions[resourceId] || {}),
+            access: accessLevel
+          }
+        }
+      }
+    }));
+  };
+
+  const handleActionChange = (resourceId, actionValue) => {
+    const currentActions = modal.data.permissions[resourceId]?.actions || [];
+    const newActions = currentActions.includes(actionValue)
+      ? currentActions.filter(a => a !== actionValue)
+      : [...currentActions, actionValue];
+
+    setModal(prev => ({
+      ...prev,
+      data: {
+        ...prev.data,
+        permissions: {
+          ...prev.data.permissions,
+          [resourceId]: {
+            ...(prev.data.permissions[resourceId] || {}),
+            actions: newActions
+          }
+        }
+      }
+    }));
+  };
+
   const handleSave = async () => {
-    const { groupId, groupName, description, department, id } = modal.data;
+    const { groupId, groupName, description, department, id, permissions } = modal.data;
 
     setGroupIdError(!groupId);
     setGroupNameError(!groupName);
 
     if (!groupId || !groupName) {
-      setSnackbar({
-        open: true,
-        msg: 'Group ID and Group Name are required',
-        severity: 'error',
-      });
+      setSnackbar({ open: true, msg: 'Group ID and Group Name are required', severity: 'error' });
       return;
     }
 
     if (!isAdmin) {
-      setSnackbar({
-        open: true,
-        msg: 'Only admins can add or edit groups',
-        severity: 'error',
-      });
+      setSnackbar({ open: true, msg: 'Only admins can add or edit groups', severity: 'error' });
       return;
     }
 
     try {
-      // Check for duplicate Group ID (only for new groups)
-      if (!modal.edit) {
-        if (groups.some((g) => g.groupId === groupId)) {
-          setGroupIdError(true);
-          return setSnackbar({
-            open: true,
-            msg: 'Group ID already exists',
-            severity: 'error',
-          });
-        }
+      if (!modal.edit && groups.some((g) => g.groupId === groupId)) {
+        setGroupIdError(true);
+        return setSnackbar({ open: true, msg: 'Group ID already exists', severity: 'error' });
       }
 
-      // Check for duplicate Group Name (case-insensitive, exclude current if editing)
-      const duplicateName = groups.find(
-        (g) =>
-          (g.groupName || '').toLowerCase() === groupName.toLowerCase() &&
-          g.id !== (modal.edit ? id : '')
-      );
-
-      if (duplicateName) {
+      if (groups.some((g) => (g.groupName || '').toLowerCase() === groupName.toLowerCase() && g.id !== (modal.edit ? id : ''))) {
         setGroupNameError(true);
-        return setSnackbar({
-          open: true,
-          msg: 'Group Name already exists',
-          severity: 'error',
-        });
+        return setSnackbar({ open: true, msg: 'Group Name already exists', severity: 'error' });
       }
+
+      const groupData = {
+        groupId,
+        name: groupName,
+        groupName,
+        description,
+        department,
+        permissions, // Save the granular permissions map
+        updatedAt: new Date().toISOString(),
+      };
 
       if (modal.edit) {
-        await setDoc(
-          doc(db, 'groups', id),
-          {
-            groupId,
-            name: groupName,
-            groupName,
-            description,
-            department,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
+        await setDoc(doc(db, 'groups', id), groupData, { merge: true });
         setSnackbar({ open: true, msg: 'Group updated successfully', severity: 'success' });
       } else {
-        await setDoc(doc(db, 'groups', groupId), {
-          groupId,
-          name: groupName,
-          groupName,
-          description,
-          department,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        await setDoc(doc(db, 'groups', groupId), { ...groupData, createdAt: new Date().toISOString() });
         setSnackbar({ open: true, msg: 'Group added successfully', severity: 'success' });
       }
       closeModal();
       fetchGroups();
     } catch (err) {
-      setSnackbar({
-        open: true,
-        msg: 'Save failed: ' + err.message,
-        severity: 'error',
-      });
+      setSnackbar({ open: true, msg: 'Save failed: ' + err.message, severity: 'error' });
     }
   };
 
@@ -273,10 +312,7 @@ const UserGroupMaster = () => {
       const groupToDelete = groups.find((g) => g.id === deleteTarget.id);
       if (!groupToDelete) return;
 
-      const usersQuery = query(
-        collection(db, 'users'),
-        where('groupId', '==', groupToDelete.groupId)
-      );
+      const usersQuery = query(collection(db, 'users'), where('groupId', '==', groupToDelete.groupId));
       const usersSnapshot = await getDocs(usersQuery);
 
       if (!usersSnapshot.empty) {
@@ -294,66 +330,105 @@ const UserGroupMaster = () => {
       setGroups((groups) => groups.filter((g) => g.id !== deleteTarget.id));
       setSnackbar({ open: true, msg: 'Group deleted successfully', severity: 'success' });
     } catch (err) {
-      setSnackbar({
-        open: true,
-        msg: 'Delete failed: ' + err.message,
-        severity: 'error',
-      });
+      setSnackbar({ open: true, msg: 'Delete failed: ' + err.message, severity: 'error' });
     } finally {
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     }
   };
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
+  const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
   const refreshData = async () => {
-    setLoading(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, 'groups'));
-      const groupsData = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          groupId: data.groupId || doc.id,
-          groupName: data.name || data.groupName || doc.id || '',
-          description: data.description || '',
-          department: data.department || '',
-        };
-      });
-      setGroups(groupsData);
-      calculateStats(groupsData);
-      setSnackbar({ open: true, msg: 'Data refreshed successfully', severity: 'success' });
-    } catch (error) {
-      setSnackbar({ open: true, msg: 'Error refreshing data', severity: 'error' });
-    } finally {
-      setLoading(false);
-    }
+    await fetchGroups();
+    setSnackbar({ open: true, msg: 'Data refreshed', severity: 'success' });
   };
 
   if (loading && groups.length === 0) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 64px)' }}><CircularProgress /></Box>;
+  }
+
+  // Render Access Rights Section
+  const renderAccessRights = () => {
+    // Group permissions by category
+    const groupedResources = Resources.reduce((acc, resource) => {
+      if (!acc[resource.category]) acc[resource.category] = [];
+      acc[resource.category].push(resource);
+      return acc;
+    }, {});
+
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: 'calc(100vh - 64px)',
-          backgroundColor: '#f8fafc',
-        }}
-      >
-        <CircularProgress />
+      <Box sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ShieldIcon color="primary" /> Group Access Rights
+        </Typography>
+        {Object.entries(groupedResources).map(([category, resources]) => (
+          <Box key={category} sx={{ mb: 3, p: 2, border: '1px solid #e2e8f0', borderRadius: '12px', bgcolor: '#f8fafc' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#334155' }}>
+              {category}
+            </Typography>
+            <Grid container spacing={2}>
+              {resources.map((resource) => (
+                <Grid item xs={12} md={6} key={resource.id}>
+                  <Paper sx={{ p: 2, borderRadius: '8px' }} elevation={0} variant="outlined">
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{resource.name}</Typography>
+                    </Box>
+                    <Box sx={{ mb: resource.hasActions ? 2 : 0 }}>
+                      <RadioGroup
+                        row
+                        value={modal.data.permissions[resource.id]?.access || 'no_access'}
+                        onChange={(e) => handlePermissionChange(resource.id, e.target.value)}
+                      >
+                        {AccessLevels.map((level) => (
+                          <FormControlLabel
+                            key={level.value}
+                            value={level.value}
+                            control={<Radio size="small" />}
+                            label={
+                              <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                                {level.label}
+                              </Typography>
+                            }
+                            sx={{ mr: 2 }}
+                          />
+                        ))}
+                      </RadioGroup>
+                    </Box>
+
+                    {/* Specific actions for MRF or other resources if needed */}
+                    {resource.hasActions && (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {ApprovalActions.map(action => {
+                          const isSelected = (modal.data.permissions[resource.id]?.actions || []).includes(action.value);
+                          return (
+                            <Chip
+                              key={action.value}
+                              label={action.label}
+                              size="small"
+                              color={isSelected ? "primary" : "default"}
+                              variant={isSelected ? "filled" : "outlined"}
+                              onClick={() => handleActionChange(resource.id, action.value)}
+                              clickable
+                            />
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        ))}
       </Box>
     );
-  }
+  };
+
 
   return (
     <Box
@@ -724,12 +799,13 @@ const UserGroupMaster = () => {
       <Dialog
         open={modal.open}
         onClose={closeModal}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: '12px',
-            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
           },
         }}
       >
@@ -749,7 +825,7 @@ const UserGroupMaster = () => {
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Group ID"
                 value={modal.data.groupId}
@@ -765,6 +841,7 @@ const UserGroupMaster = () => {
                 disabled={modal.edit}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -773,7 +850,7 @@ const UserGroupMaster = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Group Name"
                 value={modal.data.groupName}
@@ -788,6 +865,7 @@ const UserGroupMaster = () => {
                 helperText={groupNameError ? 'Group Name is required or already exists' : ''}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -809,6 +887,7 @@ const UserGroupMaster = () => {
                 fullWidth
                 multiline
                 rows={3}
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -817,7 +896,7 @@ const UserGroupMaster = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Department"
                 value={modal.data.department}
@@ -828,6 +907,7 @@ const UserGroupMaster = () => {
                   }))
                 }
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -837,6 +917,11 @@ const UserGroupMaster = () => {
               />
             </Grid>
           </Grid>
+
+          <Divider sx={{ my: 4 }} />
+
+          {/* New Group Access Rights Section */}
+          {renderAccessRights()}
         </DialogContent>
         <DialogActions
           sx={{

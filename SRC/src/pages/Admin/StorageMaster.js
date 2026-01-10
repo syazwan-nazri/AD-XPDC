@@ -96,13 +96,13 @@ const StorageMaster = () => {
     const sorted = [...filteredParts].sort((a, b) => {
       const sapA = parseInt(a.sapNumber || '0') || 0;
       const sapB = parseInt(b.sapNumber || '0') || 0;
-      
+
       const aIsLowStock = (a.currentStock || 0) < (a.safetyLevel || 0);
       const bIsLowStock = (b.currentStock || 0) < (b.safetyLevel || 0);
-      
+
       if (aIsLowStock && !bIsLowStock) return -1;
       if (!aIsLowStock && bIsLowStock) return 1;
-      
+
       return sapB - sapA;
     });
     return sorted;
@@ -198,28 +198,28 @@ const StorageMaster = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
       p: 3,
       width: '100%'
     }}>
-      <Box sx={{ 
+      <Box sx={{
         width: '100%',
         maxWidth: 'none',
         margin: '0 auto'
       }}>
         {/* Header Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           mb: 4,
           flexWrap: 'wrap',
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -233,8 +233,8 @@ const StorageMaster = () => {
               <WarehouseIcon sx={{ fontSize: 28 }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 700, 
+              <Typography variant="h4" sx={{
+                fontWeight: 700,
                 color: '#1e293b',
                 mb: 0.5
               }}>
@@ -248,7 +248,7 @@ const StorageMaster = () => {
 
           {/* Stats Cards */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -265,7 +265,7 @@ const StorageMaster = () => {
                 </Typography>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -289,7 +289,7 @@ const StorageMaster = () => {
         </Box>
 
         {/* Parts List Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -297,8 +297,8 @@ const StorageMaster = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#dbeafe',
             display: 'flex',
@@ -306,7 +306,7 @@ const StorageMaster = () => {
             alignItems: 'center'
           }}>
             <Box>
-              <Typography variant="h6" sx={{ 
+              <Typography variant="h6" sx={{
                 fontWeight: 600,
                 color: '#1e293b',
                 display: 'flex',
@@ -321,9 +321,9 @@ const StorageMaster = () => {
               </Typography>
             </Box>
             <Tooltip title="Refresh data">
-              <IconButton 
+              <IconButton
                 onClick={refreshData}
-                sx={{ 
+                sx={{
                   color: '#3b82f6',
                   backgroundColor: 'white',
                   border: '1px solid #e2e8f0',
@@ -365,8 +365,8 @@ const StorageMaster = () => {
 
           {/* Parts Table */}
           {sortedParts.length === 0 ? (
-            <Box sx={{ 
-              p: 6, 
+            <Box sx={{
+              p: 6,
               textAlign: 'center',
               color: '#94a3b8'
             }}>
@@ -398,9 +398,9 @@ const StorageMaster = () => {
                     {partsPaginated.map((part) => {
                       const isLowStock = (part.currentStock || 0) < (part.safetyLevel || 0);
                       const isOutOfStock = (part.currentStock || 0) === 0;
-                      
+
                       return (
-                        <TableRow key={part.id} hover sx={{ 
+                        <TableRow key={part.id} hover sx={{
                           backgroundColor: isOutOfStock ? '#fee2e2' : isLowStock ? '#fef3c7' : 'white',
                           '&:hover': {
                             backgroundColor: isOutOfStock ? '#fecaca' : isLowStock ? '#fde68a' : '#f8fafc'
@@ -451,8 +451,8 @@ const StorageMaster = () => {
                               {isOutOfStock && (
                                 <WarningAmberIcon sx={{ fontSize: 16, color: '#ef4444' }} />
                               )}
-                              <Typography variant="body2" sx={{ 
-                                fontWeight: 600, 
+                              <Typography variant="body2" sx={{
+                                fontWeight: 600,
                                 color: isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : '#059669'
                               }}>
                                 {part.currentStock}
@@ -464,7 +464,7 @@ const StorageMaster = () => {
                               <IconButton
                                 size="small"
                                 onClick={() => handleEditPart(part)}
-                                sx={{ 
+                                sx={{
                                   color: '#3b82f6',
                                   '&:hover': { backgroundColor: '#dbeafe' }
                                 }}
@@ -476,7 +476,7 @@ const StorageMaster = () => {
                               <IconButton
                                 size="small"
                                 onClick={() => handleDeletePart(part)}
-                                sx={{ 
+                                sx={{
                                   color: '#ef4444',
                                   '&:hover': { backgroundColor: '#fee2e2' }
                                 }}
@@ -493,10 +493,10 @@ const StorageMaster = () => {
               </Box>
 
               {/* Pagination */}
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 p: 2,
                 borderTop: '1px solid #e2e8f0'
               }}>
@@ -530,7 +530,7 @@ const StorageMaster = () => {
       </Box>
 
       {/* Edit Part Dialog */}
-      <Dialog open={editPartDialogOpen} onClose={() => setEditPartDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={editPartDialogOpen} onClose={() => setEditPartDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
           Edit Part Rack Assignment
         </DialogTitle>
@@ -542,6 +542,7 @@ const StorageMaster = () => {
               fullWidth
               disabled
               size="small"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -556,6 +557,7 @@ const StorageMaster = () => {
               fullWidth
               disabled
               size="small"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -570,6 +572,7 @@ const StorageMaster = () => {
               fullWidth
               disabled
               size="small"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -584,6 +587,7 @@ const StorageMaster = () => {
               fullWidth
               disabled
               size="small"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -598,6 +602,7 @@ const StorageMaster = () => {
               fullWidth
               disabled
               size="small"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -628,6 +633,7 @@ const StorageMaster = () => {
               fullWidth
               size="small"
               inputProps={{ maxLength: 2 }}
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -649,6 +655,7 @@ const StorageMaster = () => {
               fullWidth
               size="small"
               inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -662,10 +669,10 @@ const StorageMaster = () => {
           <Button onClick={() => setEditPartDialogOpen(false)} variant="outlined" sx={{ borderRadius: '8px' }}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSavePartChanges} 
+          <Button
+            onClick={handleSavePartChanges}
             variant="contained"
-            sx={{ 
+            sx={{
               borderRadius: '8px',
               background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)'
             }}
@@ -705,9 +712,9 @@ const StorageMaster = () => {
           <Button onClick={handleDeletePartClose} variant="outlined" sx={{ borderRadius: '8px' }}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleConfirmDeletePart} 
-            variant="contained" 
+          <Button
+            onClick={handleConfirmDeletePart}
+            variant="contained"
             color="error"
             sx={{ borderRadius: '8px' }}
           >
@@ -723,10 +730,10 @@ const StorageMaster = () => {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ 
+          sx={{
             width: '100%',
             borderRadius: '10px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)'

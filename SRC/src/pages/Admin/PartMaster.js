@@ -78,40 +78,40 @@ const PartMaster = () => {
   const parts = useSelector((state) => state.parts.parts);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  
+
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterRackLevel, setFilterRackLevel] = useState('');
 
-  const [form, setForm] = useState({ 
-    sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', 
-    safetyLevel: '', replenishQty: '', currentStock: '' 
+  const [form, setForm] = useState({
+    sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '',
+    safetyLevel: '', replenishQty: '', currentStock: ''
   });
-  
+
   // Track the current running SAP#
   const [currentRunningSap, setCurrentRunningSap] = useState('7000001');
-  
+
   // Dialog for SAP# mismatch
   const [sapDialogOpen, setSapDialogOpen] = useState(false);
   const [pendingAdd, setPendingAdd] = useState(false);
-  
+
   // Pagination states
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  
+
   // Modal states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [barcodeDialogOpen, setBarcodeDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ 
+  const [editForm, setEditForm] = useState({
     sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '',
     safetyLevel: '', replenishQty: '', currentStock: 0
   });
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [barcodeTarget, setBarcodeTarget] = useState(null);
-  
+
   // Validation states
   const [sapError, setSapError] = useState(false);
   const [editSapError, setEditSapError] = useState(false);
@@ -127,13 +127,13 @@ const PartMaster = () => {
   const [replenishQtyError, setReplenishQtyError] = useState(false);
   const [editReplenishQtyError, setEditReplenishQtyError] = useState(false);
   const [currentStockError, setCurrentStockError] = useState(false);
-  
+
   // CSV Import states
   const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const [csvPreview, setCsvPreview] = useState([]);
   const [csvErrors, setCsvErrors] = useState([]);
-  
+
   // Cleanup states
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
   const [duplicatesFound, setDuplicatesFound] = useState([]);
@@ -219,14 +219,14 @@ const PartMaster = () => {
   // Filtered parts
   const filteredParts = useMemo(() => {
     const filtered = parts.filter(p => {
-      const matchesSearch = 
+      const matchesSearch =
         (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (p.sapNumber && p.sapNumber.includes(searchQuery)) ||
         (p.internalRef && p.internalRef.toLowerCase().includes(searchQuery.toLowerCase()));
-      
+
       const matchesCategory = filterCategory ? p.category === filterCategory : true;
       const matchesRackLevel = filterRackLevel ? p.rackLevel === filterRackLevel : true;
-      
+
       return matchesSearch && matchesCategory && matchesRackLevel;
     });
 
@@ -234,18 +234,18 @@ const PartMaster = () => {
     const sorted = filtered.sort((a, b) => {
       const sapA = parseInt(a.sapNumber || '0') || 0;
       const sapB = parseInt(b.sapNumber || '0') || 0;
-      
+
       const aHasValidSafety = (a.safetyLevel || 0) > 0;
       const bHasValidSafety = (b.safetyLevel || 0) > 0;
       const aIsLowStock = aHasValidSafety && (a.currentStock || 0) < (a.safetyLevel || 0);
       const bIsLowStock = bHasValidSafety && (b.currentStock || 0) < (b.safetyLevel || 0);
-      
+
       if (aIsLowStock && !bIsLowStock) return -1;
       if (!aIsLowStock && bIsLowStock) return 1;
-      
+
       return sapB - sapA;
     });
-    
+
     return sorted;
   }, [parts, searchQuery, filterCategory, filterRackLevel]);
 
@@ -267,7 +267,7 @@ const PartMaster = () => {
     setCategoryError(false);
     setRackNumberError(false);
     setRackLevelError(false);
-    
+
     let hasError = false;
     if (!form.sapNumber || form.sapNumber.trim() === '') { setSapError(true); hasError = true; }
     if (!form.internalRef || form.internalRef.trim() === '') { setInternalRefError(true); hasError = true; }
@@ -283,7 +283,7 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Incomplete Form. Please provide the missing information.', severity: 'error' });
       return;
     }
-    
+
     if (!validateSapNumber(form.sapNumber)) {
       setSapError(true);
       setSnackbar({ open: true, message: 'SAP # must be 7 digits starting with 7', severity: 'error' });
@@ -293,13 +293,13 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'SAP # already exists', severity: 'error' });
       return;
     }
-    
+
     if (!force && form.sapNumber !== currentRunningSap) {
       setSapDialogOpen(true);
       setPendingAdd(true);
       return;
     }
-    
+
     if (!validateInternalRef(form.internalRef)) {
       setInternalRefError(true);
       setSnackbar({ open: true, message: 'Internal Ref No format: ABCD123, ABC123, AB123, AB1234 (with or without space)', severity: 'error' });
@@ -309,19 +309,19 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Internal Ref No already exists', severity: 'error' });
       return;
     }
-    
+
     if (parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())) {
       setNameError(true);
       setSnackbar({ open: true, message: 'Name already exists', severity: 'error' });
       return;
     }
-    
+
     if (!validateRackNumber(form.rackNumber)) {
       setRackNumberError(true);
       setSnackbar({ open: true, message: 'Rack Number must be exactly 2 digits (e.g., 00, 01, 10)', severity: 'error' });
       return;
     }
-    
+
     if (!validateRackLevel(form.rackLevel)) {
       setRackLevelError(true);
       setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
@@ -349,7 +349,7 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Replenish Quantity must be 0 or greater', severity: 'error' });
       return;
     }
-    
+
     try {
       const newPart = {
         ...form,
@@ -381,7 +381,7 @@ const PartMaster = () => {
     setSapDialogOpen(false);
     setPendingAdd(false);
   };
-  
+
   const handleClear = () => {
     setForm(f => ({
       ...f,
@@ -404,7 +404,7 @@ const PartMaster = () => {
     setReplenishQtyError(false);
     setCurrentStockError(false);
   };
-  
+
   // Edit handlers (keep functionality)
   const handleEditClick = (part) => {
     setEditingId(part.id);
@@ -421,16 +421,16 @@ const PartMaster = () => {
     });
     setEditDialogOpen(true);
   };
-  
+
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditingId(null);
     setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: 0 });
   };
-  
+
   const handleSaveChanges = async () => {
     if (!editingId) return;
-    
+
     if (!editForm.sapNumber) {
       setEditSapError(true);
       return setSnackbar({ open: true, message: 'SAP # required', severity: 'error' });
@@ -448,7 +448,7 @@ const PartMaster = () => {
       return setSnackbar({ open: true, message: 'Rack Level must be A, B, C, or D only', severity: 'error' });
     }
 
-    const duplicateName = parts.some(p => 
+    const duplicateName = parts.some(p =>
       p.id !== editingId && p.name.toLowerCase() === editForm.name.toLowerCase()
     );
     if (duplicateName) {
@@ -472,11 +472,11 @@ const PartMaster = () => {
       setEditReplenishQtyError(true);
       return setSnackbar({ open: true, message: 'Replenish Quantity must be 0 or greater', severity: 'error' });
     }
-    
+
     setEditSapError(false);
     setEditRackNumberError(false);
     setEditRackLevelError(false);
-    
+
     try {
       const updatedPart = {
         ...editForm,
@@ -494,18 +494,18 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'Failed to update part', severity: 'error' });
     }
   };
-  
+
   // Delete handlers (keep functionality)
   const handleDeleteClick = (part) => {
     setDeleteTarget(part);
     setDeleteDialogOpen(true);
   };
-  
+
   const handleDeleteClose = () => {
     setDeleteDialogOpen(false);
     setDeleteTarget(null);
   };
-  
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -523,43 +523,43 @@ const PartMaster = () => {
   const handleCsvFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const csv = event.target.result;
         const lines = csv.split('\n').filter(line => line.trim());
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        
+
         const requiredColumns = ['sapnumber', 'internalref', 'name', 'category', 'safetylevel', 'replenishqty'];
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
-        
+
         if (missingColumns.length > 0) {
           setCsvErrors([`Missing required columns: ${missingColumns.join(', ')}`]);
           setCsvPreview([]);
           return;
         }
-        
+
         const rows = [];
         const errors = [];
         const seenSapNumbers = new Set();
         const seenInternalRefs = new Set();
         const seenNames = new Set();
-        
+
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',').map(v => v.trim());
           const row = {};
           headers.forEach((h, idx) => {
             row[h] = values[idx] || '';
           });
-          
+
           const rowErrors = [];
           if (!row.sapnumber) rowErrors.push(`Row ${i}: SAP # is required`);
           else if (!/^7\d{6}$/.test(row.sapnumber)) rowErrors.push(`Row ${i}: SAP # must be 7 digits starting with 7`);
           else if (parts.some(p => p.sapNumber === row.sapnumber)) rowErrors.push(`Row ${i}: SAP # already exists in database`);
           else if (seenSapNumbers.has(row.sapnumber)) rowErrors.push(`Row ${i}: Duplicate SAP # within this file`);
           else seenSapNumbers.add(row.sapnumber);
-          
+
           if (!row.internalref) rowErrors.push(`Row ${i}: Internal Ref No is required`);
           else if (!/^[A-Z]{2,4}\s?\d{3,4}$/.test(row.internalref.toUpperCase())) rowErrors.push(`Row ${i}: Invalid Internal Ref No format`);
           else {
@@ -568,7 +568,7 @@ const PartMaster = () => {
             else if (seenInternalRefs.has(normalizedRef)) rowErrors.push(`Row ${i}: Duplicate Internal Ref within this file`);
             else seenInternalRefs.add(normalizedRef);
           }
-          
+
           if (!row.name) rowErrors.push(`Row ${i}: Part Name is required`);
           else {
             const normalizedName = row.name.toLowerCase();
@@ -576,11 +576,11 @@ const PartMaster = () => {
             else if (seenNames.has(normalizedName)) rowErrors.push(`Row ${i}: Duplicate Part Name within this file`);
             else seenNames.add(normalizedName);
           }
-          
+
           if (!row.category) rowErrors.push(`Row ${i}: Category is required`);
           if (!row.safetylevel || Number(row.safetylevel) < 0) rowErrors.push(`Row ${i}: Safety Level must be 0 or greater`);
           if (!row.replenishqty || Number(row.replenishqty) < 0) rowErrors.push(`Row ${i}: Replenish Quantity must be 0 or greater`);
-          
+
           if (rowErrors.length > 0) {
             errors.push(...rowErrors);
           } else {
@@ -597,7 +597,7 @@ const PartMaster = () => {
             });
           }
         }
-        
+
         setCsvPreview(rows);
         setCsvErrors(errors);
         setCsvFile(file);
@@ -608,7 +608,7 @@ const PartMaster = () => {
     };
     reader.readAsText(file);
   };
-  
+
   const handleBulkImport = async () => {
     if (csvErrors.length > 0) {
       setSnackbar({ open: true, message: 'Please fix errors before importing', severity: 'error' });
@@ -618,7 +618,7 @@ const PartMaster = () => {
       setSnackbar({ open: true, message: 'No valid rows to import', severity: 'error' });
       return;
     }
-    
+
     try {
       const newParts = [];
       for (const row of csvPreview) {
@@ -628,7 +628,7 @@ const PartMaster = () => {
         });
         newParts.push({ ...row, id: docRef.id });
       }
-      
+
       dispatch(setParts([...parts, ...newParts]));
       setSnackbar({ open: true, message: `Successfully imported ${newParts.length} parts`, severity: 'success' });
       setCsvImportDialogOpen(false);
@@ -678,7 +678,7 @@ const PartMaster = () => {
     try {
       setCleanupInProgress(true);
       setCleanupProgress(0);
-      
+
       const allIdsToDelete = [];
       duplicatesFound.forEach(duplicate => {
         for (let i = 1; i < duplicate.ids.length; i++) {
@@ -690,20 +690,20 @@ const PartMaster = () => {
       let deletedCount = 0;
 
       const batchSize = 100;
-      
+
       for (let i = 0; i < allIdsToDelete.length; i += batchSize) {
         const batch = writeBatch(db);
         const batchIds = allIdsToDelete.slice(i, Math.min(i + batchSize, allIdsToDelete.length));
-        
+
         batchIds.forEach(id => {
           batch.delete(doc(db, 'parts', id));
         });
-        
+
         await batch.commit();
-        
+
         deletedCount += batchIds.length;
         setCleanupProgress(Math.round((deletedCount / totalToDelete) * 100));
-        
+
         batchIds.forEach(id => {
           dispatch(deletePart(id));
         });
@@ -794,10 +794,10 @@ const PartMaster = () => {
 
   if (loading && parts.length === 0) {
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         minHeight: 'calc(100vh - 64px)',
         backgroundColor: '#f8fafc'
       }}>
@@ -807,29 +807,29 @@ const PartMaster = () => {
   }
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
       p: 3,
       width: '100%'
     }}>
       {/* Main Content Container */}
-      <Box sx={{ 
+      <Box sx={{
         width: '100%',
         maxWidth: 'none',
         margin: '0 auto'
       }}>
         {/* Header Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           mb: 4,
           flexWrap: 'wrap',
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -843,8 +843,8 @@ const PartMaster = () => {
               <InventoryIcon sx={{ fontSize: 28 }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 700, 
+              <Typography variant="h4" sx={{
+                fontWeight: 700,
                 color: '#1e293b',
                 mb: 0.5
               }}>
@@ -858,7 +858,7 @@ const PartMaster = () => {
 
           {/* Stats Cards */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -875,7 +875,7 @@ const PartMaster = () => {
                 </Typography>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -895,7 +895,7 @@ const PartMaster = () => {
                 </Box>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -915,7 +915,7 @@ const PartMaster = () => {
                 </Box>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -939,7 +939,7 @@ const PartMaster = () => {
         </Box>
 
         {/* Search and Filter Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -947,12 +947,12 @@ const PartMaster = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#eff6ff'
           }}>
-            <Typography variant="h6" sx={{ 
+            <Typography variant="h6" sx={{
               fontWeight: 600,
               color: '#1e293b',
               display: 'flex',
@@ -1000,9 +1000,9 @@ const PartMaster = () => {
               </Grid>
               <Grid item xs={12} md={3}>
                 <Box sx={{ width: '100%' }}>
-                  <BarcodeScanner 
-                    onScan={handleScan} 
-                    label="Scan Barcode" 
+                  <BarcodeScanner
+                    onScan={handleScan}
+                    label="Scan Barcode"
                     autoFocus={false}
                     size="small"
                     fullWidth
@@ -1047,9 +1047,9 @@ const PartMaster = () => {
               </Grid>
               <Grid item xs={12} md={1}>
                 <Tooltip title="Refresh data">
-                  <IconButton 
+                  <IconButton
                     onClick={refreshData}
-                    sx={{ 
+                    sx={{
                       color: '#3b82f6',
                       backgroundColor: 'white',
                       border: '1px solid #e2e8f0',
@@ -1067,7 +1067,7 @@ const PartMaster = () => {
         </Paper>
 
         {/* Parts List Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -1075,8 +1075,8 @@ const PartMaster = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#eff6ff',
             display: 'flex',
@@ -1084,7 +1084,7 @@ const PartMaster = () => {
             alignItems: 'center'
           }}>
             <Box>
-              <Typography variant="h6" sx={{ 
+              <Typography variant="h6" sx={{
                 fontWeight: 600,
                 color: '#1e293b',
                 display: 'flex',
@@ -1105,7 +1105,7 @@ const PartMaster = () => {
                   startIcon={<FileUploadIcon />}
                   onClick={() => setCsvImportDialogOpen(true)}
                   size="small"
-                  sx={{ 
+                  sx={{
                     borderRadius: '10px',
                     borderColor: '#e2e8f0',
                     color: '#64748b',
@@ -1125,7 +1125,7 @@ const PartMaster = () => {
                   startIcon={<CleaningServicesIcon />}
                   onClick={handleDetectDuplicates}
                   size="small"
-                  sx={{ 
+                  sx={{
                     borderRadius: '10px',
                     borderColor: '#e2e8f0',
                     color: '#64748b',
@@ -1148,8 +1148,8 @@ const PartMaster = () => {
               <CircularProgress />
             </Box>
           ) : filteredParts.length === 0 ? (
-            <Box sx={{ 
-              p: 6, 
+            <Box sx={{
+              p: 6,
               textAlign: 'center',
               color: '#94a3b8'
             }}>
@@ -1158,7 +1158,7 @@ const PartMaster = () => {
                 No parts found
               </Typography>
               <Typography variant="body2">
-                {parts.length === 0 ? 
+                {parts.length === 0 ?
                   "No parts found. Add your first part below." :
                   "No parts match your search criteria. Try changing your filters."}
               </Typography>
@@ -1189,9 +1189,9 @@ const PartMaster = () => {
                         const currentStock = p.currentStock || 0;
                         const isLowStock = currentStock < safetyLevel;
                         const isZeroStock = currentStock === 0;
-                        
+
                         return (
-                          <TableRow key={p.id} hover sx={{ 
+                          <TableRow key={p.id} hover sx={{
                             backgroundColor: isZeroStock ? '#fef2f2' : isLowStock ? '#fffbeb' : 'inherit'
                           }}>
                             <TableCell>
@@ -1200,7 +1200,7 @@ const PartMaster = () => {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip 
+                              <Chip
                                 label={p.internalRef || '—'}
                                 size="small"
                                 variant="outlined"
@@ -1209,7 +1209,7 @@ const PartMaster = () => {
                             </TableCell>
                             <TableCell>{p.name}</TableCell>
                             <TableCell>
-                              <Chip 
+                              <Chip
                                 label={p.category || '—'}
                                 size="small"
                                 color="primary"
@@ -1223,7 +1223,7 @@ const PartMaster = () => {
                                   {p.rackNumber || '—'}
                                 </Typography>
                                 {p.rackLevel && (
-                                  <Chip 
+                                  <Chip
                                     label={`Lvl ${p.rackLevel}`}
                                     size="small"
                                     variant="outlined"
@@ -1255,7 +1255,7 @@ const PartMaster = () => {
                               </Box>
                             </TableCell>
                             <TableCell>
-                              <Chip 
+                              <Chip
                                 label={getStockStatusText(currentStock, safetyLevel)}
                                 color={getStockStatusColor(currentStock, safetyLevel)}
                                 size="small"
@@ -1268,7 +1268,7 @@ const PartMaster = () => {
                                   <IconButton
                                     size="small"
                                     onClick={() => handleBarcodeClick(p)}
-                                    sx={{ 
+                                    sx={{
                                       color: '#3b82f6',
                                       '&:hover': { backgroundColor: '#eff6ff' }
                                     }}
@@ -1280,7 +1280,7 @@ const PartMaster = () => {
                                   <IconButton
                                     size="small"
                                     onClick={() => handleEditClick(p)}
-                                    sx={{ 
+                                    sx={{
                                       color: '#f59e0b',
                                       '&:hover': { backgroundColor: '#fffbeb' }
                                     }}
@@ -1293,7 +1293,7 @@ const PartMaster = () => {
                                     size="small"
                                     color="error"
                                     onClick={() => handleDeleteClick(p)}
-                                    sx={{ 
+                                    sx={{
                                       '&:hover': { backgroundColor: '#fef2f2' }
                                     }}
                                   >
@@ -1318,7 +1318,7 @@ const PartMaster = () => {
                 page={page}
                 onPageChange={handleChangePage}
                 onRowsPerPageChange={handleChangeRowsPerPage}
-                sx={{ 
+                sx={{
                   borderTop: '1px solid #e2e8f0',
                   '& .MuiTablePagination-toolbar': {
                     padding: 2
@@ -1330,19 +1330,19 @@ const PartMaster = () => {
         </Paper>
 
         {/* New Part Entry Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
           backgroundColor: 'white',
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#eff6ff'
           }}>
-            <Typography variant="h6" sx={{ 
+            <Typography variant="h6" sx={{
               fontWeight: 600,
               color: '#1e293b',
               display: 'flex',
@@ -1372,8 +1372,8 @@ const PartMaster = () => {
                   }}
                   error={sapError}
                   helperText={sapError ? (
-                    parts.some(p => p.sapNumber === form.sapNumber) 
-                      ? "SAP # already exists" 
+                    parts.some(p => p.sapNumber === form.sapNumber)
+                      ? "SAP # already exists"
                       : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
                   ) : "Auto-generated (editable)"}
                   required
@@ -1640,19 +1640,19 @@ const PartMaster = () => {
               </Grid>
             </Grid>
 
-            <Box sx={{ 
-              display: 'flex', 
+            <Box sx={{
+              display: 'flex',
               justifyContent: 'center',
               gap: 2,
               pt: 4,
               mt: 2,
               borderTop: '1px solid #e2e8f0'
             }}>
-              <Button 
+              <Button
                 variant="contained"
                 onClick={() => handleAddPart()}
                 startIcon={<AddIcon />}
-                sx={{ 
+                sx={{
                   minWidth: 200,
                   background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                   px: 4,
@@ -1674,11 +1674,11 @@ const PartMaster = () => {
               >
                 Add Part
               </Button>
-              <Button 
+              <Button
                 variant="outlined"
                 onClick={handleClear}
                 startIcon={<ClearIcon />}
-                sx={{ 
+                sx={{
                   px: 4,
                   py: 1.5,
                   borderRadius: '10px',
@@ -1699,8 +1699,8 @@ const PartMaster = () => {
       </Box>
 
       {/* Enhanced SAP# Mismatch Dialog */}
-      <Dialog 
-        open={sapDialogOpen} 
+      <Dialog
+        open={sapDialogOpen}
         onClose={handleSapDialogClose}
         maxWidth="sm"
         fullWidth
@@ -1711,8 +1711,8 @@ const PartMaster = () => {
           }
         }}
       >
-        <DialogTitle sx={{ 
-          pb: 1, 
+        <DialogTitle sx={{
+          pb: 1,
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#fffbeb'
         }}>
@@ -1724,9 +1724,9 @@ const PartMaster = () => {
           </Box>
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
-          <Alert 
-            severity="warning" 
-            sx={{ 
+          <Alert
+            severity="warning"
+            sx={{
               mb: 3,
               borderRadius: '10px',
               backgroundColor: '#fffbeb',
@@ -1761,19 +1761,19 @@ const PartMaster = () => {
             </Grid>
           </Box>
           <Typography variant="body2" sx={{ color: '#64748b', mt: 3 }}>
-            To maintain sequential integrity, please use the expected SAP#. 
+            To maintain sequential integrity, please use the expected SAP#.
             This helps prevent gaps in the numbering system.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
+        <DialogActions sx={{
+          p: 2,
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#f8fafc'
         }}>
-          <Button 
+          <Button
             onClick={handleSapDialogClose}
             variant="outlined"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               borderColor: '#e2e8f0',
               color: '#64748b',
@@ -1782,10 +1782,10 @@ const PartMaster = () => {
           >
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSapDialogEditBack}
             variant="contained"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
               textTransform: 'none',
@@ -1799,20 +1799,21 @@ const PartMaster = () => {
       </Dialog>
 
       {/* Enhanced Edit Part Dialog */}
-      <Dialog 
-        open={editDialogOpen} 
+      <Dialog
+        open={editDialogOpen}
         onClose={handleEditClose}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: '12px',
-            overflow: 'hidden'
+            display: 'flex',
+            flexDirection: 'column',
           }
         }}
       >
-        <DialogTitle sx={{ 
-          pb: 1, 
+        <DialogTitle sx={{
+          pb: 1,
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#eff6ff'
         }}>
@@ -1847,6 +1848,7 @@ const PartMaster = () => {
                 value={editForm.internalRef}
                 onChange={(e) => setEditForm(f => ({ ...f, internalRef: e.target.value }))}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1862,6 +1864,7 @@ const PartMaster = () => {
                 value={editForm.name}
                 onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value.toUpperCase() }))}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1877,6 +1880,7 @@ const PartMaster = () => {
                 value={editForm.category}
                 onChange={(e) => setEditForm(f => ({ ...f, category: e.target.value.toUpperCase() }))}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1898,6 +1902,7 @@ const PartMaster = () => {
                 error={editRackNumberError}
                 helperText={editRackNumberError ? "Must be exactly 2 digits" : ""}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1918,6 +1923,7 @@ const PartMaster = () => {
                 error={editRackLevelError}
                 inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1941,6 +1947,7 @@ const PartMaster = () => {
                 helperText={editSafetyLevelError ? (editForm.safetyLevel === '' ? 'Required' : 'Must be ≥ 0') : ''}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1964,6 +1971,7 @@ const PartMaster = () => {
                 helperText={editReplenishQtyError ? (editForm.replenishQty === '' ? 'Required' : 'Must be ≥ 0') : ''}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1979,6 +1987,7 @@ const PartMaster = () => {
                 value={editForm.currentStock}
                 onChange={(e) => setEditForm(f => ({ ...f, currentStock: e.target.value }))}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1989,15 +1998,15 @@ const PartMaster = () => {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
+        <DialogActions sx={{
+          p: 2,
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#f8fafc'
         }}>
-          <Button 
+          <Button
             onClick={handleEditClose}
             variant="outlined"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               borderColor: '#e2e8f0',
               color: '#64748b',
@@ -2006,10 +2015,10 @@ const PartMaster = () => {
           >
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSaveChanges}
             variant="contained"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
               textTransform: 'none',
@@ -2022,8 +2031,8 @@ const PartMaster = () => {
       </Dialog>
 
       {/* Enhanced Delete Confirmation Dialog */}
-      <Dialog 
-        open={deleteDialogOpen} 
+      <Dialog
+        open={deleteDialogOpen}
         onClose={handleDeleteClose}
         maxWidth="sm"
         fullWidth
@@ -2034,8 +2043,8 @@ const PartMaster = () => {
           }
         }}
       >
-        <DialogTitle sx={{ 
-          pb: 1, 
+        <DialogTitle sx={{
+          pb: 1,
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#fef2f2'
         }}>
@@ -2047,9 +2056,9 @@ const PartMaster = () => {
           </Box>
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
-          <Alert 
-            severity="error" 
-            sx={{ 
+          <Alert
+            severity="error"
+            sx={{
               mb: 3,
               borderRadius: '10px',
               backgroundColor: '#fef2f2',
@@ -2060,7 +2069,7 @@ const PartMaster = () => {
               This action cannot be undone
             </Typography>
           </Alert>
-          
+
           {deleteTarget && (
             <Box sx={{ p: 2, backgroundColor: '#f8fafc', borderRadius: '10px' }}>
               <Typography variant="subtitle2" sx={{ color: '#64748b', mb: 2 }}>
@@ -2095,15 +2104,15 @@ const PartMaster = () => {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
+        <DialogActions sx={{
+          p: 2,
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#f8fafc'
         }}>
-          <Button 
+          <Button
             onClick={handleDeleteClose}
             variant="outlined"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               borderColor: '#e2e8f0',
               color: '#64748b',
@@ -2112,11 +2121,11 @@ const PartMaster = () => {
           >
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleConfirmDelete}
             variant="contained"
             color="error"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
               textTransform: 'none',
@@ -2129,8 +2138,8 @@ const PartMaster = () => {
       </Dialog>
 
       {/* Enhanced Barcode Dialog */}
-      <Dialog 
-        open={barcodeDialogOpen} 
+      <Dialog
+        open={barcodeDialogOpen}
         onClose={handleBarcodeClose}
         maxWidth="sm"
         fullWidth
@@ -2141,8 +2150,8 @@ const PartMaster = () => {
           }
         }}
       >
-        <DialogTitle sx={{ 
-          pb: 1, 
+        <DialogTitle sx={{
+          pb: 1,
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#eff6ff'
         }}>
@@ -2157,15 +2166,15 @@ const PartMaster = () => {
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {barcodeTarget && (
               <>
-                <Box sx={{ 
-                  p: 3, 
-                  border: '1px solid #e2e8f0', 
+                <Box sx={{
+                  p: 3,
+                  border: '1px solid #e2e8f0',
                   borderRadius: '10px',
                   backgroundColor: 'white',
                   mb: 3
                 }}>
-                  <Barcode 
-                    value={barcodeTarget.sapNumber} 
+                  <Barcode
+                    value={barcodeTarget.sapNumber}
                     width={2}
                     height={80}
                     fontSize={14}
@@ -2176,19 +2185,19 @@ const PartMaster = () => {
                     {barcodeTarget.name}
                   </Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mb: 2 }}>
-                    <Chip 
+                    <Chip
                       label={`SAP: ${barcodeTarget.sapNumber}`}
                       color="primary"
                       variant="outlined"
                     />
-                    <Chip 
+                    <Chip
                       label={`Ref: ${barcodeTarget.internalRef || '—'}`}
                       color="secondary"
                       variant="outlined"
                     />
                   </Box>
                   <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Category: {barcodeTarget.category || '—'} | 
+                    Category: {barcodeTarget.category || '—'} |
                     Location: Rack {barcodeTarget.rackNumber || '—'} Level {barcodeTarget.rackLevel || '—'}
                   </Typography>
                 </Box>
@@ -2196,15 +2205,15 @@ const PartMaster = () => {
             )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
+        <DialogActions sx={{
+          p: 2,
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#f8fafc'
         }}>
-          <Button 
+          <Button
             onClick={handleBarcodeClose}
             variant="outlined"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               borderColor: '#e2e8f0',
               color: '#64748b',
@@ -2213,11 +2222,11 @@ const PartMaster = () => {
           >
             Close
           </Button>
-          <Button 
+          <Button
             onClick={() => window.print()}
             variant="contained"
             startIcon={<PrintIcon />}
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
               textTransform: 'none',
@@ -2230,8 +2239,8 @@ const PartMaster = () => {
       </Dialog>
 
       {/* Enhanced Duplicate Cleanup Dialog */}
-      <Dialog 
-        open={cleanupDialogOpen} 
+      <Dialog
+        open={cleanupDialogOpen}
         onClose={() => !cleanupInProgress && setCleanupDialogOpen(false)}
         maxWidth="md"
         fullWidth
@@ -2242,8 +2251,8 @@ const PartMaster = () => {
           }
         }}
       >
-        <DialogTitle sx={{ 
-          pb: 1, 
+        <DialogTitle sx={{
+          pb: 1,
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#fffbeb'
         }}>
@@ -2265,11 +2274,11 @@ const PartMaster = () => {
                 Please wait while duplicate records are being cleaned up.
               </Typography>
               <Box sx={{ width: '100%', mb: 2 }}>
-                <LinearProgress 
-                  variant="determinate" 
+                <LinearProgress
+                  variant="determinate"
                   value={cleanupProgress}
-                  sx={{ 
-                    height: 10, 
+                  sx={{
+                    height: 10,
                     borderRadius: 5,
                     backgroundColor: '#e2e8f0',
                     '& .MuiLinearProgress-bar': {
@@ -2295,9 +2304,9 @@ const PartMaster = () => {
             </Box>
           ) : (
             <>
-              <Alert 
-                severity="warning" 
-                sx={{ 
+              <Alert
+                severity="warning"
+                sx={{
                   mb: 3,
                   borderRadius: '10px',
                   backgroundColor: '#fffbeb',
@@ -2311,7 +2320,7 @@ const PartMaster = () => {
                   Total duplicate records to remove: {duplicatesFound.reduce((sum, d) => sum + (d.count - 1), 0)}
                 </Typography>
               </Alert>
-              
+
               <Box sx={{ maxHeight: 300, overflowY: 'auto', mb: 3 }}>
                 <Table size="small">
                   <TableHead sx={{ backgroundColor: '#f8fafc', position: 'sticky', top: 0 }}>
@@ -2336,7 +2345,7 @@ const PartMaster = () => {
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center' }}>
-                          <Chip 
+                          <Chip
                             label={dup.count}
                             color="warning"
                             size="small"
@@ -2344,7 +2353,7 @@ const PartMaster = () => {
                           />
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center' }}>
-                          <Chip 
+                          <Chip
                             label={dup.count - 1}
                             color="error"
                             size="small"
@@ -2356,10 +2365,10 @@ const PartMaster = () => {
                   </TableBody>
                 </Table>
               </Box>
-              
-              <Alert 
-                severity="info" 
-                sx={{ 
+
+              <Alert
+                severity="info"
+                sx={{
                   borderRadius: '10px',
                   backgroundColor: '#eff6ff',
                   border: '1px solid #bfdbfe'
@@ -2372,16 +2381,16 @@ const PartMaster = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
+        <DialogActions sx={{
+          p: 2,
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#f8fafc'
         }}>
-          <Button 
+          <Button
             onClick={() => setCleanupDialogOpen(false)}
             variant="outlined"
             disabled={cleanupInProgress}
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               borderColor: '#e2e8f0',
               color: '#64748b',
@@ -2391,11 +2400,11 @@ const PartMaster = () => {
             Cancel
           </Button>
           {duplicatesFound.length > 0 && !cleanupInProgress && (
-            <Button 
+            <Button
               onClick={handleRemoveDuplicates}
               variant="contained"
               color="warning"
-              sx={{ 
+              sx={{
                 borderRadius: '10px',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 textTransform: 'none',
@@ -2409,8 +2418,8 @@ const PartMaster = () => {
       </Dialog>
 
       {/* Enhanced CSV Import Dialog */}
-      <Dialog 
-        open={csvImportDialogOpen} 
+      <Dialog
+        open={csvImportDialogOpen}
         onClose={() => setCsvImportDialogOpen(false)}
         maxWidth="md"
         fullWidth
@@ -2421,8 +2430,8 @@ const PartMaster = () => {
           }
         }}
       >
-        <DialogTitle sx={{ 
-          pb: 1, 
+        <DialogTitle sx={{
+          pb: 1,
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#eff6ff'
         }}>
@@ -2443,8 +2452,8 @@ const PartMaster = () => {
               <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
                 CSV format should include columns: SAP Number, Internal Ref, Name, Category, Safety Level, Replenish Qty
               </Typography>
-              <Box 
-                sx={{ 
+              <Box
+                sx={{
                   border: '2px dashed #e2e8f0',
                   p: 4,
                   borderRadius: '10px',
@@ -2477,9 +2486,9 @@ const PartMaster = () => {
             </Box>
           ) : csvErrors.length > 0 ? (
             <Box>
-              <Alert 
-                severity="error" 
-                sx={{ 
+              <Alert
+                severity="error"
+                sx={{
                   mb: 3,
                   borderRadius: '10px',
                   backgroundColor: '#fef2f2',
@@ -2500,9 +2509,9 @@ const PartMaster = () => {
             </Box>
           ) : csvPreview.length > 0 ? (
             <>
-              <Alert 
-                severity="success" 
-                sx={{ 
+              <Alert
+                severity="success"
+                sx={{
                   mb: 3,
                   borderRadius: '10px',
                   backgroundColor: '#f0fdf4',
@@ -2552,12 +2561,12 @@ const PartMaster = () => {
             </>
           ) : null}
         </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
+        <DialogActions sx={{
+          p: 2,
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#f8fafc'
         }}>
-          <Button 
+          <Button
             onClick={() => {
               setCsvImportDialogOpen(false);
               setCsvFile(null);
@@ -2565,7 +2574,7 @@ const PartMaster = () => {
               setCsvErrors([]);
             }}
             variant="outlined"
-            sx={{ 
+            sx={{
               borderRadius: '10px',
               borderColor: '#e2e8f0',
               color: '#64748b',
@@ -2575,11 +2584,11 @@ const PartMaster = () => {
             Cancel
           </Button>
           {csvPreview.length > 0 && csvErrors.length === 0 && (
-            <Button 
+            <Button
               onClick={handleBulkImport}
               variant="contained"
               color="success"
-              sx={{ 
+              sx={{
                 borderRadius: '10px',
                 background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
                 textTransform: 'none',
@@ -2599,10 +2608,10 @@ const PartMaster = () => {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ 
+          sx={{
             width: '100%',
             borderRadius: '10px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)'

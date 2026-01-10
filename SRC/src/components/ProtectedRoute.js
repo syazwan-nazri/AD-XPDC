@@ -1,19 +1,18 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { getRoleByGroupId, hasPermission } from '../utils/roles';
+import { checkAccess } from '../utils/roles';
 
-const ProtectedRoute = ({ requiredPermission }) => {
+const ProtectedRoute = ({ resourceId, requiredLevel = 'view' }) => {
   const user = useSelector((state) => state.auth.user);
-  
+
   if (!user) {
     return <Navigate to="/login" />;
   }
 
-  const userRole = getRoleByGroupId(user.groupId);
-  
-  if (requiredPermission && !hasPermission(userRole, requiredPermission)) {
-    return <Navigate to="/unauthorized" />;
+  // If a specific resource ID is required, check access
+  if (resourceId && !checkAccess(user, resourceId, requiredLevel)) {
+    return <Navigate to="/" replace />; // Redirect to home/dashboard if unauthorized
   }
 
   return <Outlet />;

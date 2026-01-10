@@ -139,6 +139,22 @@ function AppShell({ toggleTheme }) {
           const userDoc = await getUserDocByUid(firebaseUser.uid);
           const userData = userDoc.exists() ? userDoc.data() : {};
 
+          // Fetch Group Permissions dynamically
+          let groupPermissions = {};
+          if (userData.groupId) {
+            try {
+              const { doc, getDoc } = require('firebase/firestore');
+              const { db } = require('./firebase/config');
+              const groupRef = doc(db, 'groups', userData.groupId);
+              const groupSnap = await getDoc(groupRef);
+              if (groupSnap.exists()) {
+                groupPermissions = groupSnap.data().permissions || {};
+              }
+            } catch (err) {
+              console.error("Error fetching group permissions:", err);
+            }
+          }
+
           dispatch(
             setUser({
               email: firebaseUser.email,
@@ -147,6 +163,7 @@ function AppShell({ toggleTheme }) {
               username: userData.username || null,
               department: userData.department || null,
               mustChangePassword: userData.mustChangePassword || false,
+              groupPermissions: groupPermissions, // Store dynamic permissions
             })
           );
         } else {
@@ -250,58 +267,75 @@ function AppShell({ toggleTheme }) {
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route element={<ProtectedRoute />}>
+
+            {/* Reports */}
+            <Route element={<ProtectedRoute resourceId="dashboard" />}>
               <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="stock_inquiry" />}>
               <Route path="/reports/stock-inquiry" element={<StockInquiryReport />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="movement_history" />}>
               <Route path="/reports/stock-movement" element={<MovementHistory />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="low_stock" />}>
               <Route path="/reports/low-stock" element={<LowStockReport />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="stock_valuation" />}>
+              <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
+            </Route>
+
+            <Route element={<ProtectedRoute />}>
               <Route path="/change-password" element={<ChangePassword />} />
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
-              <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
-            </Route>
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN]} />}>
+            {/* Admin Modules */}
+            <Route element={<ProtectedRoute resourceId="user_master" />}>
               <Route path="/admin/user-master" element={<UserManagement />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="user_group_master" />}>
               <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
             </Route>
-
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
+            <Route element={<ProtectedRoute resourceId="supplier_master" />}>
               <Route path="/admin/supplier-master" element={<SupplierMaster />} />
             </Route>
-
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
+            <Route element={<ProtectedRoute resourceId="part_master" />}>
               <Route path="/admin/part-master" element={<PartMaster />} />
             </Route>
-
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER]} />}>
+            <Route element={<ProtectedRoute resourceId="part_group_master" />}>
               <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="storage_master" />}>
               <Route path="/admin/bin-master" element={<StorageMaster />} />
               <Route path="/admin/storage-locations" element={<StorageLocations />} />
             </Route>
-
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
+            <Route element={<ProtectedRoute resourceId="machine_master" />}>
               <Route path="/admin/machine-master" element={<MachineMaster />} />
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER]} />}>
+            {/* Inventory Modules */}
+            <Route element={<ProtectedRoute resourceId="stock_in" />}>
               <Route path="/inventory/stock-in" element={<StockIn />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="stock_out" />}>
               <Route path="/inventory/stock-out" element={<StockOut />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="internal_transfer" />}>
               <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="movement_logs" />}>
               <Route path="/inventory/movement-logs" element={<MovementLog />} />
             </Route>
-
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.MAINTENANCE]} />}>
+            <Route element={<ProtectedRoute resourceId="mrf" />}>
               <Route path="/inventory/mrf" element={<MRF />} />
             </Route>
-
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.STOREKEEPER, Roles.PROCUREMENT]} />}>
+            <Route element={<ProtectedRoute resourceId="stock_take" />}>
               <Route path="/inventory/stock-take" element={<StockTake />} />
               <Route path="/inventory/stock-take/process" element={<StockTakeProcess />} />
-
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={[Roles.ADMIN, Roles.PROCUREMENT]} />}>
+            {/* Procurement */}
+            <Route element={<ProtectedRoute resourceId="purchase_requisition" />}>
               <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
             </Route>
 

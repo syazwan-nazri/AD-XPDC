@@ -102,6 +102,61 @@ export const hasPermission = (userRole, permission) => {
   return role?.permissions?.[permission] || false;
 };
 
+// levels: no_access < view < edit < add
+const LEVELS = { 'no_access': 0, 'view': 1, 'edit': 2, 'add': 3 };
+
+export const checkAccess = (user, resourceId, requiredLevel = 'view') => {
+  if (!user) return false;
+
+  // 1. Priority: Check dynamic group permissions if they exist
+  if (user.groupPermissions && Object.keys(user.groupPermissions).length > 0) {
+    const userPerm = user.groupPermissions[resourceId];
+    if (!userPerm) return false; // Explicitly defined permissions exist, but this resource is missing -> No Access
+
+    const userLevelValue = LEVELS[userPerm.access] || 0;
+    const requiredLevelValue = LEVELS[requiredLevel] || 1;
+    return userLevelValue >= requiredLevelValue;
+  }
+
+  // 2. Fallback: Check static role-based permissions (Legacy)
+  const legacyPermissionMap = {
+    'user_master': 'canAccessUserManagement',
+    'user_group_master': 'canAccessUserManagement',
+    'part_master': 'canAccessPartMaster',
+    'part_group_master': 'canAccessPartGroupMaster',
+    'storage_master': 'canAccessStorageLocations',
+    'supplier_master': 'canAccessSupplierManagement',
+    'machine_master': 'canAccessAssetRegistry',
+
+    'stock_in': 'canAccessInventory',
+    'stock_out': 'canAccessInventory',
+    'internal_transfer': 'canAccessInventory',
+    'movement_logs': 'canAccessInventory',
+    'stock_take': 'canAccessStockTake',
+    'mrf': 'canAccessMRF',
+
+    'purchase_requisition': 'canAccessProcurement',
+
+    'dashboard': 'canAccessReports',
+    'stock_inquiry': 'canAccessReports',
+    'stock_valuation': 'canAccessStockValuation',
+    'movement_history': 'canAccessReports',
+    'low_stock': 'canAccessReports'
+  };
+
+  const legacyKey = legacyPermissionMap[resourceId];
+  if (legacyKey) {
+    const userRole = getRoleByGroupId(user.groupId);
+    return hasPermission(userRole, legacyKey);
+  }
+
+  // Fallback for Admin superuser if all else fails
+  if (user.groupId === 'A') return true;
+
+  return false;
+};
+
+
 export const getAccessibleModules = (userRole) => {
   const role = typeof userRole === 'string' ? Roles[userRole] : userRole;
   if (!role) return [];

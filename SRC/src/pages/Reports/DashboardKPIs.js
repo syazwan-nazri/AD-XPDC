@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import {
-  Grid, Paper, Typography, Box, Card, CardContent, Divider, MenuItem, 
+  Grid, Paper, Typography, Box, Card, CardContent, Divider, MenuItem,
   Select, FormControl, InputLabel, Tooltip, IconButton, CircularProgress,
   Chip, useMediaQuery, useTheme
 } from '@mui/material';
@@ -28,7 +28,7 @@ const DashboardKPIs = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-  
+
   const [stats, setStats] = useState({
     totalStockValue: 0,
     lowStockCount: 0,
@@ -53,7 +53,7 @@ const DashboardKPIs = () => {
     const fetchData = async () => {
       try {
         console.log('🔍 Starting data fetch...');
-        
+
         // 1. Fetch Parts
         const partsSnapshot = await getDocs(collection(db, 'parts'));
         const partsData = partsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -62,19 +62,19 @@ const DashboardKPIs = () => {
 
         // 2. Fetch Movements - Simple query first to test
         console.log('📦 Attempting to fetch movement_logs...');
-        
+
         let movementsData = [];
-        
+
         // First try: simple fetch without any query
         try {
           const simpleSnapshot = await getDocs(collection(db, 'movement_logs'));
           console.log('📊 Simple fetch result - Total docs:', simpleSnapshot.size);
-          
+
           if (simpleSnapshot.size > 0) {
             movementsData = simpleSnapshot.docs.map(doc => {
               const data = doc.data();
               let parsedDate = null;
-              
+
               // Try multiple ways to parse the date
               if (data.timestamp && typeof data.timestamp.toDate === 'function') {
                 parsedDate = data.timestamp.toDate();
@@ -93,13 +93,13 @@ const DashboardKPIs = () => {
               } else if (typeof data.date === 'number') {
                 parsedDate = new Date(data.date);
               }
-              
+
               // Fallback to current date if nothing works
               if (!parsedDate || isNaN(parsedDate.getTime())) {
                 console.warn('⚠️ Could not parse date for document:', doc.id, data);
                 parsedDate = new Date();
               }
-              
+
               return {
                 id: doc.id,
                 ...data,
@@ -122,7 +122,7 @@ const DashboardKPIs = () => {
           console.error('❌ Error fetching movements:', fetchError.message);
           movementsData = [];
         }
-        
+
         setMovements(movementsData);
 
         // 3. Fetch PRs
@@ -187,11 +187,11 @@ const DashboardKPIs = () => {
 
   // Filtered Data Calculations
   const dashboardData = useMemo(() => {
-    if (!parts.length) return { 
-      categoryData: [], 
-      stockOutTrend: [], 
-      topParts: [], 
-      inventoryHealthData: [], 
+    if (!parts.length) return {
+      categoryData: [],
+      stockOutTrend: [],
+      topParts: [],
+      inventoryHealthData: [],
       movementComparison: [],
       recentActivity: [],
       quickStats: []
@@ -203,8 +203,8 @@ const DashboardKPIs = () => {
       const cat = part.category || 'Uncategorized';
       categoryMap[cat] = (categoryMap[cat] || 0) + 1;
     });
-    const categoryData = Object.keys(categoryMap).map(key => ({ 
-      name: key, 
+    const categoryData = Object.keys(categoryMap).map(key => ({
+      name: key,
       value: categoryMap[key],
       color: COLORS[Object.keys(categoryMap).indexOf(key) % COLORS.length]
     }));
@@ -219,15 +219,15 @@ const DashboardKPIs = () => {
 
     // 3. Stock Movement Comparison (In vs Out) - APPLY FILTERS
     const movementMap = {};
-    
+
     // Calculate filter date range based on timeRange
     let filterStartDate = new Date();
     let filterEndDate = new Date();
-    
+
     // For past years, we need to adjust the end date to be the end of that year
     const isCurrentYear = selectedYear === new Date().getFullYear();
     const referenceDate = isCurrentYear ? new Date() : new Date(selectedYear, 11, 31);
-    
+
     if (timeRange === 'day') {
       filterStartDate = new Date(referenceDate);
       filterStartDate.setDate(filterStartDate.getDate() - 1);
@@ -248,60 +248,60 @@ const DashboardKPIs = () => {
       filterStartDate = new Date(selectedYear, 0, 1); // Jan 1 of selected year
       filterEndDate = new Date(selectedYear, 11, 31); // Dec 31 of selected year
     }
-    
+
     // Set start time to beginning of day
     filterStartDate.setHours(0, 0, 0, 0);
     filterEndDate.setHours(23, 59, 59, 999);
-    
+
     console.log('=== STOCK MOVEMENT ANALYSIS ===');
     console.log('Total movements available:', movements.length);
     console.log('Filter range:', filterStartDate.toLocaleDateString(), 'to', filterEndDate.toLocaleDateString());
     console.log('Time range selected:', timeRange);
     console.log('Selected Year:', selectedYear);
-    
+
     let processedCount = 0;
     let inTotal = 0, outTotal = 0, transferTotal = 0;
-    
+
     movements.forEach(m => {
       if (!m.date) {
         console.warn('Movement missing date:', m);
         return;
       }
-      
+
       const date = m.date;
       const dateYear = date.getFullYear();
-      
+
       // First apply year filter
       if (dateYear !== selectedYear) {
         return;
       }
-      
+
       // Then apply time range filter (within selected year only)
       if (date < filterStartDate || date > filterEndDate) {
         return;
       }
-      
+
       processedCount++;
-      
+
       // Create consistent date key in YYYY-MM-DD format for sorting
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const dateKey = `${year}-${month}-${day}`;
-      
+
       // Display format (e.g., "Jan 9")
       const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
+
       if (!movementMap[dateKey]) {
-        movementMap[dateKey] = { 
-          date: displayDate, 
+        movementMap[dateKey] = {
+          date: displayDate,
           dateKey: dateKey,
-          StockIn: 0, 
-          StockOut: 0, 
-          Transfers: 0 
+          StockIn: 0,
+          StockOut: 0,
+          Transfers: 0
         };
       }
-      
+
       const quantity = Number(m.quantity) || 0;
 
       // Handle multiple possible field names for type
@@ -330,20 +330,34 @@ const DashboardKPIs = () => {
         ...item,
         NetChange: item.StockIn - item.StockOut
       }));
-    
+
     console.log('Final chart data points:', movementComparison.length);
     console.log('Chart data:', movementComparison);
     console.log('=== END STOCK MOVEMENT ANALYSIS ===');;
 
-    // 4. Top Moving Items
+    // 4. Top Moving Items (Updated to use Stock Code/SAP Number)
     const partUsageMap = {};
     movements.forEach(m => {
-      const partName = m.partName || 'Unknown';
-      partUsageMap[partName] = (partUsageMap[partName] || 0) + (Number(m.quantity) || 0);
+      // Try to find part details from parts list to get SAP/Stock Code if missing in movement log
+      const partDef = parts.find(p => p.id === m.partId);
+
+      const stockCode = m.sapNumber || partDef?.sapNumber || 'N/A';
+      const partName = m.partName || partDef?.name || 'Unknown';
+
+      // Use stockCode as key if available, otherwise partName (fallback)
+      const key = stockCode !== 'N/A' ? stockCode : partName;
+
+      if (!partUsageMap[key]) {
+        partUsageMap[key] = {
+          name: partName,
+          stockCode: stockCode,
+          value: 0
+        };
+      }
+      partUsageMap[key].value += (Number(m.quantity) || 0);
     });
 
-    const topParts = Object.keys(partUsageMap)
-      .map(key => ({ name: key, value: partUsageMap[key] }))
+    const topParts = Object.values(partUsageMap)
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
 
@@ -352,13 +366,13 @@ const DashboardKPIs = () => {
       .filter(m => {
         const movementType = (m.type || m.movementType || m.movement_type || '').toUpperCase();
         return (
-          movementType === 'IN' || 
-          movementType === 'STOCK IN' || 
+          movementType === 'IN' ||
+          movementType === 'STOCK IN' ||
           movementType === 'INWARD' ||
-          movementType === 'OUT' || 
-          movementType === 'STOCK OUT' || 
+          movementType === 'OUT' ||
+          movementType === 'STOCK OUT' ||
           movementType === 'OUTWARD' ||
-          movementType === 'TRANSFER' || 
+          movementType === 'TRANSFER' ||
           movementType === 'INTERNAL TRANSFER'
         );
       })
@@ -372,7 +386,7 @@ const DashboardKPIs = () => {
         } else if (movementType === 'OUT' || movementType === 'STOCK OUT' || movementType === 'OUTWARD') {
           displayType = 'Stock Out';
         }
-        
+
         return {
           id: m.id,
           type: displayType,
@@ -392,11 +406,11 @@ const DashboardKPIs = () => {
       { label: 'Fill Rate', value: '94', unit: '%', icon: '📦', color: '#8b5cf6' }
     ];
 
-    return { 
-      categoryData, 
-      stockOutTrend: movementComparison, 
-      topParts, 
-      inventoryHealthData, 
+    return {
+      categoryData,
+      stockOutTrend: movementComparison,
+      topParts,
+      inventoryHealthData,
       movementComparison,
       recentActivity,
       quickStats
@@ -473,7 +487,7 @@ const DashboardKPIs = () => {
       // Let the sidebar handle its own space
       // The content will naturally flow to the right of the sidebar
     }}>
-      {/* Header Section - FIXED: Remove left margin here */}
+      {/* Header Section */}
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -484,13 +498,9 @@ const DashboardKPIs = () => {
         p: 3,
         backgroundColor: 'white',
         borderBottom: '1px solid #e2e8f0',
-        // REMOVED: width: '100%' - let it be automatic
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
-        // Add left padding to account for sidebar
-        pl: { xs: 3, md: 'calc(240px + 24px)' }, // 240px sidebar + 24px padding
-        pr: 3
+        position: 'relative',
+        width: '100%',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{
@@ -557,14 +567,10 @@ const DashboardKPIs = () => {
 
 
 
-      {/* Content Area - FIXED: Add proper padding for sidebar */}
+      {/* Content Area */}
       <Box sx={{
         p: 3,
-        // Add left padding to account for sidebar width
-        pl: { xs: 3, md: 'calc(240px + 24px)' }, // 240px sidebar + 24px padding
-        pr: 3,
-        width: '100%',
-        maxWidth: { md: 'calc(100vw - 240px)' }, // Account for sidebar width
+        width: '100%'
       }}>
         {/* Top KPI Cards - Full Width Row */}
         <Grid container spacing={3} sx={{ mb: 4, width: '100%' }}>
@@ -644,14 +650,14 @@ const DashboardKPIs = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dashboardData.movementComparison} margin={{ top: 10, right: 30, left: 70, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis 
-                      dataKey="date" 
-                      angle={-45} 
-                      textAnchor="end" 
+                    <XAxis
+                      dataKey="date"
+                      angle={-45}
+                      textAnchor="end"
                       height={60}
                       label={{ value: 'Date', position: 'insideBottom', offset: -5 }}
                     />
-                    <YAxis 
+                    <YAxis
                       tickFormatter={(val) => val.toLocaleString()}
                       tickMargin={12}
                       label={{ value: 'Total Transaction', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle' } }}
@@ -768,10 +774,10 @@ const DashboardKPIs = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: activity.type === 'Stock In' ? '#10b98120' : 
-                                         activity.type === 'Stock Out' ? '#ef444420' : '#8b5cf620',
-                          color: activity.type === 'Stock In' ? '#10b981' : 
-                                 activity.type === 'Stock Out' ? '#ef4444' : '#8b5cf6',
+                          backgroundColor: activity.type === 'Stock In' ? '#10b98120' :
+                            activity.type === 'Stock Out' ? '#ef444420' : '#8b5cf620',
+                          color: activity.type === 'Stock In' ? '#10b981' :
+                            activity.type === 'Stock Out' ? '#ef4444' : '#8b5cf6',
                           fontSize: '18px',
                           fontWeight: 700
                         }}>
@@ -856,36 +862,90 @@ const DashboardKPIs = () => {
               p: 3,
               height: '100%'
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'left', gap: 1, mb: 3 }}>
                 <LocalShippingIcon sx={{ color: '#10b981' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
                   Top Moving Items
                 </Typography>
               </Box>
               <Divider sx={{ mb: 3 }} />
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={dashboardData.topParts}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                  >
-                    <XAxis type="number" />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      width={100} 
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 15)}...` : value}
-                    />
-                    <ChartTooltip formatter={(value) => [`${value} units`, 'Quantity']} />
-                    <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                      {dashboardData.topParts.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <Box sx={{ height: 300, overflowY: 'auto', px: 1 }}>
+                {/* Header */}
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  mb: 2,
+                  p: 1.5,
+                  bgcolor: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <Typography variant="caption" sx={{ width: 40, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>#</Typography>
+                  <Typography variant="caption" sx={{ flex: 1, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Stock Code</Typography>
+                  <Typography variant="caption" sx={{ width: 80, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Quantity</Typography>
+                </Box>
+
+                {/* List Items */}
+                {dashboardData.topParts.map((entry, index) => (
+                  <Box key={index} sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    mb: 2,
+                    p: 0.5,
+                    '&:hover': { bgcolor: '#f8fafc', borderRadius: '8px' }
+                  }}>
+                    <Box sx={{
+                      width: 40,
+                      display: 'flex',
+                      justifyContent: 'flex-start',
+                      pl: 1
+                    }}>
+                      <Typography variant="body2" sx={{
+                        fontWeight: 700,
+                        color: index < 3 ? COLORS[index] : '#94a3b8',
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: index < 3 ? `${COLORS[index]}15` : 'transparent'
+                      }}>
+                        {index + 1}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, pr: 3 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
+                        {entry.stockCode !== 'N/A' ? entry.stockCode : entry.name}
+                      </Typography>
+                      {/* Subtitle with Name if Stock Code is displayed */}
+                      {entry.stockCode !== 'N/A' && (
+                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: -0.5, mb: 0.5 }}>
+                          {entry.name}
+                        </Typography>
+                      )}
+                      {/* Visual Bar */}
+                      <Box sx={{
+                        width: '100%',
+                        height: 6,
+                        bgcolor: '#f1f5f9',
+                        borderRadius: 3,
+                        overflow: 'hidden'
+                      }}>
+                        <Box sx={{
+                          width: `${(entry.value / (dashboardData.topParts[0]?.value || 1)) * 100}%`,
+                          height: '100%',
+                          bgcolor: COLORS[index % COLORS.length],
+                          borderRadius: 3,
+                          transition: 'width 1s ease-in-out'
+                        }} />
+                      </Box>
+                    </Box>
+                    <Typography variant="body2" sx={{ width: 80, fontWeight: 700, color: '#3b82f6', textAlign: 'right', pr: 1 }}>
+                      {entry.value}
+                    </Typography>
+                  </Box>
+                ))}
               </Box>
             </Paper>
           </Grid>
@@ -910,7 +970,7 @@ const DashboardKPIs = () => {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, 1fr)',
                 gap: 2,
-                height: 300
+                height: 'auto'
               }}>
                 {dashboardData.quickStats.map((stat, idx) => (
                   <Card key={idx} sx={{

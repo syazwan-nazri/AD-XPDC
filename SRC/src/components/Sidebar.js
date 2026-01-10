@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -29,49 +29,51 @@ import Box from '@mui/material/Box';
 import { NavLink, useLocation } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
 import { useSelector } from 'react-redux';
-import { getRoleByGroupId, hasPermission } from '../utils/roles';
+import { getRoleByGroupId, hasPermission, checkAccess } from '../utils/roles';
 
 const drawerWidth = 280;
 const collapsedWidth = 80;
 
-// Define links with their required permission key
+// Define links with their required resource key (Group Access Rights)
 const dataInputMasterLinks = [
-  { path: '/admin/user-master', text: 'User Master', icon: <PeopleIcon />, permission: 'canAccessUserManagement' },
-  { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, permission: 'canAccessUserManagement' },
-  { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, permission: 'canAccessPartMaster' },
-  { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, permission: 'canAccessPartGroupMaster' },
+  { path: '/admin/user-master', text: 'User Master', icon: <PeopleIcon />, resourceId: 'user_master' },
+  { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, resourceId: 'user_group_master' },
+  { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, resourceId: 'part_master' },
+  { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, resourceId: 'part_group_master' },
   {
     text: 'Storage Master',
     icon: <StorageIcon />,
-    permission: 'canAccessStorageLocations',
+    // For nested items, we check parent access usually, or just check subitems
+    resourceId: 'storage_master',
     subItems: [
-      { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
-      { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, permission: 'canAccessStorageLocations' },
+      { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, resourceId: 'storage_master' },
+      { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, resourceId: 'storage_master' },
+      // Note: If you want separate permissions for Bin vs Location, add separate resourceIds
     ]
   },
-  { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, permission: 'canAccessSupplierManagement' },
-  { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, permission: 'canAccessAssetRegistry' },
+  { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, resourceId: 'supplier_master' },
+  { path: '/admin/machine-master', text: 'Machine Master', icon: <BuildIcon />, resourceId: 'machine_master' },
 ];
 
 const stockMovementLinks = [
-  { path: '/inventory/stock-in', text: 'Stock In', icon: <MoveToInboxIcon />, permission: 'canAccessInventory' },
-  { path: '/inventory/stock-out', text: 'Stock Out', icon: <OutboxIcon />, permission: 'canAccessInventory' },
-  { path: '/inventory/internal-transfer', text: 'Internal Transfer', icon: <SwapHorizIcon />, permission: 'canAccessInventory' },
-  { path: '/inventory/movement-logs', text: 'Movement Logs', icon: <HistoryIcon />, permission: 'canAccessInventory' },
-  { path: '/inventory/stock-take', text: 'Stock Take', icon: <Inventory2Icon />, permission: 'canAccessStockTake' },
-  { path: '/inventory/mrf', text: 'MRF', icon: <ReceiptLongIcon />, permission: 'canAccessMRF' },
+  { path: '/inventory/stock-in', text: 'Stock In', icon: <MoveToInboxIcon />, resourceId: 'stock_in' },
+  { path: '/inventory/stock-out', text: 'Stock Out', icon: <OutboxIcon />, resourceId: 'stock_out' },
+  { path: '/inventory/internal-transfer', text: 'Internal Transfer', icon: <SwapHorizIcon />, resourceId: 'internal_transfer' },
+  { path: '/inventory/movement-logs', text: 'Movement Logs', icon: <HistoryIcon />, resourceId: 'movement_logs' },
+  { path: '/inventory/stock-take', text: 'Stock Take', icon: <Inventory2Icon />, resourceId: 'stock_take' },
+  { path: '/inventory/mrf', text: 'MRF', icon: <ReceiptLongIcon />, resourceId: 'mrf' },
 ];
 
 const purchasingLinks = [
-  { path: '/procurement/purchase-requisition', text: 'Purchase Requisition', icon: <ShoppingCartIcon />, permission: 'canAccessProcurement' },
+  { path: '/procurement/purchase-requisition', text: 'Purchase Requisition', icon: <ShoppingCartIcon />, resourceId: 'purchase_requisition' },
 ];
 
 const reportLinks = [
-  { path: '/reports/dashboard-kpis', text: 'Dashboard', icon: <DashboardIcon />, permission: 'canAccessReports' },
-  { path: '/reports/stock-inquiry', text: 'Stock Inquiry', icon: <Inventory2Icon />, permission: 'canAccessReports' },
-  { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <ReceiptLongIcon />, permission: 'canAccessStockValuation' },
-  { path: '/reports/stock-movement', text: 'Movement History', icon: <SwapHorizIcon />, permission: 'canAccessReports' },
-  { path: '/reports/low-stock', text: 'Low Stock Alert', icon: <WarningIcon />, permission: 'canAccessReports' },
+  { path: '/reports/dashboard-kpis', text: 'Dashboard', icon: <DashboardIcon />, resourceId: 'dashboard' },
+  { path: '/reports/stock-inquiry', text: 'Stock Inquiry', icon: <Inventory2Icon />, resourceId: 'stock_inquiry' },
+  { path: '/reports/stock-valuation', text: 'Stock Valuation', icon: <ReceiptLongIcon />, resourceId: 'stock_valuation' },
+  { path: '/reports/stock-movement', text: 'Movement History', icon: <SwapHorizIcon />, resourceId: 'movement_history' },
+  { path: '/reports/low-stock', text: 'Low Stock Alert', icon: <WarningIcon />, resourceId: 'low_stock' },
 ];
 
 const Sidebar = ({ open, onToggle }) => {
@@ -84,17 +86,33 @@ const Sidebar = ({ open, onToggle }) => {
   };
 
   const user = useSelector((state) => state.auth.user);
-  const userRole = user ? getRoleByGroupId(user.groupId) : null;
 
-  // Filter links
-  const filterLinks = (links) => links.filter(link =>
-    !link.permission || (userRole && hasPermission(userRole, link.permission))
-  );
+  // New Filter Logic using Dynamic Permissions (Clean, no mutation)
+  const filterNodes = (nodes) => {
+    return nodes.reduce((acc, node) => {
+      // Check if node has subItems
+      if (node.subItems) {
+        const filteredSubItems = filterNodes(node.subItems);
+        // If has accessible subItems OR parent itself is explicitly accessible (if we allowed empty parents)
+        // Here we assume if parent has subItems, at least one must be accessible to show parent
+        if (filteredSubItems.length > 0) {
+          acc.push({ ...node, subItems: filteredSubItems });
+        }
+      } else {
+        // Leaf node
+        if (checkAccess(user, node.resourceId)) {
+          acc.push(node);
+        }
+      }
+      return acc;
+    }, []);
+  };
 
-  const filteredDataMasterLinks = filterLinks(dataInputMasterLinks);
-  const filteredStockMovementLinks = filterLinks(stockMovementLinks);
-  const filteredPurchasingLinks = filterLinks(purchasingLinks);
-  const filteredReportLinks = filterLinks(reportLinks);
+  // We use useMemo to avoid recalculating on every render unless user changes
+  const filteredDataMasterLinks = useMemo(() => user ? filterNodes(dataInputMasterLinks) : [], [user]);
+  const filteredStockMovementLinks = useMemo(() => user ? filterNodes(stockMovementLinks) : [], [user]);
+  const filteredPurchasingLinks = useMemo(() => user ? filterNodes(purchasingLinks) : [], [user]);
+  const filteredReportLinks = useMemo(() => user ? filterNodes(reportLinks) : [], [user]);
 
   if (!user) return null;
 

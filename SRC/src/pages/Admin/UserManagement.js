@@ -163,7 +163,7 @@ const UserManagement = () => {
 
   const filteredUsers = useMemo(() => {
     const q = (search || '').trim().toLowerCase();
-    
+
     return users.filter((user) => {
       const matchesSearch = !q ? true : [
         user.username,
@@ -766,12 +766,13 @@ const UserManagement = () => {
       <Dialog
         open={modal.open}
         onClose={closeModal}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: '12px',
-            overflow: 'hidden'
+            display: 'flex',
+            flexDirection: 'column',
           }
         }}
       >
@@ -789,7 +790,7 @@ const UserManagement = () => {
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Email"
                 type="email"
@@ -803,6 +804,7 @@ const UserManagement = () => {
                 disabled={modal.edit}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -811,7 +813,7 @@ const UserManagement = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Username"
                 value={modal.data.username}
@@ -823,6 +825,7 @@ const UserManagement = () => {
                 helperText={usernameError ? 'Username is required or already exists' : ''}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -831,7 +834,7 @@ const UserManagement = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Department"
                 value={modal.data.department}
@@ -843,6 +846,7 @@ const UserManagement = () => {
                 helperText={departmentError ? 'Department is required' : ''}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -851,9 +855,9 @@ const UserManagement = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <FormControl fullWidth required error={groupError}>
-                <InputLabel>User Group</InputLabel>
+                <InputLabel shrink>User Group</InputLabel>
                 <Select
                   label="User Group"
                   value={modal.data.groupId || ""}
@@ -862,12 +866,13 @@ const UserManagement = () => {
                     setGroupError(false);
                   }}
                   disabled={!isAdmin}
+                  displayEmpty
                   sx={{
                     borderRadius: '10px',
                     backgroundColor: '#f8fafc',
                   }}
                 >
-                  <MenuItem value="">
+                  <MenuItem value="" disabled>
                     <em>Select a group</em>
                   </MenuItem>
                   {userGroups && userGroups.length > 0 ? (
@@ -879,6 +884,27 @@ const UserManagement = () => {
                   ) : (
                     <MenuItem disabled>No groups available</MenuItem>
                   )}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel shrink>Status</InputLabel>
+                <Select
+                  label="Status"
+                  value={modal.data.status || "pending"}
+                  onChange={(e) => {
+                    setModal((m) => ({ ...m, data: { ...m.data, status: e.target.value } }));
+                  }}
+                  displayEmpty
+                  sx={{
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }}
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

@@ -1009,12 +1009,13 @@ const SupplierMaster = () => {
       <Dialog
         open={editDialogOpen}
         onClose={handleEditClose}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: '12px',
-            overflow: 'hidden'
+            display: 'flex',
+            flexDirection: 'column',
           }
         }}
       >
@@ -1032,7 +1033,7 @@ const SupplierMaster = () => {
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Supplier Name"
                 value={editForm.name}
@@ -1044,6 +1045,7 @@ const SupplierMaster = () => {
                 helperText={editNameError ? 'Supplier name is required' : ''}
                 fullWidth
                 required
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1052,12 +1054,13 @@ const SupplierMaster = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Contact Person"
                 value={editForm.contactPerson}
                 onChange={(e) => setEditForm({ ...editForm, contactPerson: e.target.value })}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1066,13 +1069,14 @@ const SupplierMaster = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Email"
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1081,12 +1085,13 @@ const SupplierMaster = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 label="Phone"
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1103,6 +1108,7 @@ const SupplierMaster = () => {
                 fullWidth
                 multiline
                 rows={3}
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
