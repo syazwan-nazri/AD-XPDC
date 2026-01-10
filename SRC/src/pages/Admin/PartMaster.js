@@ -115,8 +115,8 @@ const PartMaster = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [barcodeDialogOpen, setBarcodeDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '',
-    safetyLevel: '', replenishQty: '', currentStock: 0
+    sapNumber: '', internalRef: '', name: '', category: '',
+    safetyLevel: '', replenishQty: '', currentStock: 0, warehouseLocationId: ''
   });
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -149,6 +149,8 @@ const PartMaster = () => {
   const [duplicatesFound, setDuplicatesFound] = useState([]);
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const [cleanupProgress, setCleanupProgress] = useState(0);
+  // Warehouse locations list for location selection/display
+  const [warehouseLocations, setWarehouseLocations] = useState([]);
 
   // Stats states
   const [stats, setStats] = useState({
@@ -183,6 +185,17 @@ const PartMaster = () => {
       }
     };
     fetchParts();
+    // Fetch warehouse locations for dropdown
+    const fetchWarehouseLocations = async () => {
+      try {
+        const locationsSnapshot = await getDocs(collection(db, 'warehouseLocations'));
+        const locationsData = locationsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setWarehouseLocations(locationsData);
+      } catch (error) {
+        setSnackbar({ open: true, message: 'Error fetching warehouse locations', severity: 'error' });
+      }
+    };
+    fetchWarehouseLocations();
   }, [dispatch]);
 
   // Calculate statistics
@@ -427,11 +440,10 @@ const PartMaster = () => {
       internalRef: part.internalRef || '',
       name: part.name || '',
       category: part.category || '',
-      rackNumber: part.rackNumber || '',
-      rackLevel: part.rackLevel || '',
       safetyLevel: (part.safetyLevel ?? part.minStockLevel) || '',
       replenishQty: (part.replenishQty ?? part.maxStockLevel) || '',
-      currentStock: part.currentStock || 0
+      currentStock: part.currentStock || 0,
+      warehouseLocationId: part.warehouseLocationId || ''
     });
     setEditDialogOpen(true);
   };
@@ -439,7 +451,7 @@ const PartMaster = () => {
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditingId(null);
-    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', rackNumber: '', rackLevel: '', safetyLevel: '', replenishQty: '', currentStock: 0 });
+    setEditForm({ sapNumber: '', internalRef: '', name: '', category: '', safetyLevel: '', replenishQty: '', currentStock: 0, warehouseLocationId: '' });
   };
 
   const handleSaveChanges = async () => {
@@ -1340,6 +1352,7 @@ const PartMaster = () => {
                         const currentStock = p.currentStock || 0;
                         const isLowStock = currentStock < safetyLevel;
                         const isZeroStock = currentStock === 0;
+                        const selectedLocation = warehouseLocations.find(l => l.id === p.warehouseLocationId);
 
                         return (
                           <TableRow key={p.id} hover sx={{
@@ -1369,19 +1382,29 @@ const PartMaster = () => {
                               />
                             </TableCell>
                             <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {p.rackNumber || '—'}
-                                </Typography>
-                                {p.rackLevel && (
-                                  <Chip
-                                    label={`Lvl ${p.rackLevel}`}
-                                    size="small"
-                                    variant="outlined"
-                                    color="secondary"
-                                  />
-                                )}
-                              </Box>
+                              {selectedLocation ? (
+                                <Chip
+                                  label={selectedLocation.locationName}
+                                  size="small"
+                                  color="secondary"
+                                  variant="outlined"
+                                  sx={{ fontWeight: 600 }}
+                                />
+                              ) : (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {p.rackNumber || '—'}
+                                  </Typography>
+                                  {p.rackLevel && (
+                                    <Chip
+                                      label={`Lvl ${p.rackLevel}`}
+                                      size="small"
+                                      variant="outlined"
+                                      color="secondary"
+                                    />
+                                  )}
+                                </Box>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" sx={{ color: '#64748b' }}>
@@ -2000,6 +2023,33 @@ const PartMaster = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <TextField
+                select
+                label="Warehouse Location"
+                value={editForm.warehouseLocationId}
+                onChange={(e) => setEditForm(f => ({ ...f, warehouseLocationId: e.target.value }))}
+                fullWidth
+                disabled={!canEdit}
+                InputLabelProps={{ shrink: true }}
+                helperText="Select from registered warehouse locations"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  }
+                }}
+              >
+                <MenuItem value="">— No Location —</MenuItem>
+                {warehouseLocations
+                  .filter(loc => (loc.status || 'Active') === 'Active')
+                  .map(loc => (
+                    <MenuItem key={loc.id} value={loc.id}>
+                      {loc.locationName}
+                    </MenuItem>
+                  ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
                 label="Internal Ref No"
                 value={editForm.internalRef}
                 onChange={(e) => setEditForm(f => ({ ...f, internalRef: e.target.value }))}
@@ -2041,48 +2091,6 @@ const PartMaster = () => {
                 disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '10px',
-                    backgroundColor: '#f8fafc',
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Rack Number"
-                value={editForm.rackNumber}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setEditForm(f => ({ ...f, rackNumber: value }));
-                  setEditRackNumberError(value && !validateRackNumber(value));
-                }}
-                error={editRackNumberError}
-                helperText={editRackNumberError ? "Must be exactly 2 digits" : ""}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '10px',
-                    backgroundColor: '#f8fafc',
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Rack Level"
-                value={editForm.rackLevel}
-                onChange={(e) => {
-                  const value = e.target.value.toUpperCase();
-                  setEditForm(f => ({ ...f, rackLevel: value }));
-                  setEditRackLevelError(value && !validateRackLevel(value));
-                }}
-                error={editRackLevelError}
-                inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -2357,10 +2365,10 @@ const PartMaster = () => {
                       variant="outlined"
                     />
                   </Box>
-                  <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Category: {barcodeTarget.category || '—'} |
-                    Location: Rack {barcodeTarget.rackNumber || '—'} Level {barcodeTarget.rackLevel || '—'}
-                  </Typography>
+                      <Typography variant="body2" sx={{ color: '#64748b' }}>
+                        Category: {barcodeTarget.category || '—'} |
+                        Location: {warehouseLocations.find(l => l.id === barcodeTarget.warehouseLocationId)?.locationName || `Rack ${barcodeTarget.rackNumber || '—'} Level ${barcodeTarget.rackLevel || '—'}`}
+                      </Typography>
                 </Box>
               </>
             )}
