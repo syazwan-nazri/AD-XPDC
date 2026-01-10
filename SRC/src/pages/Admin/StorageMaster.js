@@ -534,7 +534,7 @@ const StorageMaster = () => {
         <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
           Edit Part Rack Assignment
         </DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
+        <DialogContent dividers sx={{ p: 4, overflowY: 'auto' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="SAP#"

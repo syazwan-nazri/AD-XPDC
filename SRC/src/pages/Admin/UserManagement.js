@@ -781,14 +781,29 @@ const UserManagement = () => {
           borderBottom: '1px solid #e2e8f0',
           backgroundColor: '#faf5ff'
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              flexDirection: { xs: 'column', sm: 'row' },
+              textAlign: { xs: 'center', sm: 'left' },
+            }}
+          >
             <PersonIcon sx={{ color: '#8b5cf6' }} />
+
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
               {modal.edit ? 'Edit User' : 'Add New User'}
             </Typography>
           </Box>
+
+
         </DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
+        <DialogContent dividers
+          sx={{
+            p: 4,
+            overflowY: 'auto',
+          }}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <TextField

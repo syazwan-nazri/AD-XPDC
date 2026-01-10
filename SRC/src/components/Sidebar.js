@@ -29,7 +29,7 @@ import Box from '@mui/material/Box';
 import { NavLink, useLocation } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
 import { useSelector } from 'react-redux';
-import { getRoleByGroupId, hasPermission, checkAccess } from '../utils/roles';
+import { checkAccess } from '../utils/roles';
 
 const drawerWidth = 280;
 const collapsedWidth = 80;
@@ -82,6 +82,9 @@ const Sidebar = ({ open, onToggle }) => {
   const [openSection, setOpenSection] = useState('');
 
   const handleToggle = (section) => {
+    if (!open && onToggle) {
+      onToggle(); // Pop out the sidebar if it is closed
+    }
     setOpenSection((prev) => (prev === section ? '' : section));
   };
 
@@ -127,7 +130,7 @@ const Sidebar = ({ open, onToggle }) => {
             onClick={() => handleToggle(sectionId)}
             sx={{
               justifyContent: open ? 'initial' : 'center',
-              px: open ? 2.5 : 1,
+              px: open ? 2.5 : 1, // Reduced padding when closed for better centering
               py: 1.5,
               borderLeft: open && isOpen ? `4px solid ${sectionColor}` : 'none',
               backgroundColor: isOpen && open ? `${sectionColor}08` : 'transparent',
@@ -139,7 +142,7 @@ const Sidebar = ({ open, onToggle }) => {
           >
             <ListItemIcon sx={{
               minWidth: 0,
-              mr: open ? 2.5 : 'auto',
+              mr: open ? 2.5 : 0, // Remove auto margin to allow centering
               justifyContent: 'center',
               color: sectionColor,
               fontSize: 22
@@ -198,7 +201,7 @@ const Sidebar = ({ open, onToggle }) => {
                         >
                           <ListItemIcon sx={{
                             minWidth: 0,
-                            mr: open ? 2 : 'auto',
+                            mr: open ? 2 : 0, // Centering fix
                             justifyContent: 'center',
                             color: location.pathname === subItem.path ? sectionColor : '#94a3b8',
                             fontSize: 18
@@ -247,7 +250,7 @@ const Sidebar = ({ open, onToggle }) => {
                   >
                     <ListItemIcon sx={{
                       minWidth: 0,
-                      mr: open ? 2 : 'auto',
+                      mr: open ? 2 : 0, // Centering fix
                       justifyContent: 'center',
                       color: location.pathname === item.path ? sectionColor : '#94a3b8',
                       fontSize: 18
@@ -279,8 +282,7 @@ const Sidebar = ({ open, onToggle }) => {
 
   return (
     <Drawer
-      variant="persistent"
-      open={open}
+      variant="permanent"
       sx={{
         width: open ? drawerWidth : collapsedWidth,
         flexShrink: 0,

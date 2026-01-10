@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { db } from '../../firebase/config';
 import { collection, getDocs, deleteDoc, doc, setDoc, query, where } from 'firebase/firestore';
-import { Roles } from '../../utils/roles';
+
+
 import {
   Box,
   Button,
@@ -51,27 +52,7 @@ const defaultForm = {
 };
 
 // Convert Roles to array for predefined groups
-const predefinedGroups = Object.values(Roles).map(role => ({
-  groupId: role.groupId,
-  groupName: role.name,
-  description: getGroupDescription(role.name),
-  permissions: role.permissions
-}));
 
-function getGroupDescription(roleName) {
-  switch (roleName) {
-    case 'Admin':
-      return 'Administrator group with full access';
-    case 'Store keeper':
-      return 'Manages inventory and stock';
-    case 'Maintenance Technician':
-      return 'Handles maintenance requests';
-    case 'Procurement Officer':
-      return 'Manages purchases and orders';
-    default:
-      return '';
-  }
-}
 
 const Resources = [
   { id: 'user_master', name: 'User Master', category: 'Admin' },
@@ -823,7 +804,7 @@ const UserGroupMaster = () => {
             </Typography>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
+        <DialogContent dividers sx={{ p: 4, overflowY: 'auto' }}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <TextField

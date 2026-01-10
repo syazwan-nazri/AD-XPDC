@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   TextField,
   Button,
@@ -14,8 +14,7 @@ import {
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../firebase/config";
 import { useNavigate, Link } from "react-router-dom";
-import { setDoc, doc } from "firebase/firestore";
-import { Roles } from "../../utils/roles";
+import { setDoc, doc, collection, getDocs, query } from "firebase/firestore";
 
 const Register = () => {
   const [email, setEmail] = useState("");
@@ -23,9 +22,28 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
   const [groupId, setGroupId] = useState("");
+  const [userGroups, setUserGroups] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Fetch groups dynamically from Firestore
+  useEffect(() => {
+    const fetchUserGroups = async () => {
+      try {
+        const q = query(collection(db, "groups"));
+        const snapshot = await getDocs(q);
+        const groups = snapshot.docs.map(doc => ({
+          groupId: doc.id,
+          ...doc.data()
+        }));
+        setUserGroups(groups);
+      } catch (err) {
+        console.error("Failed to fetch user groups", err);
+      }
+    };
+    fetchUserGroups();
+  }, []);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -115,9 +133,9 @@ const Register = () => {
             label="User Group"
             onChange={(e) => setGroupId(e.target.value)}
           >
-            {Object.values(Roles).map((role) => (
-              <MenuItem key={role.groupId} value={role.groupId}>
-                {role.name} ({role.groupId})
+            {userGroups.map((group) => (
+              <MenuItem key={group.groupId} value={group.groupId}>
+                {group.name || group.groupName || group.groupId} ({group.groupId})
               </MenuItem>
             ))}
           </Select>

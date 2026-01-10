@@ -5,9 +5,10 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
-import { Roles } from "./roles";
 
 // Function to sync a single user's data
 export const syncUserData = async (user) => {
@@ -31,62 +32,6 @@ export const syncUserData = async (user) => {
   }
 };
 
-// Function to sync Firebase user groups
-export const syncUserGroups = async () => {
-  try {
-    const groupsRef = collection(db, "groups");
-    const groupsSnapshot = await getDocs(groupsRef);
-    const existingGroups = {};
-
-    // Get existing groups
-    groupsSnapshot.forEach((doc) => {
-      existingGroups[doc.id] = doc.data();
-    });
-
-    // Update or create each predefined role
-    for (const [roleKey, roleData] of Object.entries(Roles)) {
-      const groupRef = doc(db, "groups", roleData.groupId);
-
-      if (!existingGroups[roleData.groupId]) {
-        // Create new group if it doesn't exist
-        await setDoc(groupRef, {
-          groupId: roleData.groupId,
-          name: roleData.name,
-          permissions: roleData.permissions,
-          description: getGroupDescription(roleData.groupId),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        // Update existing group
-        await updateDoc(groupRef, {
-          name: roleData.name,
-          permissions: roleData.permissions,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error syncing user groups:", error);
-    throw error;
-  }
-};
-
-// Helper function to get group description
-const getGroupDescription = (groupId) => {
-  switch (groupId) {
-    case "A":
-      return "Administrator group with full system access";
-    case "S":
-      return "Store keeper responsible for inventory management";
-    case "P":
-      return "Procurement officer handling purchase orders";
-    case "M":
-      return "Maintenance technician managing repairs and maintenance";
-    default:
-      return "User group";
-  }
-};
 
 // Function to get user's document by uid
 export const getUserDocByUid = async (uid) => {
@@ -103,6 +48,7 @@ export const getUserDocByUid = async (uid) => {
 // Function to get user's document by email
 export const getUserDocByEmail = async (email) => {
   try {
+    const { collection, query, where, getDocs } = require("firebase/firestore");
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("email", "==", email.toLowerCase()));
     const querySnapshot = await getDocs(q);

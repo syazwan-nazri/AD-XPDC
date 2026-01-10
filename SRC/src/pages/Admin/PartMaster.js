@@ -1824,7 +1824,7 @@ const PartMaster = () => {
             </Typography>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
+        <DialogContent dividers sx={{ p: 4, overflowY: 'auto' }}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <TextField

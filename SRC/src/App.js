@@ -24,11 +24,12 @@ import PartGroupMaster from "./pages/Admin/PartGroupMaster";
 import StorageMaster from "./pages/Admin/StorageMaster";
 import StorageLocations from "./pages/Admin/StorageLocations";
 import Login from "./pages/Auth/Login";
-import { Roles } from "./utils/roles";
+
+
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase/config";
 import { setUser, logout } from "./redux/authSlice";
-import { syncUserGroups, syncUserData, getUserDocByUid } from "./utils/userManagement";
+import { syncUserData, getUserDocByUid } from "./utils/userManagement";
 import CircularProgress from "@mui/material/CircularProgress";
 import UserManagement from "./pages/Admin/UserManagement";
 import UserGroupMaster from "./pages/Admin/UserGroupMaster";
@@ -50,8 +51,8 @@ import MovementHistory from "./pages/Reports/MovementHistory";
 import LowStockReport from "./pages/Reports/LowStockReport";
 import ChangePassword from "./pages/Auth/ChangePassword";
 
-const drawerWidth = 260;
-const collapsedWidth = 64;
+const drawerWidth = 280;
+const collapsedWidth = 80;
 
 function AuthGuard({ authReady, children }) {
   const user = useSelector((state) => state.auth.user);
@@ -99,17 +100,9 @@ function AppShell({ toggleTheme }) {
   const theme = useTheme();
 
   // Initialize user groups and sync data
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // Sync user groups first
-        await syncUserGroups();
-      } catch (error) {
-        console.error("Failed to sync user groups:", error);
-      }
-    };
-    init();
-  }, []);
+
+
+
 
   const location = useLocation();
   // Sidebar open/collapse (start CLOSED!)
@@ -167,6 +160,7 @@ function AppShell({ toggleTheme }) {
             })
           );
         } else {
+
           dispatch(logout());
         }
       } catch (error) {
@@ -257,6 +251,9 @@ function AppShell({ toggleTheme }) {
             minHeight: "100vh",
             background: theme.palette.background.default,
             overflowX: "hidden",
+            // Since Sidebar is now variant="permanent" and flexShrink={0}, it takes up space in the flex container.
+            // The main content with flexGrow={1} will automatically fill the remaining space.
+            // No manual marginLeft is needed.
           })}
         >
           {/* Offset for fixed AppBar */}
