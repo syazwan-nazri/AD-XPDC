@@ -25,6 +25,9 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import HistoryIcon from '@mui/icons-material/History';
 import WarningIcon from '@mui/icons-material/Warning';
+import WarehouseIcon from '@mui/icons-material/Warehouse';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import BusinessIcon from '@mui/icons-material/Business';
 import Box from '@mui/material/Box';
 import { NavLink, useLocation } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
@@ -38,17 +41,15 @@ const collapsedWidth = 80;
 const dataInputMasterLinks = [
   { path: '/admin/user-master', text: 'User Master', icon: <PeopleIcon />, resourceId: 'user_master' },
   { path: '/admin/user-group-master', text: 'User Group Master', icon: <GroupIcon />, resourceId: 'user_group_master' },
+  { path: '/admin/department-master', text: 'Department Master', icon: <BusinessIcon />, resourceId: 'department_master' },
   { path: '/admin/part-master', text: 'Part Master', icon: <Inventory2Icon />, resourceId: 'part_master' },
   { path: '/admin/part-group-master', text: 'Part Group Master', icon: <GroupIcon />, resourceId: 'part_group_master' },
   {
-    text: 'Storage Master',
-    icon: <StorageIcon />,
-    // For nested items, we check parent access usually, or just check subitems
-    resourceId: 'storage_master',
+    text: 'Warehouse & Storage',
+    icon: <WarehouseIcon />,
     subItems: [
-      { path: '/admin/bin-master', text: 'Storage Master', icon: <StorageIcon />, resourceId: 'storage_master' },
-      { path: '/admin/storage-locations', text: 'Storage Locations', icon: <StorageIcon />, resourceId: 'storage_master' },
-      // Note: If you want separate permissions for Bin vs Location, add separate resourceIds
+      { path: '/admin/warehouse-master', text: 'Warehouse Master', icon: <WarehouseIcon />, resourceId: 'warehouse_master' },
+      { path: '/admin/warehouse-locations', text: 'Warehouse Locations', icon: <LocationOnIcon />, resourceId: 'warehouse_locations' },
     ]
   },
   { path: '/admin/supplier-master', text: 'Supplier Master', icon: <GroupIcon />, resourceId: 'supplier_master' },

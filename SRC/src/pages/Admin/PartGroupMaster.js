@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../../firebase/config';
+import { useSelector } from 'react-redux';
 import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import {
   Box,
@@ -42,6 +43,7 @@ import {
   Inventory as InventoryIcon,
   CheckCircle as CheckCircleIcon,
   Info as InfoIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 
 // Main Part Group Master Page
@@ -49,6 +51,14 @@ const PartGroupMaster = () => {
   const [materialGroups, setMaterialGroups] = useState([]);
   const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const user = useSelector(state => state.auth.user);
+  const isAdmin = user?.groupId?.toLowerCase() === 'a' || user?.groupId?.toLowerCase() === 'admin';
+  const permissions = user?.groupPermissions?.part_group_master || {};
+
+  const canAdd = permissions.access === 'add' || isAdmin;
+  const canEdit = permissions.access === 'edit' || permissions.access === 'add' || isAdmin;
+  const canDelete = permissions.access === 'add' || isAdmin;
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // Material Group dropdown options
@@ -161,7 +171,7 @@ const PartGroupMaster = () => {
         (p.internalRef && p.internalRef.toLowerCase().includes(searchQueryParts.toLowerCase()));
       return matchesSearch;
     });
-    
+
     // Sort by SAP# descending (higher numbers at top, lower numbers at bottom)
     return filtered.sort((a, b) => {
       const sapA = parseInt(a.sapNumber || '0') || 0;
@@ -206,6 +216,10 @@ const PartGroupMaster = () => {
 
   // Handle add material group
   const handleAddGroup = async () => {
+    if (!canAdd) {
+      setSnackbar({ open: true, message: 'You do not have permission to add groups', severity: 'error' });
+      return;
+    }
     setGroupIdError(false);
     setMaterialGroupError(false);
     setDescriptionError(false);
@@ -285,6 +299,10 @@ const PartGroupMaster = () => {
 
   // Handle save group changes
   const handleSaveGroupChanges = async () => {
+    if (!canEdit) {
+      setSnackbar({ open: true, message: 'You do not have permission to edit groups', severity: 'error' });
+      return;
+    }
     setEditGroupIdError(false);
     setEditMaterialGroupError(false);
     setEditDescriptionError(false);
@@ -302,10 +320,10 @@ const PartGroupMaster = () => {
     }
 
     // Check for duplicate Group ID or Material Group name (excluding current group)
-    const groupIdExists = materialGroups.some(g => 
+    const groupIdExists = materialGroups.some(g =>
       g.id !== editGroupForm.id && g.groupId.toLowerCase() === editGroupForm.groupId.toLowerCase()
     );
-    const materialGroupExists = materialGroups.some(g => 
+    const materialGroupExists = materialGroups.some(g =>
       g.id !== editGroupForm.id && g.materialGroup.toLowerCase() === editGroupForm.materialGroup.toLowerCase()
     );
 
@@ -349,6 +367,10 @@ const PartGroupMaster = () => {
 
   // Handle confirm delete group
   const handleConfirmDeleteGroup = async () => {
+    if (!canDelete) {
+      setSnackbar({ open: true, message: 'You do not have permission to delete groups', severity: 'error' });
+      return;
+    }
     try {
       // Find all parts assigned to this material group
       const partsToUnassign = parts.filter(p => p.materialGroupId === deleteGroupTarget.id);
@@ -376,7 +398,7 @@ const PartGroupMaster = () => {
       setDeleteGroupDialogOpen(false);
       setDeleteGroupTarget(null);
       const unassignedCount = partsToUnassign.length;
-      const message = unassignedCount > 0 
+      const message = unassignedCount > 0
         ? `Material Group deleted successfully. ${unassignedCount} part(s) unassigned and moved to Part List without Material Group`
         : 'Material Group deleted successfully';
       setSnackbar({ open: true, message, severity: 'success' });
@@ -433,6 +455,10 @@ const PartGroupMaster = () => {
 
   // Handle confirm delete part
   const handleConfirmDeletePart = async () => {
+    if (!canDelete) {
+      setSnackbar({ open: true, message: 'You do not have permission to delete parts', severity: 'error' });
+      return;
+    }
     try {
       await deleteDoc(doc(db, 'parts', deletePartTarget.id));
 
@@ -470,10 +496,10 @@ const PartGroupMaster = () => {
 
   if (loading) {
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         minHeight: 'calc(100vh - 64px)',
         backgroundColor: '#f8fafc'
       }}>
@@ -483,29 +509,29 @@ const PartGroupMaster = () => {
   }
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
       p: 3,
       width: '100%'
     }}>
       {/* Main Content Container */}
-      <Box sx={{ 
+      <Box sx={{
         width: '100%',
         maxWidth: 'none',
         margin: '0 auto'
       }}>
         {/* Header Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           mb: 4,
           flexWrap: 'wrap',
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -519,8 +545,8 @@ const PartGroupMaster = () => {
               <LayersIcon sx={{ fontSize: 28 }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 700, 
+              <Typography variant="h4" sx={{
+                fontWeight: 700,
                 color: '#1e293b',
                 mb: 0.5
               }}>
@@ -534,7 +560,7 @@ const PartGroupMaster = () => {
 
           {/* Stats Cards */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -551,7 +577,7 @@ const PartGroupMaster = () => {
                 </Typography>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -571,7 +597,7 @@ const PartGroupMaster = () => {
                 </Box>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -595,122 +621,58 @@ const PartGroupMaster = () => {
         </Box>
 
         {/* Material Group Form Section */}
-        <Paper elevation={0} sx={{ 
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
-          backgroundColor: 'white',
-          mb: 4,
-          width: '100%'
-        }}>
-          <Box sx={{ 
-            p: 3, 
-            borderBottom: '1px solid #e2e8f0',
-            backgroundColor: '#f3e8ff',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+        {canAdd ? (
+          <Paper elevation={0} sx={{
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+            backgroundColor: 'white',
+            mb: 4,
+            width: '100%'
           }}>
-            <Box>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 600,
-                color: '#1e293b',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1
-              }}>
-                <AddIcon sx={{ fontSize: 20, color: '#8b5cf6' }} />
-                Add New Material Group
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-                Create a new material group for spare parts classification
-              </Typography>
+            <Box sx={{
+              p: 3,
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#f3e8ff',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <Box>
+                <Typography variant="h6" sx={{
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  <AddIcon sx={{ fontSize: 20, color: '#8b5cf6' }} />
+                  Add New Material Group
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                  Create a new material group for spare parts classification
+                </Typography>
+              </Box>
             </Box>
-          </Box>
 
-          <Box sx={{ p: 3 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  label="Group ID"
-                  placeholder="e.g., BEAR"
-                  value={groupForm.groupId}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-                    setGroupForm({ ...groupForm, groupId: value });
-                    setGroupIdError(false);
-                  }}
-                  error={groupIdError}
-                  helperText={groupIdError ? 'Must be 4 letters' : `${groupForm.groupId.length}/4`}
-                  fullWidth
-                  required
-                  size="small"
-                  inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                {!groupFormShowOther ? (
+            <Box sx={{ p: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={3}>
                   <TextField
-                    select
-                    label="Material Group"
-                    value={groupForm.materialGroup}
+                    label="Group ID"
+                    placeholder="e.g., BEAR"
+                    value={groupForm.groupId}
                     onChange={(e) => {
-                      if (e.target.value === 'OTHER') {
-                        setGroupFormShowOther(true);
-                        setGroupForm({ ...groupForm, materialGroup: '' });
-                      } else {
-                        setGroupForm({ ...groupForm, materialGroup: e.target.value });
-                      }
-                      setMaterialGroupError(false);
+                      const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+                      setGroupForm({ ...groupForm, groupId: value });
+                      setGroupIdError(false);
                     }}
-                    error={materialGroupError}
-                    helperText={materialGroupError ? 'Required' : ''}
+                    error={groupIdError}
+                    helperText={groupIdError ? 'Must be 4 letters' : `${groupForm.groupId.length}/4`}
                     fullWidth
                     required
                     size="small"
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  >
-                    <MenuItem value="">-- Select Material Group --</MenuItem>
-                    {materialGroupOptions.map((option) => (
-                      <MenuItem key={option} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                    <MenuItem value="OTHER">Other (Custom)</MenuItem>
-                  </TextField>
-                ) : (
-                  <TextField
-                    label="Material Group"
-                    placeholder="Enter custom group name"
-                    value={groupForm.materialGroup}
-                    onChange={(e) => {
-                      setGroupForm({ ...groupForm, materialGroup: e.target.value });
-                      setMaterialGroupError(false);
-                    }}
-                    onBlur={() => {
-                      if (!groupForm.materialGroup.trim()) {
-                        setGroupFormShowOther(false);
-                        setGroupForm({ ...groupForm, materialGroup: '' });
-                      }
-                    }}
-                    error={materialGroupError}
-                    helperText={materialGroupError ? 'Required or clear to go back' : 'Clear to go back to list'}
-                    fullWidth
-                    required
-                    size="small"
-                    autoFocus
+                    inputProps={{ maxLength: 4, style: { textTransform: 'uppercase' } }}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         borderRadius: '10px',
@@ -718,67 +680,137 @@ const PartGroupMaster = () => {
                       }
                     }}
                   />
-                )}
-              </Grid>
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Description"
-                  placeholder="Brief description of this group"
-                  value={groupForm.description}
-                  onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
-                  fullWidth
-                  multiline
-                  rows={1}
-                  size="small"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
+                <Grid item xs={12} sm={6} md={3}>
+                  {!groupFormShowOther ? (
+                    <TextField
+                      select
+                      label="Material Group"
+                      value={groupForm.materialGroup}
+                      onChange={(e) => {
+                        if (e.target.value === 'OTHER') {
+                          setGroupFormShowOther(true);
+                          setGroupForm({ ...groupForm, materialGroup: '' });
+                        } else {
+                          setGroupForm({ ...groupForm, materialGroup: e.target.value });
+                        }
+                        setMaterialGroupError(false);
+                      }}
+                      error={materialGroupError}
+                      helperText={materialGroupError ? 'Required' : ''}
+                      fullWidth
+                      required
+                      size="small"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    >
+                      <MenuItem value="">-- Select Material Group --</MenuItem>
+                      {materialGroupOptions.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                      <MenuItem value="OTHER">Other (Custom)</MenuItem>
+                    </TextField>
+                  ) : (
+                    <TextField
+                      label="Material Group"
+                      placeholder="Enter custom group name"
+                      value={groupForm.materialGroup}
+                      onChange={(e) => {
+                        setGroupForm({ ...groupForm, materialGroup: e.target.value });
+                        setMaterialGroupError(false);
+                      }}
+                      onBlur={() => {
+                        if (!groupForm.materialGroup.trim()) {
+                          setGroupFormShowOther(false);
+                          setGroupForm({ ...groupForm, materialGroup: '' });
+                        }
+                      }}
+                      error={materialGroupError}
+                      helperText={materialGroupError ? 'Required or clear to go back' : 'Clear to go back to list'}
+                      fullWidth
+                      required
+                      size="small"
+                      autoFocus
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  )}
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Description"
+                    placeholder="Brief description of this group"
+                    value={groupForm.description}
+                    onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                    fullWidth
+                    multiline
+                    rows={1}
+                    size="small"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ClearIcon />}
+                    onClick={handleClearGroupForm}
+                    fullWidth
+                    sx={{
                       borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
+                      borderColor: '#e2e8f0',
+                      color: '#64748b',
+                      textTransform: 'none',
+                      '&:hover': {
+                        borderColor: '#64748b'
+                      }
+                    }}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleAddGroup}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                      textTransform: 'none',
+                      fontWeight: 600
+                    }}
+                  >
+                    Add Group
+                  </Button>
+                </Grid>
               </Grid>
-
-              <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ClearIcon />}
-                  onClick={handleClearGroupForm}
-                  fullWidth
-                  sx={{
-                    borderRadius: '10px',
-                    borderColor: '#e2e8f0',
-                    color: '#64748b',
-                    textTransform: 'none',
-                    '&:hover': {
-                      borderColor: '#64748b'
-                    }
-                  }}
-                >
-                  Clear
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={handleAddGroup}
-                  fullWidth
-                  sx={{
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                    textTransform: 'none',
-                    fontWeight: 600
-                  }}
-                >
-                  Add Group
-                </Button>
-              </Grid>
-            </Grid>
-          </Box>
-        </Paper>
+            </Box>
+          </Paper>
+        ) : (
+          <Alert severity="info" sx={{ borderRadius: '16px', mb: 4 }}>
+            You do not have permission to create new material groups.
+          </Alert>
+        )}
 
         {/* Material Groups List Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -786,8 +818,8 @@ const PartGroupMaster = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#f3e8ff',
             display: 'flex',
@@ -795,7 +827,7 @@ const PartGroupMaster = () => {
             alignItems: 'center'
           }}>
             <Box>
-              <Typography variant="h6" sx={{ 
+              <Typography variant="h6" sx={{
                 fontWeight: 600,
                 color: '#1e293b',
                 display: 'flex',
@@ -839,8 +871,8 @@ const PartGroupMaster = () => {
 
           {/* Groups Table */}
           {filteredGroups.length === 0 ? (
-            <Box sx={{ 
-              p: 6, 
+            <Box sx={{
+              p: 6,
               textAlign: 'center',
               color: '#94a3b8'
             }}>
@@ -849,7 +881,7 @@ const PartGroupMaster = () => {
                 No material groups found
               </Typography>
               <Typography variant="body2">
-                {materialGroups.length === 0 ? 
+                {materialGroups.length === 0 ?
                   "No groups yet. Create your first group above." :
                   "No groups match your search criteria."}
               </Typography>
@@ -868,7 +900,7 @@ const PartGroupMaster = () => {
                   </TableHead>
                   <TableBody>
                     {groupsPaginated.map((group) => (
-                      <TableRow key={group.id} hover sx={{ 
+                      <TableRow key={group.id} hover sx={{
                         '&:hover': {
                           backgroundColor: '#f8fafc'
                         }
@@ -894,30 +926,32 @@ const PartGroupMaster = () => {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="Edit Group">
+                          <Tooltip title={canEdit ? "Edit Group" : "View Group"}>
                             <IconButton
                               size="small"
                               onClick={() => handleEditGroup(group)}
-                              sx={{ 
-                                color: '#8b5cf6',
-                                '&:hover': { backgroundColor: '#f3e8ff' }
+                              sx={{
+                                color: canEdit ? '#8b5cf6' : '#64748b',
+                                '&:hover': { backgroundColor: canEdit ? '#f3e8ff' : '#f1f5f9' }
                               }}
                             >
-                              <EditIcon fontSize="small" />
+                              {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete Group">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteGroup(group)}
-                              sx={{ 
-                                color: '#ef4444',
-                                '&:hover': { backgroundColor: '#fee2e2' }
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {canDelete && (
+                            <Tooltip title="Delete Group">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteGroup(group)}
+                                sx={{
+                                  color: '#ef4444',
+                                  '&:hover': { backgroundColor: '#fee2e2' }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -926,10 +960,10 @@ const PartGroupMaster = () => {
               </Box>
 
               {/* Pagination */}
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 p: 2,
                 borderTop: '1px solid #e2e8f0'
               }}>
@@ -962,7 +996,7 @@ const PartGroupMaster = () => {
         </Paper>
 
         {/* Parts Without Group Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -970,8 +1004,8 @@ const PartGroupMaster = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#fef3c7',
             display: 'flex',
@@ -979,7 +1013,7 @@ const PartGroupMaster = () => {
             alignItems: 'center'
           }}>
             <Box>
-              <Typography variant="h6" sx={{ 
+              <Typography variant="h6" sx={{
                 fontWeight: 600,
                 color: '#1e293b',
                 display: 'flex',
@@ -1023,8 +1057,8 @@ const PartGroupMaster = () => {
 
           {/* Parts Table */}
           {filteredPartsPending.length === 0 ? (
-            <Box sx={{ 
-              p: 6, 
+            <Box sx={{
+              p: 6,
               textAlign: 'center',
               color: '#94a3b8'
             }}>
@@ -1051,7 +1085,7 @@ const PartGroupMaster = () => {
                   </TableHead>
                   <TableBody>
                     {partsPaginated.map((part) => (
-                      <TableRow key={part.id} hover sx={{ 
+                      <TableRow key={part.id} hover sx={{
                         backgroundColor: '#fffbeb',
                         '&:hover': {
                           backgroundColor: '#fef3c7'
@@ -1084,30 +1118,32 @@ const PartGroupMaster = () => {
                           />
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="Assign Material Group">
+                          <Tooltip title={canEdit ? "Assign Material Group" : "View Part"}>
                             <IconButton
                               size="small"
                               onClick={() => handleEditPart(part)}
-                              sx={{ 
-                                color: '#f59e0b',
-                                '&:hover': { backgroundColor: '#fef3c7' }
+                              sx={{
+                                color: canEdit ? '#f59e0b' : '#64748b',
+                                '&:hover': { backgroundColor: canEdit ? '#fef3c7' : '#f1f5f9' }
                               }}
                             >
-                              <EditIcon fontSize="small" />
+                              {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete Part">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeletePart(part)}
-                              sx={{ 
-                                color: '#ef4444',
-                                '&:hover': { backgroundColor: '#fee2e2' }
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {canDelete && (
+                            <Tooltip title="Delete Part">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeletePart(part)}
+                                sx={{
+                                  color: '#ef4444',
+                                  '&:hover': { backgroundColor: '#fee2e2' }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1116,10 +1152,10 @@ const PartGroupMaster = () => {
               </Box>
 
               {/* Pagination */}
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 p: 2,
                 borderTop: '1px solid #e2e8f0'
               }}>
@@ -1152,7 +1188,7 @@ const PartGroupMaster = () => {
         </Paper>
 
         {/* Parts With Group Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -1160,8 +1196,8 @@ const PartGroupMaster = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#dbeafe',
             display: 'flex',
@@ -1169,7 +1205,7 @@ const PartGroupMaster = () => {
             alignItems: 'center'
           }}>
             <Box>
-              <Typography variant="h6" sx={{ 
+              <Typography variant="h6" sx={{
                 fontWeight: 600,
                 color: '#1e293b',
                 display: 'flex',
@@ -1187,8 +1223,8 @@ const PartGroupMaster = () => {
 
           {/* Parts Table */}
           {filteredPartsWithGroup.length === 0 ? (
-            <Box sx={{ 
-              p: 6, 
+            <Box sx={{
+              p: 6,
               textAlign: 'center',
               color: '#94a3b8'
             }}>
@@ -1218,7 +1254,7 @@ const PartGroupMaster = () => {
                     {partsWithGroupPaginated.map((part) => {
                       const group = materialGroups.find(g => g.id === part.materialGroupId);
                       return (
-                        <TableRow key={part.id} hover sx={{ 
+                        <TableRow key={part.id} hover sx={{
                           '&:hover': {
                             backgroundColor: '#f0f9ff'
                           }
@@ -1260,30 +1296,32 @@ const PartGroupMaster = () => {
                             />
                           </TableCell>
                           <TableCell align="center">
-                            <Tooltip title="Edit Material Group">
+                            <Tooltip title={canEdit ? "Edit Material Group" : "View Part"}>
                               <IconButton
                                 size="small"
                                 onClick={() => handleEditPart(part)}
-                                sx={{ 
-                                  color: '#3b82f6',
-                                  '&:hover': { backgroundColor: '#dbeafe' }
+                                sx={{
+                                  color: canEdit ? '#3b82f6' : '#64748b',
+                                  '&:hover': { backgroundColor: canEdit ? '#dbeafe' : '#f1f5f9' }
                                 }}
                               >
-                                <EditIcon fontSize="small" />
+                                {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Delete Part">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeletePart(part)}
-                                sx={{ 
-                                  color: '#ef4444',
-                                  '&:hover': { backgroundColor: '#fee2e2' }
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            {canDelete && (
+                              <Tooltip title="Delete Part">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeletePart(part)}
+                                  sx={{
+                                    color: '#ef4444',
+                                    '&:hover': { backgroundColor: '#fee2e2' }
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -1293,10 +1331,10 @@ const PartGroupMaster = () => {
               </Box>
 
               {/* Pagination */}
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 p: 2,
                 borderTop: '1px solid #e2e8f0'
               }}>
@@ -1376,6 +1414,7 @@ const PartGroupMaster = () => {
                 helperText={editMaterialGroupError ? 'Required' : ''}
                 fullWidth
                 size="small"
+                disabled={!canEdit}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1411,6 +1450,7 @@ const PartGroupMaster = () => {
                 fullWidth
                 size="small"
                 autoFocus
+                disabled={!canEdit}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1428,6 +1468,7 @@ const PartGroupMaster = () => {
               multiline
               rows={3}
               size="small"
+              disabled={!canEdit}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -1439,18 +1480,20 @@ const PartGroupMaster = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
           <Button onClick={() => setEditGroupDialogOpen(false)} variant="outlined" sx={{ borderRadius: '8px' }}>
-            Cancel
+            {canEdit ? 'Cancel' : 'Close'}
           </Button>
-          <Button 
-            onClick={handleSaveGroupChanges} 
-            variant="contained"
-            sx={{ 
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
-            }}
-          >
-            Save Changes
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleSaveGroupChanges}
+              variant="contained"
+              sx={{
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+              }}
+            >
+              Save Changes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -1481,9 +1524,9 @@ const PartGroupMaster = () => {
           <Button onClick={handleDeleteGroupClose} variant="outlined" sx={{ borderRadius: '8px' }}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleConfirmDeleteGroup} 
-            variant="contained" 
+          <Button
+            onClick={handleConfirmDeleteGroup}
+            variant="contained"
             color="error"
             sx={{ borderRadius: '8px' }}
           >
@@ -1564,6 +1607,7 @@ const PartGroupMaster = () => {
               onChange={(e) => setEditPartForm({ ...editPartForm, materialGroupId: e.target.value })}
               fullWidth
               size="small"
+              disabled={!canEdit}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -1587,18 +1631,20 @@ const PartGroupMaster = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
           <Button onClick={() => setEditPartDialogOpen(false)} variant="outlined" sx={{ borderRadius: '8px' }}>
-            Cancel
+            {canEdit ? 'Cancel' : 'Close'}
           </Button>
-          <Button 
-            onClick={handleSavePartChanges} 
-            variant="contained"
-            sx={{ 
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-            }}
-          >
-            Save Changes
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleSavePartChanges}
+              variant="contained"
+              sx={{
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+              }}
+            >
+              Save Changes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -1632,9 +1678,9 @@ const PartGroupMaster = () => {
           <Button onClick={handleDeletePartClose} variant="outlined" sx={{ borderRadius: '8px' }}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleConfirmDeletePart} 
-            variant="contained" 
+          <Button
+            onClick={handleConfirmDeletePart}
+            variant="contained"
             color="error"
             sx={{ borderRadius: '8px' }}
           >
@@ -1650,10 +1696,10 @@ const PartGroupMaster = () => {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ 
+          sx={{
             width: '100%',
             borderRadius: '10px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)'

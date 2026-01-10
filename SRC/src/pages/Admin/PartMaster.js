@@ -71,6 +71,7 @@ import {
   Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
 import BarcodeScanner from '../../components/BarcodeScanner';
+import { Visibility as VisibilityIcon } from '@mui/icons-material';
 
 // Main Part Master Page
 const PartMaster = () => {
@@ -78,6 +79,14 @@ const PartMaster = () => {
   const parts = useSelector((state) => state.parts.parts);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  const user = useSelector(state => state.auth.user);
+  const isAdmin = user?.groupId?.toLowerCase() === 'a' || user?.groupId?.toLowerCase() === 'admin';
+  const permissions = user?.groupPermissions?.part_master || {};
+
+  const canAdd = permissions.access === 'add' || isAdmin;
+  const canEdit = permissions.access === 'edit' || permissions.access === 'add' || isAdmin;
+  const canDelete = permissions.access === 'add' || isAdmin;
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -261,6 +270,10 @@ const PartMaster = () => {
 
   // Add part (keep functionality)
   const handleAddPart = async (force = false) => {
+    if (!canAdd) {
+      setSnackbar({ open: true, message: 'You do not have permission to add parts', severity: 'error' });
+      return;
+    }
     setSapError(false);
     setInternalRefError(false);
     setNameError(false);
@@ -430,6 +443,10 @@ const PartMaster = () => {
 
   const handleSaveChanges = async () => {
     if (!editingId) return;
+    if (!canEdit) {
+      setSnackbar({ open: true, message: 'You do not have permission to edit parts', severity: 'error' });
+      return;
+    }
 
     if (!editForm.sapNumber) {
       setEditSapError(true);
@@ -508,6 +525,10 @@ const PartMaster = () => {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!canDelete) {
+      setSnackbar({ open: true, message: 'You do not have permission to delete parts', severity: 'error' });
+      return;
+    }
     try {
       await deleteDoc(doc(db, 'parts', deleteTarget.id));
       dispatch(deletePart(deleteTarget.id));
@@ -610,6 +631,10 @@ const PartMaster = () => {
   };
 
   const handleBulkImport = async () => {
+    if (!canAdd) {
+      setSnackbar({ open: true, message: 'You do not have permission to import parts', severity: 'error' });
+      return;
+    }
     if (csvErrors.length > 0) {
       setSnackbar({ open: true, message: 'Please fix errors before importing', severity: 'error' });
       return;
@@ -675,6 +700,10 @@ const PartMaster = () => {
 
   // Remove duplicate entries (keep first, delete others)
   const handleRemoveDuplicates = async () => {
+    if (!canAdd) {
+      setSnackbar({ open: true, message: 'You do not have permission to clean up duplicates', severity: 'error' });
+      return;
+    }
     try {
       setCleanupInProgress(true);
       setCleanupProgress(0);
@@ -1098,48 +1127,50 @@ const PartMaster = () => {
                 {filteredParts.length} parts found
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Tooltip title="Import CSV">
-                <Button
-                  variant="outlined"
-                  startIcon={<FileUploadIcon />}
-                  onClick={() => setCsvImportDialogOpen(true)}
-                  size="small"
-                  sx={{
-                    borderRadius: '10px',
-                    borderColor: '#e2e8f0',
-                    color: '#64748b',
-                    textTransform: 'none',
-                    '&:hover': {
-                      borderColor: '#3b82f6',
-                      color: '#3b82f6'
-                    }
-                  }}
-                >
-                  Import
-                </Button>
-              </Tooltip>
-              <Tooltip title="Cleanup Duplicates">
-                <Button
-                  variant="outlined"
-                  startIcon={<CleaningServicesIcon />}
-                  onClick={handleDetectDuplicates}
-                  size="small"
-                  sx={{
-                    borderRadius: '10px',
-                    borderColor: '#e2e8f0',
-                    color: '#64748b',
-                    textTransform: 'none',
-                    '&:hover': {
-                      borderColor: '#f59e0b',
-                      color: '#f59e0b'
-                    }
-                  }}
-                >
-                  Cleanup
-                </Button>
-              </Tooltip>
-            </Box>
+            {canAdd && (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Tooltip title="Import CSV">
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileUploadIcon />}
+                    onClick={() => setCsvImportDialogOpen(true)}
+                    size="small"
+                    sx={{
+                      borderRadius: '10px',
+                      borderColor: '#e2e8f0',
+                      color: '#64748b',
+                      textTransform: 'none',
+                      '&:hover': {
+                        borderColor: '#3b82f6',
+                        color: '#3b82f6'
+                      }
+                    }}
+                  >
+                    Import
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Cleanup Duplicates">
+                  <Button
+                    variant="outlined"
+                    startIcon={<CleaningServicesIcon />}
+                    onClick={handleDetectDuplicates}
+                    size="small"
+                    sx={{
+                      borderRadius: '10px',
+                      borderColor: '#e2e8f0',
+                      color: '#64748b',
+                      textTransform: 'none',
+                      '&:hover': {
+                        borderColor: '#f59e0b',
+                        color: '#f59e0b'
+                      }
+                    }}
+                  >
+                    Cleanup
+                  </Button>
+                </Tooltip>
+              </Box>
+            )}
           </Box>
 
           {/* Parts Table */}
@@ -1276,30 +1307,32 @@ const PartMaster = () => {
                                     <QrCodeIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Edit Part">
+                                <Tooltip title={canEdit ? "Edit Part" : "View Details"}>
                                   <IconButton
                                     size="small"
                                     onClick={() => handleEditClick(p)}
                                     sx={{
-                                      color: '#f59e0b',
-                                      '&:hover': { backgroundColor: '#fffbeb' }
+                                      color: canEdit ? '#f59e0b' : '#64748b',
+                                      '&:hover': { backgroundColor: canEdit ? '#fffbeb' : '#f1f5f9' }
                                     }}
                                   >
-                                    <EditIcon fontSize="small" />
+                                    {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Delete Part">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleDeleteClick(p)}
-                                    sx={{
-                                      '&:hover': { backgroundColor: '#fef2f2' }
-                                    }}
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
+                                {canDelete && (
+                                  <Tooltip title="Delete Part">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleDeleteClick(p)}
+                                      sx={{
+                                        '&:hover': { backgroundColor: '#fef2f2' }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                               </Box>
                             </TableCell>
                           </TableRow>
@@ -1329,373 +1362,376 @@ const PartMaster = () => {
           )}
         </Paper>
 
-        {/* New Part Entry Section */}
-        <Paper elevation={0} sx={{
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
-          backgroundColor: 'white',
-          width: '100%'
-        }}>
-          <Box sx={{
-            p: 3,
-            borderBottom: '1px solid #e2e8f0',
-            backgroundColor: '#eff6ff'
+        {canAdd && (
+          <Paper elevation={0} sx={{
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+            backgroundColor: 'white',
+            width: '100%'
           }}>
-            <Typography variant="h6" sx={{
-              fontWeight: 600,
-              color: '#1e293b',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}>
-              <AddIcon sx={{ fontSize: 20, color: '#3b82f6' }} />
-              New Part Entry
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-              Fill in the details below to add a new part
-            </Typography>
-          </Box>
-
-          <Box sx={{ p: 4 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6} lg={3}>
-                <TextField
-                  label="SAP #"
-                  value={form.sapNumber}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm(f => ({ ...f, sapNumber: value }));
-                    const isValidFormat = validateSapNumber(value);
-                    const isDuplicate = value && parts.some(p => p.sapNumber === value);
-                    setSapError(value && (!isValidFormat || isDuplicate));
-                  }}
-                  error={sapError}
-                  helperText={sapError ? (
-                    parts.some(p => p.sapNumber === form.sapNumber)
-                      ? "SAP # already exists"
-                      : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
-                  ) : "Auto-generated (editable)"}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <NumbersIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <TextField
-                  label="Internal Ref No"
-                  value={form.internalRef}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    setForm(f => ({ ...f, internalRef: value }));
-                    const isValidFormat = validateInternalRef(value);
-                    const isDuplicate = value && parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === value.replace(/\s+/g, '').toUpperCase());
-                    setInternalRefError(value && (!isValidFormat || isDuplicate));
-                  }}
-                  error={internalRefError}
-                  helperText={internalRefError ? (
-                    parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())
-                      ? "Internal Ref No already exists"
-                      : "Format: ABCD123, ABC123, AB123, AB1234"
-                  ) : ""}
-                  required
-                  fullWidth
-                  inputProps={{ style: { textTransform: 'uppercase' } }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocalOfferIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <TextField
-                  label="Part Name"
-                  value={form.name}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    setForm(f => ({ ...f, name: value }));
-                    const trimmedValue = value.trim();
-                    const isDuplicate = trimmedValue && parts.some(p => p.name && p.name.trim().toLowerCase() === trimmedValue.toLowerCase());
-                    setNameError((!value || value.trim() === '') || isDuplicate);
-                  }}
-                  error={nameError}
-                  helperText={nameError ? (
-                    form.name && form.name.trim() && parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())
-                      ? "Name already exists"
-                      : "Name is required"
-                  ) : ""}
-                  required
-                  fullWidth
-                  inputProps={{ style: { textTransform: 'uppercase' } }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <DescriptionIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <TextField
-                  label="Category"
-                  value={form.category}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    setForm(f => ({ ...f, category: value }));
-                    setCategoryError(!value || value.trim() === '');
-                  }}
-                  error={categoryError}
-                  helperText={categoryError ? 'Category is required' : ''}
-                  required
-                  fullWidth
-                  inputProps={{ style: { textTransform: 'uppercase' } }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <CategoryIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <TextField
-                  label="Rack Number"
-                  value={form.rackNumber}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm(f => ({ ...f, rackNumber: value }));
-                    setRackNumberError(value && !validateRackNumber(value));
-                  }}
-                  error={rackNumberError}
-                  helperText={rackNumberError ? (form.rackNumber ? "Must be exactly 2 digits" : "Rack Number is required") : ""}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocationOnIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <TextField
-                  label="Rack Level"
-                  value={form.rackLevel}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    setForm(f => ({ ...f, rackLevel: value }));
-                    setRackLevelError(value && !validateRackLevel(value));
-                  }}
-                  error={rackLevelError}
-                  helperText={rackLevelError ? (form.rackLevel ? 'Must be A, B, C, or D' : 'Rack Level is required') : ''}
-                  inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <StorageIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={2}>
-                <TextField
-                  label="Safety Level"
-                  type="number"
-                  value={form.safetyLevel}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm(f => ({ ...f, safetyLevel: value }));
-                    setSafetyLevelError(value === '' || Number(value) < 0);
-                  }}
-                  inputProps={{ min: 0 }}
-                  error={safetyLevelError}
-                  helperText={safetyLevelError ? (form.safetyLevel === '' ? 'Required' : 'Must be ≥ 0') : ''}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SafetyDividerIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={2}>
-                <TextField
-                  label="Replenish Qty"
-                  type="number"
-                  value={form.replenishQty}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm(f => ({ ...f, replenishQty: value }));
-                    setReplenishQtyError(value === '' || Number(value) < 0);
-                  }}
-                  inputProps={{ min: 0 }}
-                  error={replenishQtyError}
-                  helperText={replenishQtyError ? (form.replenishQty === '' ? 'Required' : 'Must be ≥ 0') : ''}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <ReplayIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={2}>
-                <TextField
-                  label="Current Stock"
-                  type="number"
-                  value={form.currentStock}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm(f => ({ ...f, currentStock: value }));
-                    setCurrentStockError(value === '');
-                  }}
-                  required
-                  fullWidth
-                  error={currentStockError}
-                  helperText={currentStockError ? 'Current Stock is required' : ''}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <InventoryIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-            </Grid>
-
             <Box sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 2,
-              pt: 4,
-              mt: 2,
-              borderTop: '1px solid #e2e8f0'
+              p: 3,
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#eff6ff'
             }}>
-              <Button
-                variant="contained"
-                onClick={() => handleAddPart()}
-                startIcon={<AddIcon />}
-                sx={{
-                  minWidth: 200,
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  fontSize: '1rem',
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                  '&:hover': {
-                    boxShadow: '0 6px 20px rgba(59, 130, 246, 0.6)',
-                    transform: 'translateY(-2px)'
-                  },
-                  '&:disabled': {
-                    background: '#e2e8f0',
-                    color: '#94a3b8'
-                  }
-                }}
-              >
-                Add Part
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={handleClear}
-                startIcon={<ClearIcon />}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  borderColor: '#e2e8f0',
-                  color: '#64748b',
-                  '&:hover': {
-                    borderColor: '#3b82f6',
-                    color: '#3b82f6'
-                  }
-                }}
-              >
-                Clear Form
-              </Button>
+              <Typography variant="h6" sx={{
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <AddIcon sx={{ fontSize: 20, color: '#3b82f6' }} />
+                New Part Entry
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                Fill in the details below to add a new part
+              </Typography>
             </Box>
-          </Box>
-        </Paper>
+
+            <Box sx={{ p: 4 }}>
+              <Grid container spacing={3}>
+                {/* ... (keep fields as is, they are only shown if canAdd) ... */}
+                {/* I will actually include the whole block to be safe */}
+                <Grid item xs={12} md={6} lg={3}>
+                  <TextField
+                    label="SAP #"
+                    value={form.sapNumber}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm(f => ({ ...f, sapNumber: value }));
+                      const isValidFormat = validateSapNumber(value);
+                      const isDuplicate = value && parts.some(p => p.sapNumber === value);
+                      setSapError(value && (!isValidFormat || isDuplicate));
+                    }}
+                    error={sapError}
+                    helperText={sapError ? (
+                      parts.some(p => p.sapNumber === form.sapNumber)
+                        ? "SAP # already exists"
+                        : "SAP # must be 7 digits starting with 7 (e.g., 7000001)"
+                    ) : "Auto-generated (editable)"}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <NumbersIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <TextField
+                    label="Internal Ref No"
+                    value={form.internalRef}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setForm(f => ({ ...f, internalRef: value }));
+                      const isValidFormat = validateInternalRef(value);
+                      const isDuplicate = value && parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === value.replace(/\s+/g, '').toUpperCase());
+                      setInternalRefError(value && (!isValidFormat || isDuplicate));
+                    }}
+                    error={internalRefError}
+                    helperText={internalRefError ? (
+                      parts.some(p => p.internalRef && p.internalRef.replace(/\s+/g, '').toUpperCase() === form.internalRef.replace(/\s+/g, '').toUpperCase())
+                        ? "Internal Ref No already exists"
+                        : "Format: ABCD123, ABC123, AB123, AB1234"
+                    ) : ""}
+                    required
+                    fullWidth
+                    inputProps={{ style: { textTransform: 'uppercase' } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LocalOfferIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <TextField
+                    label="Part Name"
+                    value={form.name}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setForm(f => ({ ...f, name: value }));
+                      const trimmedValue = value.trim();
+                      const isDuplicate = trimmedValue && parts.some(p => p.name && p.name.trim().toLowerCase() === trimmedValue.toLowerCase());
+                      setNameError((!value || value.trim() === '') || isDuplicate);
+                    }}
+                    error={nameError}
+                    helperText={nameError ? (
+                      form.name && form.name.trim() && parts.some(p => p.name && p.name.trim().toLowerCase() === form.name.trim().toLowerCase())
+                        ? "Name already exists"
+                        : "Name is required"
+                    ) : ""}
+                    required
+                    fullWidth
+                    inputProps={{ style: { textTransform: 'uppercase' } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <DescriptionIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <TextField
+                    label="Category"
+                    value={form.category}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setForm(f => ({ ...f, category: value }));
+                      setCategoryError(!value || value.trim() === '');
+                    }}
+                    error={categoryError}
+                    helperText={categoryError ? 'Category is required' : ''}
+                    required
+                    fullWidth
+                    inputProps={{ style: { textTransform: 'uppercase' } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CategoryIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <TextField
+                    label="Rack Number"
+                    value={form.rackNumber}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm(f => ({ ...f, rackNumber: value }));
+                      setRackNumberError(value && !validateRackNumber(value));
+                    }}
+                    error={rackNumberError}
+                    helperText={rackNumberError ? (form.rackNumber ? "Must be exactly 2 digits" : "Rack Number is required") : ""}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LocationOnIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <TextField
+                    label="Rack Level"
+                    value={form.rackLevel}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setForm(f => ({ ...f, rackLevel: value }));
+                      setRackLevelError(value && !validateRackLevel(value));
+                    }}
+                    error={rackLevelError}
+                    helperText={rackLevelError ? (form.rackLevel ? 'Must be A, B, C, or D' : 'Rack Level is required') : ''}
+                    inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <StorageIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={2}>
+                  <TextField
+                    label="Safety Level"
+                    type="number"
+                    value={form.safetyLevel}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm(f => ({ ...f, safetyLevel: value }));
+                      setSafetyLevelError(value === '' || Number(value) < 0);
+                    }}
+                    inputProps={{ min: 0 }}
+                    error={safetyLevelError}
+                    helperText={safetyLevelError ? (form.safetyLevel === '' ? 'Required' : 'Must be ≥ 0') : ''}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SafetyDividerIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={2}>
+                  <TextField
+                    label="Replenish Qty"
+                    type="number"
+                    value={form.replenishQty}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm(f => ({ ...f, replenishQty: value }));
+                      setReplenishQtyError(value === '' || Number(value) < 0);
+                    }}
+                    inputProps={{ min: 0 }}
+                    error={replenishQtyError}
+                    helperText={replenishQtyError ? (form.replenishQty === '' ? 'Required' : 'Must be ≥ 0') : ''}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <ReplayIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={2}>
+                  <TextField
+                    label="Current Stock"
+                    type="number"
+                    value={form.currentStock}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm(f => ({ ...f, currentStock: value }));
+                      setCurrentStockError(value === '');
+                    }}
+                    required
+                    fullWidth
+                    error={currentStockError}
+                    helperText={currentStockError ? 'Current Stock is required' : ''}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <InventoryIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
+
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 2,
+                pt: 4,
+                mt: 2,
+                borderTop: '1px solid #e2e8f0'
+              }}>
+                <Button
+                  variant="contained"
+                  onClick={() => handleAddPart()}
+                  startIcon={<AddIcon />}
+                  sx={{
+                    minWidth: 200,
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                    '&:hover': {
+                      boxShadow: '0 6px 20px rgba(59, 130, 246, 0.6)',
+                      transform: 'translateY(-2px)'
+                    },
+                    '&:disabled': {
+                      background: '#e2e8f0',
+                      color: '#94a3b8'
+                    }
+                  }}
+                >
+                  Add Part
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={handleClear}
+                  startIcon={<ClearIcon />}
+                  sx={{
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    borderColor: '#e2e8f0',
+                    color: '#64748b',
+                    '&:hover': {
+                      borderColor: '#3b82f6',
+                      color: '#3b82f6'
+                    }
+                  }}
+                >
+                  Clear Form
+                </Button>
+              </Box>
+            </Box>
+          </Paper>
+        )}
       </Box>
 
       {/* Enhanced SAP# Mismatch Dialog */}
@@ -1848,6 +1884,7 @@ const PartMaster = () => {
                 value={editForm.internalRef}
                 onChange={(e) => setEditForm(f => ({ ...f, internalRef: e.target.value }))}
                 fullWidth
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
                 sx={{
@@ -1864,6 +1901,7 @@ const PartMaster = () => {
                 value={editForm.name}
                 onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value.toUpperCase() }))}
                 fullWidth
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
                 sx={{
@@ -1880,6 +1918,7 @@ const PartMaster = () => {
                 value={editForm.category}
                 onChange={(e) => setEditForm(f => ({ ...f, category: e.target.value.toUpperCase() }))}
                 fullWidth
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { textTransform: 'uppercase' } }}
                 sx={{
@@ -2013,20 +2052,22 @@ const PartMaster = () => {
               textTransform: 'none'
             }}
           >
-            Cancel
+            {canEdit ? 'Cancel' : 'Close'}
           </Button>
-          <Button
-            onClick={handleSaveChanges}
-            variant="contained"
-            sx={{
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-              textTransform: 'none',
-              fontWeight: 600
-            }}
-          >
-            Save Changes
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleSaveChanges}
+              variant="contained"
+              sx={{
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Save Changes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

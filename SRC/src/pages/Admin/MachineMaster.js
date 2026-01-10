@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { db } from '../../firebase/config';
+import { useSelector } from 'react-redux';
 import {
   collection,
   getDocs,
@@ -52,6 +53,7 @@ import AddIcon from '@mui/icons-material/Add';
 import WarningIcon from '@mui/icons-material/Warning';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const normalize = (v) => (v || '').trim().toLowerCase();
 
@@ -66,9 +68,15 @@ const statusChipVariant = (status) => {
 const MachineMaster = () => {
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
   const [stats, setStats] = useState({ total: 0, active: 0 });
+
+  const user = useSelector(state => state.auth.user);
+  const isAdmin = user?.groupId?.toLowerCase() === 'a' || user?.groupId?.toLowerCase() === 'admin';
+  const permissions = user?.groupPermissions?.machine_master || {};
+
+  const canAdd = permissions.access === 'add' || isAdmin;
+  const canEdit = permissions.access === 'edit' || permissions.access === 'add' || isAdmin;
+  const canDelete = permissions.access === 'add' || isAdmin;
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -137,15 +145,15 @@ const MachineMaster = () => {
       const matchesSearch = !q
         ? true
         : [
-            m.name,
-            m.model,
-            m.serialNumber,
-            m.location,
-            m.status,
-          ]
-            .map((x) => (x || '').toString().toLowerCase())
-            .join(' | ')
-            .includes(q);
+          m.name,
+          m.model,
+          m.serialNumber,
+          m.location,
+          m.status,
+        ]
+          .map((x) => (x || '').toString().toLowerCase())
+          .join(' | ')
+          .includes(q);
 
       const matchesStatus =
         statusFilter === 'All'
@@ -163,8 +171,10 @@ const MachineMaster = () => {
   }, [form.name, form.serialNumber]);
 
   const handleAdd = async () => {
+    if (!canAdd) {
+      return setSnackbar({ open: true, message: 'You do not have permission to add machines', severity: 'error' });
+    }
     const trimmedName = (form.name || '').trim();
-    const trimmedSerial = (form.serialNumber || '').trim();
 
     if (!trimmedName) {
       setNameError(true);
@@ -243,8 +253,10 @@ const MachineMaster = () => {
   };
 
   const handleSaveEdit = async () => {
+    if (!canEdit) {
+      return setSnackbar({ open: true, message: 'You do not have permission to edit machines', severity: 'error' });
+    }
     const trimmedName = (editForm.name || '').trim();
-    const trimmedSerial = (editForm.serialNumber || '').trim();
 
     if (!trimmedName) {
       setEditNameError(true);
@@ -315,6 +327,9 @@ const MachineMaster = () => {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!canDelete) {
+      return setSnackbar({ open: true, message: 'You do not have permission to delete machines', severity: 'error' });
+    }
     try {
       await deleteDoc(doc(db, 'machines', deleteTarget.id));
       setSnackbar({ open: true, message: 'Machine deleted successfully', severity: 'success' });
@@ -674,30 +689,32 @@ const MachineMaster = () => {
                             </TableCell>
                             <TableCell>
                               <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                <Tooltip title="Edit Machine">
+                                <Tooltip title={canEdit ? "Edit Machine" : "View Machine"}>
                                   <IconButton
                                     size="small"
                                     onClick={() => handleEditClick(m)}
                                     sx={{
-                                      color: '#10b981',
-                                      '&:hover': { backgroundColor: '#f0fdf4' }
+                                      color: canEdit ? '#10b981' : '#64748b',
+                                      '&:hover': { backgroundColor: canEdit ? '#f0fdf4' : '#f1f5f9' }
                                     }}
                                   >
-                                    <EditIcon fontSize="small" />
+                                    {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Delete Machine">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleDeleteClick(m)}
-                                    sx={{
-                                      '&:hover': { backgroundColor: '#fef2f2' }
-                                    }}
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
+                                {canDelete && (
+                                  <Tooltip title="Delete Machine">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleDeleteClick(m)}
+                                      sx={{
+                                        '&:hover': { backgroundColor: '#fef2f2' }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                               </Box>
                             </TableCell>
                           </TableRow>
@@ -727,212 +744,217 @@ const MachineMaster = () => {
           )}
         </Paper>
 
-        {/* New Machine Entry Section */}
-        <Paper elevation={0} sx={{
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
-          backgroundColor: 'white',
-          width: '100%'
-        }}>
-          <Box sx={{
-            p: 3,
-            borderBottom: '1px solid #e2e8f0',
-            backgroundColor: '#f0fdf4'
+        {canAdd ? (
+          <Paper elevation={0} sx={{
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+            backgroundColor: 'white',
+            width: '100%'
           }}>
-            <Typography variant="h6" sx={{
-              fontWeight: 600,
-              color: '#1e293b',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
+            <Box sx={{
+              p: 3,
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#f0fdf4'
             }}>
-              <AddIcon sx={{ fontSize: 20, color: '#10b981' }} />
-              New Machine Entry
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-              Fill in the details below to add a new machine
-            </Typography>
-          </Box>
+              <Typography variant="h6" sx={{
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <AddIcon sx={{ fontSize: 20, color: '#10b981' }} />
+                New Machine Entry
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                Fill in the details below to add a new machine
+              </Typography>
+            </Box>
 
-          <Box sx={{ p: 4 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Machine Name"
-                  value={form.name}
-                  onChange={(e) => {
-                    setForm({ ...form, name: e.target.value });
+            <Box sx={{ p: 4 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Machine Name"
+                    value={form.name}
+                    onChange={(e) => {
+                      setForm({ ...form, name: e.target.value });
+                      setNameError(false);
+                    }}
+                    error={nameError}
+                    helperText={nameError ? 'Machine name is required' : ''}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <BuildIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Model"
+                    value={form.model}
+                    onChange={(e) => setForm({ ...form, model: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Serial Number"
+                    value={form.serialNumber}
+                    onChange={(e) => {
+                      setForm({ ...form, serialNumber: e.target.value });
+                      setSerialError(false);
+                    }}
+                    error={serialError}
+                    helperText={serialError ? 'Serial number is required' : ''}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <VerifiedUserIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Location"
+                    value={form.location}
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LocationOnIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={form.status}
+                      label="Status"
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      sx={{
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }}
+                    >
+                      <MenuItem value="Active">Active</MenuItem>
+                      <MenuItem value="Inactive">Inactive</MenuItem>
+                      <MenuItem value="Maintenance">Maintenance</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 2,
+                pt: 4,
+                mt: 2,
+                borderTop: '1px solid #e2e8f0'
+              }}>
+                <Button
+                  variant="contained"
+                  onClick={handleAdd}
+                  disabled={!isMachineFormValid}
+                  startIcon={<AddIcon />}
+                  sx={{
+                    minWidth: 200,
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                    '&:hover': {
+                      boxShadow: '0 6px 20px rgba(16, 185, 129, 0.6)',
+                      transform: 'translateY(-2px)'
+                    },
+                    '&:disabled': {
+                      background: '#e2e8f0',
+                      color: '#94a3b8'
+                    }
+                  }}
+                >
+                  Add Machine
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setForm({
+                      name: '',
+                      model: '',
+                      serialNumber: '',
+                      location: '',
+                      status: 'Active',
+                    });
                     setNameError(false);
-                  }}
-                  error={nameError}
-                  helperText={nameError ? 'Machine name is required' : ''}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <BuildIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Model"
-                  value={form.model}
-                  onChange={(e) => setForm({ ...form, model: e.target.value })}
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Serial Number"
-                  value={form.serialNumber}
-                  onChange={(e) => {
-                    setForm({ ...form, serialNumber: e.target.value });
                     setSerialError(false);
                   }}
-                  error={serialError}
-                  helperText={serialError ? 'Serial number is required' : ''}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <VerifiedUserIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
+                  startIcon={<ClearIcon />}
                   sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    borderColor: '#e2e8f0',
+                    color: '#64748b',
+                    '&:hover': {
+                      borderColor: '#10b981',
+                      color: '#10b981'
                     }
                   }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Location"
-                  value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocationOnIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={form.status}
-                    label="Status"
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    sx={{
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }}
-                  >
-                    <MenuItem value="Active">Active</MenuItem>
-                    <MenuItem value="Inactive">Inactive</MenuItem>
-                    <MenuItem value="Maintenance">Maintenance</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <Box sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 2,
-              pt: 4,
-              mt: 2,
-              borderTop: '1px solid #e2e8f0'
-            }}>
-              <Button
-                variant="contained"
-                onClick={handleAdd}
-                disabled={!isMachineFormValid}
-                startIcon={<AddIcon />}
-                sx={{
-                  minWidth: 200,
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  fontSize: '1rem',
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                  '&:hover': {
-                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.6)',
-                    transform: 'translateY(-2px)'
-                  },
-                  '&:disabled': {
-                    background: '#e2e8f0',
-                    color: '#94a3b8'
-                  }
-                }}
-              >
-                Add Machine
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setForm({
-                    name: '',
-                    model: '',
-                    serialNumber: '',
-                    location: '',
-                    status: 'Active',
-                  });
-                  setNameError(false);
-                  setSerialError(false);
-                }}
-                startIcon={<ClearIcon />}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  borderColor: '#e2e8f0',
-                  color: '#64748b',
-                  '&:hover': {
-                    borderColor: '#10b981',
-                    color: '#10b981'
-                  }
-                }}
-              >
-                Clear Form
-              </Button>
+                >
+                  Clear Form
+                </Button>
+              </Box>
             </Box>
-          </Box>
-        </Paper>
+          </Paper>
+        ) : (
+          <Alert severity="info" sx={{ borderRadius: '16px', mb: 4 }}>
+            You do not have permission to add new machines.
+          </Alert>
+        )}
       </Box>
 
       {/* Edit Machine Dialog */}
@@ -974,6 +996,7 @@ const MachineMaster = () => {
                 helperText={editNameError ? 'Machine name is required' : ''}
                 fullWidth
                 required
+                disabled={!canEdit}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -988,6 +1011,7 @@ const MachineMaster = () => {
                 value={editForm.model}
                 onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
                 fullWidth
+                disabled={!canEdit}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1008,6 +1032,7 @@ const MachineMaster = () => {
                 helperText={editSerialError ? 'Serial number is required' : ''}
                 fullWidth
                 required
+                disabled={!canEdit}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1022,6 +1047,7 @@ const MachineMaster = () => {
                 value={editForm.location}
                 onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
                 fullWidth
+                disabled={!canEdit}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '10px',
@@ -1031,7 +1057,7 @@ const MachineMaster = () => {
               />
             </Grid>
             <Grid item xs={12}>
-              <FormControl fullWidth>
+              <FormControl fullWidth disabled={!canEdit}>
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={editForm.status}
@@ -1065,20 +1091,22 @@ const MachineMaster = () => {
               textTransform: 'none'
             }}
           >
-            Cancel
+            {canEdit ? 'Cancel' : 'Close'}
           </Button>
-          <Button
-            onClick={handleSaveEdit}
-            variant="contained"
-            sx={{
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              textTransform: 'none',
-              fontWeight: 600
-            }}
-          >
-            Save Changes
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleSaveEdit}
+              variant="contained"
+              sx={{
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Save Changes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

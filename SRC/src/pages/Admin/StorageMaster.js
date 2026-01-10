@@ -31,14 +31,19 @@ import {
   Search as SearchIcon,
   Warehouse as WarehouseIcon,
   Refresh as RefreshIcon,
-  Warning as WarningIcon,
-  StorageRounded as StorageRoundedIcon,
   WarningAmber as WarningAmberIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 
-// Storage Master Page - Parts Management Only
 const StorageMaster = () => {
   const parts = useSelector(state => state.parts.parts || []);
+  const user = useSelector(state => state.auth.user);
+  const isAdmin = user?.groupId?.toLowerCase() === 'a' || user?.groupId?.toLowerCase() === 'admin';
+  const permissions = user?.groupPermissions?.storage_master || {};
+
+  const canEdit = permissions.access === 'edit' || permissions.access === 'add' || isAdmin;
+  const canDelete = permissions.access === 'add' || isAdmin;
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // Parts List states
@@ -460,30 +465,32 @@ const StorageMaster = () => {
                             </Box>
                           </TableCell>
                           <TableCell align="center">
-                            <Tooltip title="Edit Part">
+                            <Tooltip title={canEdit ? "Edit Part" : "View Part"}>
                               <IconButton
                                 size="small"
                                 onClick={() => handleEditPart(part)}
                                 sx={{
-                                  color: '#3b82f6',
-                                  '&:hover': { backgroundColor: '#dbeafe' }
+                                  color: canEdit ? '#3b82f6' : '#64748b',
+                                  '&:hover': { backgroundColor: canEdit ? '#dbeafe' : '#f1f5f9' }
                                 }}
                               >
-                                <EditIcon fontSize="small" />
+                                {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Delete Part">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeletePart(part)}
-                                sx={{
-                                  color: '#ef4444',
-                                  '&:hover': { backgroundColor: '#fee2e2' }
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            {canDelete && (
+                              <Tooltip title="Delete Part">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeletePart(part)}
+                                  sx={{
+                                    color: '#ef4444',
+                                    '&:hover': { backgroundColor: '#fee2e2' }
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -634,6 +641,7 @@ const StorageMaster = () => {
               size="small"
               inputProps={{ maxLength: 2 }}
               InputLabelProps={{ shrink: true }}
+              disabled={!canEdit}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -656,6 +664,7 @@ const StorageMaster = () => {
               size="small"
               inputProps={{ maxLength: 1, style: { textTransform: 'uppercase' } }}
               InputLabelProps={{ shrink: true }}
+              disabled={!canEdit}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -667,18 +676,20 @@ const StorageMaster = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #e2e8f0' }}>
           <Button onClick={() => setEditPartDialogOpen(false)} variant="outlined" sx={{ borderRadius: '8px' }}>
-            Cancel
+            {canEdit ? 'Cancel' : 'Close'}
           </Button>
-          <Button
-            onClick={handleSavePartChanges}
-            variant="contained"
-            sx={{
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)'
-            }}
-          >
-            Save Changes
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleSavePartChanges}
+              variant="contained"
+              sx={{
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)'
+              }}
+            >
+              Save Changes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

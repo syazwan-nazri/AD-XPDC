@@ -62,6 +62,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import AddIcon from "@mui/icons-material/Add";
 import PersonIcon from "@mui/icons-material/Person";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import WarningIcon from "@mui/icons-material/Warning";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
@@ -76,13 +77,19 @@ const defaultForm = {
 
 const UserManagement = () => {
   const currentUser = useSelector((state) => state.auth.user);
-  const isAdmin = currentUser?.groupId === "A";
+  const isAdmin = currentUser?.groupId?.toLowerCase() === 'a' || currentUser?.groupId?.toLowerCase() === 'admin';
+  const permissions = currentUser?.groupPermissions?.user_master || {};
+
+  const canAdd = permissions.access === 'add' || isAdmin;
+  const canEdit = permissions.access === 'edit' || permissions.access === 'add' || isAdmin;
+  const canDelete = permissions.access === 'add' || isAdmin;
   const [users, setUsers] = useState([]);
   const [userGroups, setUserGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [stats, setStats] = useState({ total: 0, active: 0 });
+  const [departments, setDepartments] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
@@ -156,9 +163,22 @@ const UserManagement = () => {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const q = query(collection(db, "departments"), where("status", "==", "Active"));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setDepartments(data);
+    } catch (err) {
+      console.error("Failed to fetch departments:", err);
+      setDepartments([]);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchUserGroups();
+    fetchDepartments();
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -239,10 +259,10 @@ const UserManagement = () => {
       return;
     }
 
-    if (!isAdmin) {
+    if (modal.edit ? !canEdit : !canAdd) {
       setSnackbar({
         open: true,
-        msg: "Only admins can add or edit users",
+        msg: `You do not have permission to ${modal.edit ? 'edit' : 'add'} users`,
         severity: "error",
       });
       return;
@@ -250,18 +270,26 @@ const UserManagement = () => {
 
     try {
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("username", "==", username));
-      const querySnapshot = await getDocs(q);
 
-      const isDuplicateUsername = querySnapshot.docs.some(doc => doc.id !== id);
+      // Check duplicate username
+      const qUsername = query(usersRef, where("username", "==", username));
+      const snapUsername = await getDocs(qUsername);
+      const isDuplicateUsername = snapUsername.docs.some(doc => doc.id !== id);
 
       if (isDuplicateUsername) {
         setUsernameError(true);
-        setSnackbar({
-          open: true,
-          msg: "Username already exists",
-          severity: "error",
-        });
+        setSnackbar({ open: true, msg: "Username already exists", severity: "error" });
+        return;
+      }
+
+      // Check duplicate email
+      const qEmail = query(usersRef, where("email", "==", email));
+      const snapEmail = await getDocs(qEmail);
+      const isDuplicateEmail = snapEmail.docs.some(doc => doc.id !== id);
+
+      if (isDuplicateEmail) {
+        setEmailError(true);
+        setSnackbar({ open: true, msg: "Email already exists in the system", severity: "error" });
         return;
       }
 
@@ -341,6 +369,10 @@ const UserManagement = () => {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!canDelete) {
+      setSnackbar({ open: true, msg: "You do not have permission to delete users", severity: "error" });
+      return;
+    }
     try {
       await deleteDoc(doc(db, "users", deleteTarget.id));
       setUsers((users) => users.filter((u) => u.id !== deleteTarget.id));
@@ -598,7 +630,7 @@ const UserManagement = () => {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {isAdmin && (
+            {canAdd && (
               <Tooltip title="Add User">
                 <Button
                   variant="contained"
@@ -706,21 +738,19 @@ const UserManagement = () => {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            {isAdmin && (
-                              <Tooltip title="Edit User">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => openEdit(u)}
-                                  sx={{
-                                    color: '#8b5cf6',
-                                    '&:hover': { backgroundColor: '#faf5ff' }
-                                  }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                            {isAdmin && (
+                            <Tooltip title={canEdit ? "Edit User" : "View Details"}>
+                              <IconButton
+                                size="small"
+                                onClick={() => openEdit(u)}
+                                sx={{
+                                  color: canEdit ? '#8b5cf6' : '#64748b',
+                                  '&:hover': { backgroundColor: canEdit ? '#faf5ff' : '#f1f5f9' }
+                                }}
+                              >
+                                {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                              </IconButton>
+                            </Tooltip>
+                            {canDelete && (
                               <Tooltip title="Delete User">
                                 <IconButton
                                   size="small"
@@ -816,7 +846,7 @@ const UserManagement = () => {
                 }}
                 error={emailError}
                 helperText={emailError ? 'Email is required' : ''}
-                disabled={modal.edit}
+                disabled={modal.edit || !canAdd}
                 fullWidth
                 required
                 InputLabelProps={{ shrink: true }}
@@ -840,6 +870,7 @@ const UserManagement = () => {
                 helperText={usernameError ? 'Username is required or already exists' : ''}
                 fullWidth
                 required
+                disabled={modal.edit ? !canEdit : !canAdd}
                 InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -850,25 +881,40 @@ const UserManagement = () => {
               />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                label="Department"
-                value={modal.data.department}
-                onChange={(e) => {
-                  setModal((m) => ({ ...m, data: { ...m.data, department: e.target.value } }));
-                  setDepartmentError(false);
-                }}
-                error={departmentError}
-                helperText={departmentError ? 'Department is required' : ''}
-                fullWidth
-                required
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
+              <FormControl fullWidth required error={departmentError}>
+                <InputLabel shrink>Department</InputLabel>
+                <Select
+                  value={modal.data.department || ""}
+                  onChange={(e) => {
+                    setModal((m) => ({ ...m, data: { ...m.data, department: e.target.value } }));
+                    setDepartmentError(false);
+                  }}
+                  disabled={!(modal.edit ? canEdit : canAdd)}
+                  displayEmpty
+                  sx={{
                     borderRadius: '10px',
                     backgroundColor: '#f8fafc',
-                  }
-                }}
-              />
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select a department</em>
+                  </MenuItem>
+                  {departments && departments.length > 0 ? (
+                    departments.map((d) => (
+                      <MenuItem key={d.id} value={d.departmentName}>
+                        {d.departmentName}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>No departments available</MenuItem>
+                  )}
+                </Select>
+                {departmentError && (
+                  <Typography variant="caption" color="error" sx={{ ml: 1.5, mt: 0.5 }}>
+                    Department is required
+                  </Typography>
+                )}
+              </FormControl>
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth required error={groupError}>
@@ -880,7 +926,7 @@ const UserManagement = () => {
                     setModal((m) => ({ ...m, data: { ...m.data, groupId: e.target.value } }));
                     setGroupError(false);
                   }}
-                  disabled={!isAdmin}
+                  disabled={!(modal.edit ? canEdit : canAdd)}
                   displayEmpty
                   sx={{
                     borderRadius: '10px',
@@ -892,7 +938,7 @@ const UserManagement = () => {
                   </MenuItem>
                   {userGroups && userGroups.length > 0 ? (
                     userGroups.map((g) => (
-                      <MenuItem key={g.groupId || g.id} value={g.groupId || g.id}>
+                      <MenuItem key={g.id} value={g.id}>
                         {g.groupName || g.name || g.id}
                       </MenuItem>
                     ))
@@ -911,6 +957,7 @@ const UserManagement = () => {
                   onChange={(e) => {
                     setModal((m) => ({ ...m, data: { ...m.data, status: e.target.value } }));
                   }}
+                  disabled={!(modal.edit ? canEdit : canAdd)}
                   displayEmpty
                   sx={{
                     borderRadius: '10px',
@@ -940,21 +987,22 @@ const UserManagement = () => {
               textTransform: 'none'
             }}
           >
-            Cancel
+            {modal.edit ? (canEdit ? 'Cancel' : 'Close') : 'Cancel'}
           </Button>
-          <Button
-            onClick={handleSave}
-            variant="contained"
-            disabled={!isAdmin}
-            sx={{
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-              textTransform: 'none',
-              fontWeight: 600
-            }}
-          >
-            {modal.edit ? 'Update User' : 'Add User'}
-          </Button>
+          {(modal.edit ? canEdit : canAdd) && (
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              sx={{
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              {modal.edit ? 'Update User' : 'Add User'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

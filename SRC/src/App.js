@@ -21,18 +21,20 @@ import ResetPassword from "./pages/Auth/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PartMaster from "./pages/Admin/PartMaster";
 import PartGroupMaster from "./pages/Admin/PartGroupMaster";
-import StorageMaster from "./pages/Admin/StorageMaster";
-import StorageLocations from "./pages/Admin/StorageLocations";
+import WarehouseMaster from "./pages/Admin/WarehouseMaster";
+import WarehouseLocations from "./pages/Admin/WarehouseLocations";
 import Login from "./pages/Auth/Login";
 
 
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "./firebase/config";
+import { auth, db } from "./firebase/config";
+import { doc, getDoc } from "firebase/firestore";
 import { setUser, logout } from "./redux/authSlice";
 import { syncUserData, getUserDocByUid } from "./utils/userManagement";
 import CircularProgress from "@mui/material/CircularProgress";
 import UserManagement from "./pages/Admin/UserManagement";
 import UserGroupMaster from "./pages/Admin/UserGroupMaster";
+import DepartmentMaster from "./pages/Admin/DepartmentMaster";
 import Home from "./pages/Home";
 import DashboardKPIs from "./pages/Reports/DashboardKPIs";
 import SupplierMaster from "./pages/Admin/SupplierMaster";
@@ -136,8 +138,6 @@ function AppShell({ toggleTheme }) {
           let groupPermissions = {};
           if (userData.groupId) {
             try {
-              const { doc, getDoc } = require('firebase/firestore');
-              const { db } = require('./firebase/config');
               const groupRef = doc(db, 'groups', userData.groupId);
               const groupSnap = await getDoc(groupRef);
               if (groupSnap.exists()) {
@@ -293,6 +293,9 @@ function AppShell({ toggleTheme }) {
             <Route element={<ProtectedRoute resourceId="user_group_master" />}>
               <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
             </Route>
+            <Route element={<ProtectedRoute resourceId="department_master" />}>
+              <Route path="/admin/department-master" element={<DepartmentMaster />} />
+            </Route>
             <Route element={<ProtectedRoute resourceId="supplier_master" />}>
               <Route path="/admin/supplier-master" element={<SupplierMaster />} />
             </Route>
@@ -302,9 +305,11 @@ function AppShell({ toggleTheme }) {
             <Route element={<ProtectedRoute resourceId="part_group_master" />}>
               <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
             </Route>
-            <Route element={<ProtectedRoute resourceId="storage_master" />}>
-              <Route path="/admin/bin-master" element={<StorageMaster />} />
-              <Route path="/admin/storage-locations" element={<StorageLocations />} />
+            <Route element={<ProtectedRoute resourceId="warehouse_master" />}>
+              <Route path="/admin/warehouse-master" element={<WarehouseMaster />} />
+            </Route>
+            <Route element={<ProtectedRoute resourceId="warehouse_locations" />}>
+              <Route path="/admin/warehouse-locations" element={<WarehouseLocations />} />
             </Route>
             <Route element={<ProtectedRoute resourceId="machine_master" />}>
               <Route path="/admin/machine-master" element={<MachineMaster />} />

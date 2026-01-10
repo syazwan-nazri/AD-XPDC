@@ -33,6 +33,10 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -48,33 +52,15 @@ const defaultForm = {
   groupName: '',
   description: '',
   department: '',
+  status: 'Active',
   permissions: {}
 };
 
 // Convert Roles to array for predefined groups
 
 
-const Resources = [
-  { id: 'user_master', name: 'User Master', category: 'Admin' },
-  { id: 'user_group_master', name: 'User Group Master', category: 'Admin' },
-  { id: 'part_master', name: 'Part Master', category: 'Data Master' },
-  { id: 'part_group_master', name: 'Part Group Master', category: 'Data Master' },
-  { id: 'storage_master', name: 'Storage Master', category: 'Data Master' },
-  { id: 'supplier_master', name: 'Supplier Master', category: 'Data Master' },
-  { id: 'machine_master', name: 'Machine Master', category: 'Data Master' },
-  { id: 'stock_in', name: 'Stock In', category: 'Inventory' },
-  { id: 'stock_out', name: 'Stock Out', category: 'Inventory' },
-  { id: 'internal_transfer', name: 'Internal Transfer', category: 'Inventory' },
-  { id: 'movement_logs', name: 'Movement Logs', category: 'Inventory' },
-  { id: 'mrf', name: 'Material Requisition (MRF)', category: 'Inventory', hasActions: true },
-  { id: 'stock_take', name: 'Stock Take', category: 'Inventory' },
-  { id: 'purchase_requisition', name: 'Purchase Requisition', category: 'Procurement', hasActions: true },
-  { id: 'dashboard', name: 'Dashboard', category: 'Reports' },
-  { id: 'stock_inquiry', name: 'Stock Inquiry Report', category: 'Reports' },
-  { id: 'stock_valuation', name: 'Stock Valuation Report', category: 'Reports' },
-  { id: 'movement_history', name: 'Movement History Report', category: 'Reports' },
-  { id: 'low_stock', name: 'Low Stock Report', category: 'Reports' },
-];
+import { APP_RESOURCES as Resources, RESOURCE_CATEGORIES } from '../../constants/resources';
+
 
 const AccessLevels = [
   { value: 'no_access', label: 'No Access' },
@@ -118,7 +104,7 @@ const UserGroupMaster = () => {
   const calculateStats = (data) => {
     setStats({
       total: data.length,
-      active: data.filter(g => !['D', 'S'].includes(g.groupId?.[0])).length,
+      active: data.filter(g => (g.status || 'Active') === 'Active').length,
     });
   };
 
@@ -135,6 +121,7 @@ const UserGroupMaster = () => {
           groupName: data.name || data.groupName || doc.id || '',
           description: data.description || '',
           department: data.department || '',
+          status: data.status || 'Active',
           // Ensure permissions object exists
           permissions: data.permissions || {},
         };
@@ -264,6 +251,7 @@ const UserGroupMaster = () => {
         groupName,
         description,
         department,
+        status: modal.data.status || 'Active',
         permissions, // Save the granular permissions map
         updatedAt: new Date().toISOString(),
       };
@@ -365,19 +353,32 @@ const UserGroupMaster = () => {
                         value={modal.data.permissions[resource.id]?.access || 'no_access'}
                         onChange={(e) => handlePermissionChange(resource.id, e.target.value)}
                       >
-                        {AccessLevels.map((level) => (
-                          <FormControlLabel
-                            key={level.value}
-                            value={level.value}
-                            control={<Radio size="small" />}
-                            label={
-                              <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-                                {level.label}
-                              </Typography>
+                        {AccessLevels
+                          .filter((level) => {
+                            if (category === RESOURCE_CATEGORIES.REPORTS) {
+                              return level.value === 'no_access' || level.value === 'view';
                             }
-                            sx={{ mr: 2 }}
-                          />
-                        ))}
+                            return true;
+                          })
+                          .map((level) => {
+                            let label = level.label;
+                            if (category === RESOURCE_CATEGORIES.REPORTS && level.value === 'view') {
+                              label = 'View';
+                            }
+                            return (
+                              <FormControlLabel
+                                key={level.value}
+                                value={level.value}
+                                control={<Radio size="small" />}
+                                label={
+                                  <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                                    {label}
+                                  </Typography>
+                                }
+                                sx={{ mr: 2 }}
+                              />
+                            );
+                          })}
                       </RadioGroup>
                     </Box>
 
@@ -687,6 +688,7 @@ const UserGroupMaster = () => {
                     <TableCell sx={{ fontWeight: 600 }}>Group Name</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -717,6 +719,14 @@ const UserGroupMaster = () => {
                           <Typography variant="body2" sx={{ color: '#64748b' }}>
                             {g.department || '—'}
                           </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={g.status || 'Active'}
+                            size="small"
+                            color={(g.status || 'Active') === 'Active' ? 'success' : 'default'}
+                            sx={{ fontWeight: 600, borderRadius: '6px' }}
+                          />
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -896,6 +906,31 @@ const UserGroupMaster = () => {
                   },
                 }}
               />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label="Status"
+                value={modal.data.status}
+                onChange={(e) =>
+                  setModal((m) => ({
+                    ...m,
+                    data: { ...m.data, status: e.target.value },
+                  }))
+                }
+                fullWidth
+                SelectProps={{ native: false }}
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                  },
+                }}
+              >
+                <MenuItem value="Active">Active</MenuItem>
+                <MenuItem value="Inactive">Inactive</MenuItem>
+              </TextField>
             </Grid>
           </Grid>
 

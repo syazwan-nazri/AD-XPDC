@@ -9,7 +9,8 @@ import {
   Timestamp,
   query,
   orderBy,
-  where
+  where,
+  deleteDoc
 } from 'firebase/firestore';
 import { useSelector } from 'react-redux';
 import {
@@ -59,13 +60,16 @@ const PurchaseRequisition = () => {
   const user = useSelector(state => state.auth.user);
 
   // Check user permissions for requestor/approver roles
-  const canRequest = user?.groupPermissions?.purchase_requisition?.actions?.includes('requestor') || user?.groupId === 'A';
-  const canApprove = user?.groupPermissions?.purchase_requisition?.actions?.includes('approver') || user?.groupId === 'A';
+  const isAdmin = user?.groupId?.toLowerCase() === 'a' || user?.groupId?.toLowerCase() === 'admin';
+  const canRequest = user?.groupPermissions?.purchase_requisition?.actions?.includes('requestor') || isAdmin;
+  const canApprove = user?.groupPermissions?.purchase_requisition?.actions?.includes('approver') || isAdmin;
+  const canDelete = user?.groupPermissions?.purchase_requisition?.access === 'add' || isAdmin;
 
   // Master Data
   const [parts, setParts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [storageLocations, setStorageLocations] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [prs, setPrs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
@@ -77,9 +81,11 @@ const PurchaseRequisition = () => {
 
   // PR Header Fields
   const [prHeader, setPrHeader] = useState({
+    prNumber: '',
     supplier: null,
     prDate: new Date().toISOString().split('T')[0],
     requiredDate: '',
+    warehouse: null,
     storageLocation: null,
     remarks: ''
   });
@@ -103,9 +109,14 @@ const PurchaseRequisition = () => {
   const [viewDialog, setViewDialog] = useState(false);
   const [viewingPr, setViewingPr] = useState(null);
 
+  // Delete Dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [saving, setSaving] = useState(false);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -113,15 +124,17 @@ const PurchaseRequisition = () => {
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
-        const [partsSnap, suppliersSnap, locationsSnap] = await Promise.all([
+        const [partsSnap, suppliersSnap, warehousesSnap, locationsSnap] = await Promise.all([
           getDocs(collection(db, 'parts')),
           getDocs(collection(db, 'suppliers')),
-          getDocs(collection(db, 'storageLocations'))
+          getDocs(collection(db, 'warehouses')),
+          getDocs(collection(db, 'warehouseLocations'))
         ]);
 
         setParts(partsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id })));
         setSuppliers(suppliersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-        setStorageLocations(locationsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+        setWarehouses(warehousesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+        setLocations(locationsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id })));
       } catch (error) {
         console.error('Error fetching master data:', error);
       }
@@ -130,10 +143,31 @@ const PurchaseRequisition = () => {
     fetchPrs();
   }, []);
 
+  const generatePrNumber = async () => {
+    try {
+      const q = query(collection(db, 'purchase_requisitions'), orderBy('prNumber', 'desc'));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        return 'PR-001';
+      }
+
+      const lastPr = snapshot.docs[0].data();
+      const lastNumber = lastPr.prNumber || 'PR-000';
+      const numberPart = parseInt(lastNumber.split('-')[1]) || 0;
+      const newNumber = numberPart + 1;
+
+      return `PR-${String(newNumber).padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Error generating PR number:', error);
+      return `PR-${Date.now()}`; // Fallback to timestamp
+    }
+  };
+
   const fetchPrs = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'purchase_requisitions'), orderBy('prDate', 'desc'));
+      const q = query(collection(db, 'purchase_requisitions'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const prData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setPrs(prData);
@@ -141,6 +175,7 @@ const PurchaseRequisition = () => {
       // Calculate stats
       setStats({
         total: prData.length,
+        draft: prData.filter(p => p.status === 'Draft').length,
         pending: prData.filter(p => p.status === 'Pending').length,
         approved: prData.filter(p => p.status === 'Approved').length,
         rejected: prData.filter(p => p.status === 'Rejected').length,
@@ -152,13 +187,16 @@ const PurchaseRequisition = () => {
     }
   };
 
-  const openCreateDialog = () => {
+  const openCreateDialog = async () => {
     setEditMode(false);
     setCurrentPrId(null);
+    const newPrNumber = await generatePrNumber();
     setPrHeader({
+      prNumber: newPrNumber,
       supplier: null,
       prDate: new Date().toISOString().split('T')[0],
       requiredDate: '',
+      warehouse: null,
       storageLocation: null,
       remarks: ''
     });
@@ -167,17 +205,19 @@ const PurchaseRequisition = () => {
   };
 
   const openEditDialog = (pr) => {
-    if (pr.status !== 'Pending') {
-      setSnackbar({ open: true, message: 'Only pending PRs can be edited', severity: 'warning' });
+    if (pr.status !== 'Draft' && pr.status !== 'Rejected') {
+      setSnackbar({ open: true, message: 'Only Draft or Rejected PRs can be edited', severity: 'warning' });
       return;
     }
     setEditMode(true);
     setCurrentPrId(pr.id);
     setPrHeader({
+      prNumber: pr.prNumber,
       supplier: suppliers.find(s => s.id === pr.supplierId) || null,
       prDate: pr.prDate || new Date().toISOString().split('T')[0],
       requiredDate: pr.requiredDate || '',
-      storageLocation: storageLocations.find(l => l.id === pr.storageLocationId) || null,
+      warehouse: warehouses.find(w => w.id === pr.warehouseId) || null,
+      storageLocation: locations.find(l => l.id === pr.storageLocationId) || null,
       remarks: pr.remarks || ''
     });
     setPrLines(pr.lines || []);
@@ -238,39 +278,63 @@ const PurchaseRequisition = () => {
     setPrLines(prLines.filter((_, i) => i !== index));
   };
 
-  const handleSubmitPr = async () => {
-    // Validation
-    if (!prHeader.supplier) {
-      setSnackbar({ open: true, message: 'Please select a supplier', severity: 'error' });
+  const handleSubmitPr = async (targetStatus = 'Pending') => {
+    if (!canRequest) {
+      setSnackbar({ open: true, message: 'You do not have permission to create or edit PRs', severity: 'error' });
       return;
     }
-    if (!prHeader.requiredDate) {
-      setSnackbar({ open: true, message: 'Please select required date', severity: 'error' });
-      return;
-    }
-    if (!prHeader.storageLocation) {
-      setSnackbar({ open: true, message: 'Please select storage location', severity: 'error' });
-      return;
-    }
-    if (prLines.length === 0) {
-      setSnackbar({ open: true, message: 'Please add at least one line item', severity: 'error' });
-      return;
+    // Validation (Mandatory fields only if submitting for approval)
+    if (targetStatus === 'Pending') {
+      if (!prHeader.supplier) {
+        setSnackbar({ open: true, message: 'Please select a supplier', severity: 'error' });
+        return;
+      }
+      if (!prHeader.requiredDate) {
+        setSnackbar({ open: true, message: 'Please select required date', severity: 'error' });
+        return;
+      }
+      if (!prHeader.warehouse) {
+        setSnackbar({ open: true, message: 'Please select a warehouse', severity: 'error' });
+        return;
+      }
+      if (!prHeader.storageLocation) {
+        setSnackbar({ open: true, message: 'Please select storage location', severity: 'error' });
+        return;
+      }
+      if (prLines.length === 0) {
+        setSnackbar({ open: true, message: 'Please add at least one line item', severity: 'error' });
+        return;
+      }
     }
 
     try {
+      setSaving(true);
+
       const prData = {
-        supplierId: prHeader.supplier.id,
-        supplierName: prHeader.supplier.name,
-        prDate: prHeader.prDate,
-        requiredDate: prHeader.requiredDate,
-        storageLocationId: prHeader.storageLocation.id,
-        storageLocationName: prHeader.storageLocation.name || prHeader.storageLocation.locationName,
-        remarks: prHeader.remarks,
-        lines: prLines,
-        totalAmount: prLines.reduce((sum, line) => sum + line.totalPrice, 0),
+        prNumber: prHeader.prNumber || '',
+        supplierId: prHeader.supplier?.id || '',
+        supplierName: prHeader.supplier?.name || '',
+        prDate: prHeader.prDate || new Date().toISOString().split('T')[0],
+        requiredDate: prHeader.requiredDate || '',
+        warehouseId: prHeader.warehouse?.id || '',
+        warehouseName: prHeader.warehouse?.warehouseName || prHeader.warehouse?.name || '',
+        storageLocationId: prHeader.storageLocation?.id || '',
+        storageLocationName: prHeader.storageLocation?.locationName || prHeader.storageLocation?.name || '',
+        remarks: prHeader.remarks || '',
+        lines: prLines.map(l => ({
+          partId: l.partId || '',
+          partName: l.partName || '',
+          sapNumber: l.sapNumber || '',
+          unit: l.unit || '',
+          quantity: Number(l.quantity) || 0,
+          unitPrice: Number(l.unitPrice) || 0,
+          totalPrice: Number(l.totalPrice) || 0,
+          remarks: l.remarks || ''
+        })),
+        totalAmount: Number(prLines.reduce((sum, line) => sum + (line.totalPrice || 0), 0)) || 0,
         requesterId: user?.uid || 'unknown',
         requesterName: user?.username || user?.email || 'Unknown',
-        status: 'Pending',
+        status: targetStatus,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };
@@ -282,6 +346,13 @@ const PurchaseRequisition = () => {
         });
         setSnackbar({ open: true, message: 'Purchase Requisition Updated Successfully', severity: 'success' });
       } else {
+        // Double check uniqueness of PR number before addDoc
+        const q = query(collection(db, 'purchase_requisitions'), where('prNumber', '==', prData.prNumber));
+        const checkSnap = await getDocs(q);
+        if (!checkSnap.empty) {
+          throw new Error('PR Number ' + prData.prNumber + ' already exists. Please refresh and try again.');
+        }
+
         await addDoc(collection(db, 'purchase_requisitions'), prData);
         setSnackbar({ open: true, message: 'Purchase Requisition Created Successfully', severity: 'success' });
       }
@@ -289,12 +360,23 @@ const PurchaseRequisition = () => {
       setDialogOpen(false);
       fetchPrs();
     } catch (e) {
-      console.error(e);
-      setSnackbar({ open: true, message: 'Failed to save PR', severity: 'error' });
+      console.error('PR Save Error:', e);
+      setSnackbar({
+        open: true,
+        message: 'Failed to save PR: ' + (e.code === 'permission-denied' ? 'Access denied' : e.message),
+        severity: 'error'
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleStatusChange = async (prId, newStatus, rejectionReason = '') => {
+    if (!canApprove) {
+      setSnackbar({ open: true, message: 'You do not have permission to approve/reject PRs', severity: 'error' });
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'purchase_requisitions', prId), {
         status: newStatus,
@@ -306,8 +388,38 @@ const PurchaseRequisition = () => {
       setSnackbar({ open: true, message: `PR ${newStatus} Successfully`, severity: 'success' });
       fetchPrs();
     } catch (e) {
-      console.error(e);
-      setSnackbar({ open: true, message: 'Failed to Update PR', severity: 'error' });
+      console.error('PR Status Update Error:', e);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update PR status: ' + (e.code === 'permission-denied' ? 'Access denied' : e.message),
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleDeletePr = async () => {
+    if (!canDelete) {
+      setSnackbar({ open: true, message: 'You do not have permission to delete PRs', severity: 'error' });
+      return;
+    }
+    if (!deleteTarget) return;
+
+    try {
+      setSaving(true);
+      await deleteDoc(doc(db, 'purchase_requisitions', deleteTarget.id));
+      setSnackbar({ open: true, message: 'Purchase Requisition Deleted', severity: 'success' });
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+      fetchPrs();
+    } catch (e) {
+      console.error('PR Delete Error:', e);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete PR: ' + (e.code === 'permission-denied' ? 'Access denied' : e.message),
+        severity: 'error'
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -315,7 +427,9 @@ const PurchaseRequisition = () => {
     switch (status) {
       case 'Approved': return 'success';
       case 'Rejected': return 'error';
-      default: return 'warning';
+      case 'Pending': return 'warning';
+      case 'Draft': return 'default';
+      default: return 'info';
     }
   };
 
@@ -329,6 +443,7 @@ const PurchaseRequisition = () => {
     const matchSearch =
       pr.requesterName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pr.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pr.warehouseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pr.storageLocationName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pr.remarks?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pr.lines?.some(line =>
@@ -423,7 +538,7 @@ const PurchaseRequisition = () => {
 
         {/* Stats Cards */}
         <Grid container spacing={2} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -431,14 +546,14 @@ const PurchaseRequisition = () => {
               p: 2.5
             }}>
               <Typography variant="body2" sx={{ color: '#64748b', mb: 1 }}>
-                Total PRs
+                Draft
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                {stats.total}
+              <Typography variant="h4" sx={{ fontWeight: 700, color: '#94a3b8' }}>
+                {stats.draft || 0}
               </Typography>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -453,7 +568,7 @@ const PurchaseRequisition = () => {
               </Typography>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -468,7 +583,7 @@ const PurchaseRequisition = () => {
               </Typography>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -480,6 +595,21 @@ const PurchaseRequisition = () => {
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#ef4444' }}>
                 {stats.rejected}
+              </Typography>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card sx={{
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              p: 2.5
+            }}>
+              <Typography variant="body2" sx={{ color: '#64748b', mb: 1 }}>
+                Total PRs
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                {stats.total}
               </Typography>
             </Card>
           </Grid>
@@ -611,9 +741,11 @@ const PurchaseRequisition = () => {
               <Table sx={{ minWidth: 1200 }}>
                 <TableHead sx={{ backgroundColor: '#f8fafc' }}>
                   <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>PR Number</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>PR Date</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Requester</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Supplier</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Warehouse</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Storage Location</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Items</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Total Amount</TableCell>
@@ -625,6 +757,11 @@ const PurchaseRequisition = () => {
                   {filteredPrs.map((pr) => (
                     <TableRow key={pr.id} hover>
                       <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#f59e0b' }}>
+                          {pr.prNumber || 'N/A'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 500, color: '#1e293b' }}>
                           {pr.prDate || 'N/A'}
                         </Typography>
@@ -634,6 +771,7 @@ const PurchaseRequisition = () => {
                       </TableCell>
                       <TableCell>{pr.requesterName}</TableCell>
                       <TableCell>{pr.supplierName}</TableCell>
+                      <TableCell>{pr.warehouseName}</TableCell>
                       <TableCell>{pr.storageLocationName}</TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -667,7 +805,8 @@ const PurchaseRequisition = () => {
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {pr.status === 'Pending' && canRequest && pr.requesterId === user?.uid && (
+
+                          {(pr.status === 'Draft' || pr.status === 'Rejected') && canRequest && pr.requesterId === user?.uid && (
                             <Tooltip title="Edit PR">
                               <IconButton
                                 size="small"
@@ -678,6 +817,7 @@ const PurchaseRequisition = () => {
                               </IconButton>
                             </Tooltip>
                           )}
+
                           {pr.status === 'Pending' && canApprove && (
                             <>
                               <Tooltip title="Approve">
@@ -699,6 +839,21 @@ const PurchaseRequisition = () => {
                                 </IconButton>
                               </Tooltip>
                             </>
+                          )}
+
+                          {canDelete && (
+                            <Tooltip title="Delete PR">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setDeleteTarget(pr);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                sx={{ color: '#ef4444', '&:hover': { backgroundColor: '#fef2f2' } }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
                           )}
                         </Box>
                       </TableCell>
@@ -742,13 +897,148 @@ const PurchaseRequisition = () => {
           }}
         >
           {/* PR Header */}
-          <Paper elevation={0} sx={{ p: 3, mb: 3, border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: 'white' }}>
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 3,
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              backgroundColor: 'white'
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                mb: 3,
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
               <Box sx={{ width: 4, height: 24, backgroundColor: '#f59e0b', borderRadius: 1 }} />
               PR Header Information
             </Typography>
+
+            {/* Row 1: PR Number (auto) | Supplier (flex-grow) */}
+            <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+              <Box sx={{ minWidth: '120px', maxWidth: '150px' }}>
+                <TextField
+                  label="PR Number"
+                  value={prHeader.prNumber}
+                  disabled
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: '#f8fafc',
+                      fontWeight: 600
+                    }
+                  }}
+                />
+              </Box>
+
+              <Box sx={{ flexGrow: 1, minWidth: '300px' }}>
+                <Autocomplete
+                  options={suppliers}
+                  getOptionLabel={(option) => option.name || ''}
+                  value={prHeader.supplier}
+                  onChange={(e, v) => setPrHeader({ ...prHeader, supplier: v })}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Supplier *" fullWidth />
+                  )}
+                />
+              </Box>
+            </Box>
+
+            {/* Row 1.5: Warehouse & Location */}
+            <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+              <Box sx={{ flexGrow: 1, minWidth: '200px' }}>
+                <Autocomplete
+                  options={warehouses}
+                  getOptionLabel={(option) => option.warehouseName || option.name || ''}
+                  value={prHeader.warehouse}
+                  onChange={(e, v) => setPrHeader({ ...prHeader, warehouse: v, storageLocation: null })}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Warehouse *" fullWidth />
+                  )}
+                />
+              </Box>
+
+              <Box sx={{ flexGrow: 1, minWidth: '200px' }}>
+                <Autocomplete
+                  options={locations.filter(l => l.warehouseId === prHeader.warehouse?.id)}
+                  getOptionLabel={(option) => option.locationName || option.name || ''}
+                  value={prHeader.storageLocation}
+                  disabled={!prHeader.warehouse}
+                  onChange={(e, v) => setPrHeader({ ...prHeader, storageLocation: v })}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Storage Location *" fullWidth />
+                  )}
+                />
+              </Box>
+            </Box>
+
+            {/* Row 2: Dates and Remarks */}
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="PR Date"
+                  type="date"
+                  fullWidth
+                  value={prHeader.prDate}
+                  onChange={(e) =>
+                    setPrHeader({ ...prHeader, prDate: e.target.value })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="Required Date *"
+                  type="date"
+                  fullWidth
+                  value={prHeader.requiredDate}
+                  onChange={(e) =>
+                    setPrHeader({ ...prHeader, requiredDate: e.target.value })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Remarks"
+                  fullWidth
+                  value={prHeader.remarks}
+                  onChange={(e) =>
+                    setPrHeader({ ...prHeader, remarks: e.target.value })
+                  }
+                  placeholder="Optional notes"
+                />
+              </Grid>
+
+              {/* Row 3: Total Amount and Requestor */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Total Amount"
+                  value={`$${prLines.reduce((s, l) => s + l.totalPrice, 0).toFixed(2)}`}
+                  disabled
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: '#fff7ed',
+                      fontWeight: 700,
+                      fontSize: '1.1rem',
+                      color: '#f59e0b'
+                    }
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
                 <TextField
                   label="Requestor"
                   value={user?.username || user?.email || 'Unknown User'}
@@ -756,129 +1046,14 @@ const PurchaseRequisition = () => {
                   fullWidth
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="PR Date"
-                  type="date"
-                  fullWidth
-                  value={prHeader.prDate}
-                  onChange={(e) => setPrHeader({ ...prHeader, prDate: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'white',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Required Date *"
-                  type="date"
-                  fullWidth
-                  value={prHeader.requiredDate}
-                  onChange={(e) => setPrHeader({ ...prHeader, requiredDate: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'white',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Autocomplete
-                  options={suppliers}
-                  getOptionLabel={(option) => option.name || ''}
-                  value={prHeader.supplier}
-                  onChange={(event, newValue) => setPrHeader({ ...prHeader, supplier: newValue })}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Supplier *"
-                      placeholder="Select supplier"
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: 'white',
-                        }
-                      }}
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Autocomplete
-                  options={storageLocations}
-                  getOptionLabel={(option) => option.name || option.locationName || ''}
-                  value={prHeader.storageLocation}
-                  onChange={(event, newValue) => setPrHeader({ ...prHeader, storageLocation: newValue })}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Storage Location *"
-                      placeholder="Select storage location"
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: 'white',
-                        }
-                      }}
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Header Remarks"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={prHeader.remarks}
-                  onChange={(e) => setPrHeader({ ...prHeader, remarks: e.target.value })}
-                  placeholder="Add any additional notes for this PR..."
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'white',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Total Items"
-                  value={prLines.length}
-                  disabled
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Total Amount"
-                  value={`$${prLines.reduce((sum, line) => sum + line.totalPrice, 0).toFixed(2)}`}
-                  disabled
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: '#f8fafc',
-                      fontWeight: 600,
-                      fontSize: '1.1rem'
+                      backgroundColor: '#f8fafc'
                     }
                   }}
                 />
               </Grid>
             </Grid>
           </Paper>
+
 
           <Divider sx={{ my: 3 }} />
 
@@ -993,6 +1168,7 @@ const PurchaseRequisition = () => {
         <DialogActions sx={{ p: 3, borderTop: '1px solid #e2e8f0', backgroundColor: '#fafafa' }}>
           <Button
             onClick={() => setDialogOpen(false)}
+            disabled={saving}
             sx={{
               textTransform: 'none',
               color: '#64748b',
@@ -1002,23 +1178,39 @@ const PurchaseRequisition = () => {
           >
             Cancel
           </Button>
-          <Button
-            variant="contained"
-            onClick={handleSubmitPr}
-            sx={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              textTransform: 'none',
-              px: 4,
-              py: 1,
-              fontWeight: 600,
-              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
-              '&:hover': {
-                boxShadow: '0 6px 20px rgba(245, 158, 11, 0.6)',
-              }
-            }}
-          >
-            {editMode ? 'Update Purchase Requisition' : 'Submit Purchase Requisition'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => handleSubmitPr('Draft')}
+              disabled={saving}
+              sx={{
+                textTransform: 'none',
+                px: 3,
+                borderRadius: '8px',
+                fontWeight: 600,
+              }}
+            >
+              {saving ? 'Saving...' : 'Save as Draft'}
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => handleSubmitPr('Pending')}
+              disabled={saving}
+              sx={{
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                textTransform: 'none',
+                px: 4,
+                py: 1,
+                fontWeight: 600,
+                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
+                '&:hover': {
+                  boxShadow: '0 6px 20px rgba(245, 158, 11, 0.6)',
+                }
+              }}
+            >
+              {saving ? 'Processing...' : 'Submit for Approval'}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 
@@ -1051,73 +1243,79 @@ const PurchaseRequisition = () => {
           }}
         >
           <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: 'white' }}>
-            <Typography variant="subtitle1" sx={{ mb: 3, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Part Selection - Always Visible */}
+            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box sx={{ width: 4, height: 20, backgroundColor: '#f59e0b', borderRadius: 1 }} />
-              Part Selection
+              Select Part
             </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                  <Autocomplete
-                    fullWidth
-                    options={parts}
-                    getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
-                    value={currentLine.part}
-                    onChange={(event, newValue) => {
-                      setCurrentLine({
-                        ...currentLine,
-                        part: newValue
-                      });
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Select Part *"
-                        placeholder="Search by SAP Number or Part Name"
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            backgroundColor: 'white',
-                          }
-                        }}
-                      />
-                    )}
-                  />
-                  <Tooltip title="Advanced Part Search">
-                    <IconButton
-                      onClick={() => setPartSearchDialog(true)}
+
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', mb: 3 }}>
+              <Box sx={{ flexGrow: 1 }}>
+                <Autocomplete
+                  fullWidth
+                  options={parts}
+                  getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
+                  value={currentLine.part}
+                  onChange={(event, newValue) => {
+                    setCurrentLine({
+                      ...currentLine,
+                      part: newValue
+                    });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Part *"
+                      placeholder="Search by SAP Number or Part Name"
                       sx={{
-                        mt: 1,
-                        width: 48,
-                        height: 48,
-                        border: '1px solid #e2e8f0',
-                        backgroundColor: 'white',
-                        color: '#f59e0b',
-                        '&:hover': {
-                          backgroundColor: '#fffbeb',
-                          borderColor: '#f59e0b'
+                        '& .MuiOutlinedInput-root': {
+                          backgroundColor: 'white',
                         }
                       }}
-                    >
-                      <SearchIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Grid>
-              {currentLine.part && (
-                <>
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="subtitle1" sx={{ mb: 2, mt: 2, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 4, height: 20, backgroundColor: '#f59e0b', borderRadius: 1 }} />
-                      Part Details
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
+                    />
+                  )}
+                />
+              </Box>
+              <Tooltip title="Advanced Part Search">
+                <IconButton
+                  onClick={() => setPartSearchDialog(true)}
+                  sx={{
+                    mt: 1,
+                    width: 48,
+                    height: 48,
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: 'white',
+                    color: '#f59e0b',
+                    '&:hover': {
+                      backgroundColor: '#fffbeb',
+                      borderColor: '#f59e0b'
+                    }
+                  }}
+                >
+                  <SearchIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
+            {/* Part Details and Input Fields - Only show when part is selected */}
+            {currentLine.part && (
+              <>
+                <Divider sx={{ my: 3 }} />
+
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 4, height: 20, backgroundColor: '#f59e0b', borderRadius: 1 }} />
+                  Part Information
+                </Typography>
+
+                <Grid container spacing={2.5}>
+                  {/* Part Details Row */}
+                  <Grid item xs={12} md={4}>
                     <TextField
                       label="SAP Number"
                       value={currentLine.part.sapNumber || 'N/A'}
                       disabled
                       fullWidth
+                      size="small"
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           backgroundColor: '#f8fafc',
@@ -1125,12 +1323,13 @@ const PurchaseRequisition = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={5}>
                     <TextField
                       label="Part Name"
                       value={currentLine.part.name || ''}
                       disabled
                       fullWidth
+                      size="small"
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           backgroundColor: '#f8fafc',
@@ -1138,12 +1337,13 @@ const PurchaseRequisition = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={3}>
                     <TextField
-                      label="Unit of Measure"
+                      label="Unit"
                       value={currentLine.part.unit || ''}
                       disabled
                       fullWidth
+                      size="small"
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           backgroundColor: '#f8fafc',
@@ -1151,26 +1351,16 @@ const PurchaseRequisition = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      label="Part Group"
-                      value={currentLine.part.partGroup || 'N/A'}
-                      disabled
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: '#f8fafc',
-                        }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="subtitle1" sx={{ mb: 2, mt: 2, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 4, height: 20, backgroundColor: '#f59e0b', borderRadius: 1 }} />
-                      Quantity & Pricing
-                    </Typography>
-                  </Grid>
+                </Grid>
+
+                {/* Quantity and Pricing Section */}
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 4, height: 20, backgroundColor: '#f59e0b', borderRadius: 1 }} />
+                  Quantity & Pricing
+                </Typography>
+
+                <Grid container spacing={2.5}>
                   <Grid item xs={12} md={4}>
                     <TextField
                       label="Quantity *"
@@ -1209,16 +1399,19 @@ const PurchaseRequisition = () => {
                       fullWidth
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          backgroundColor: '#f8fafc',
+                          backgroundColor: '#fff7ed',
                           fontWeight: 600,
-                          fontSize: '1rem'
+                          fontSize: '1rem',
+                          color: '#f59e0b'
                         }
                       }}
                     />
                   </Grid>
+
+                  {/* Remarks Row */}
                   <Grid item xs={12}>
                     <TextField
-                      label="Line Remarks"
+                      label="Remarks"
                       fullWidth
                       multiline
                       rows={2}
@@ -1232,9 +1425,29 @@ const PurchaseRequisition = () => {
                       }}
                     />
                   </Grid>
-                </>
-              )}
-            </Grid>
+                </Grid>
+              </>
+            )}
+
+            {/* Empty State - Show when no part selected */}
+            {!currentLine.part && (
+              <Box sx={{
+                p: 4,
+                textAlign: 'center',
+                border: '2px dashed #e2e8f0',
+                borderRadius: '12px',
+                backgroundColor: '#f8fafc',
+                mt: 2
+              }}>
+                <SearchIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
+                <Typography variant="h6" sx={{ color: '#64748b', mb: 1 }}>
+                  No Part Selected
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                  Please select a part from the dropdown above to continue
+                </Typography>
+              </Box>
+            )}
           </Paper>
         </DialogContent>
         <DialogActions sx={{ p: 3, borderTop: '1px solid #e2e8f0', backgroundColor: '#fafafa' }}>
@@ -1252,15 +1465,20 @@ const PurchaseRequisition = () => {
           <Button
             variant="contained"
             onClick={handleAddOrUpdateLine}
+            disabled={!currentLine.part}
             sx={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              background: !currentLine.part ? '#cbd5e1' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
               textTransform: 'none',
               px: 4,
               py: 1,
               fontWeight: 600,
-              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
+              boxShadow: !currentLine.part ? 'none' : '0 4px 14px rgba(245, 158, 11, 0.4)',
               '&:hover': {
-                boxShadow: '0 6px 20px rgba(245, 158, 11, 0.6)',
+                boxShadow: !currentLine.part ? 'none' : '0 6px 20px rgba(245, 158, 11, 0.6)',
+              },
+              '&:disabled': {
+                color: 'white',
+                opacity: 0.6
               }
             }}
           >
@@ -1418,8 +1636,10 @@ const PurchaseRequisition = () => {
                 </Typography>
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={4}>
-                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Requester</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{viewingPr.requesterName}</Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>PR Number</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#f59e0b' }}>
+                      {viewingPr.prNumber || 'N/A'}
+                    </Typography>
                   </Grid>
                   <Grid item xs={12} md={4}>
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>PR Date</Typography>
@@ -1429,15 +1649,25 @@ const PurchaseRequisition = () => {
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Required Date</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>{viewingPr.requiredDate}</Typography>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={4}>
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Supplier</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>{viewingPr.supplierName}</Typography>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Warehouse</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{viewingPr.warehouseName}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Storage Location</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>{viewingPr.storageLocationName}</Typography>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  {viewingPr.remarks && (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Remarks</Typography>
+                      <Typography variant="body1">{viewingPr.remarks}</Typography>
+                    </Grid>
+                  )}
+                  <Grid item xs={12} md={4}>
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Status</Typography>
                     <Chip
                       label={viewingPr.status}
@@ -1446,18 +1676,16 @@ const PurchaseRequisition = () => {
                       sx={{ fontWeight: 600, mt: 0.5 }}
                     />
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={4}>
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Total Amount</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#f59e0b' }}>
                       ${viewingPr.totalAmount?.toFixed(2)}
                     </Typography>
                   </Grid>
-                  {viewingPr.remarks && (
-                    <Grid item xs={12}>
-                      <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Remarks</Typography>
-                      <Typography variant="body1">{viewingPr.remarks}</Typography>
-                    </Grid>
-                  )}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>Requestor</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{viewingPr.requesterName}</Typography>
+                  </Grid>
                 </Grid>
               </Paper>
 
@@ -1535,6 +1763,72 @@ const PurchaseRequisition = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
+          <Box sx={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            backgroundColor: '#fef2f2',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto',
+            mb: 2
+          }}>
+            <DeleteIcon sx={{ color: '#ef4444', fontSize: 32 }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+            Delete Purchase Requisition?
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', pb: 3 }}>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Are you sure you want to delete <strong>{deleteTarget?.prNumber}</strong>?
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0, justifyContent: 'center', gap: 2 }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            variant="outlined"
+            disabled={saving}
+            sx={{
+              borderRadius: '10px',
+              textTransform: 'none',
+              px: 3,
+              borderColor: '#e2e8f0',
+              color: '#64748b'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeletePr}
+            variant="contained"
+            disabled={saving}
+            sx={{
+              borderRadius: '10px',
+              textTransform: 'none',
+              px: 3,
+              backgroundColor: '#ef4444',
+              '&:hover': { backgroundColor: '#dc2626' }
+            }}
+          >
+            {saving ? 'Deleting...' : 'Delete PR'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

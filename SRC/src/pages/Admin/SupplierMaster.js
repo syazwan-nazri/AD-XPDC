@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { db } from '../../firebase/config';
 import {
   collection,
@@ -51,6 +52,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const MALAYSIA_STATES = [
   'Johor',
@@ -82,6 +84,14 @@ const SupplierMaster = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [stats, setStats] = useState({ total: 0, active: 0 });
+
+  const user = useSelector(state => state.auth.user);
+  const isAdmin = user?.groupId?.toLowerCase() === 'a' || user?.groupId?.toLowerCase() === 'admin';
+  const permissions = user?.groupPermissions?.supplier_master || {};
+
+  const canAdd = permissions.access === 'add' || isAdmin;
+  const canEdit = permissions.access === 'edit' || permissions.access === 'add' || isAdmin;
+  const canDelete = permissions.access === 'add' || isAdmin;
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -185,6 +195,10 @@ const SupplierMaster = () => {
     [houseNo, building, street, postalCode, state, country].filter(Boolean).join(', ');
 
   const handleAdd = async () => {
+    if (!canAdd) {
+      setSnackbar({ open: true, message: 'You do not have permission to add suppliers', severity: 'error' });
+      return;
+    }
     const trimmedName = (form.name || '').trim();
 
     if (!trimmedName) {
@@ -283,6 +297,10 @@ const SupplierMaster = () => {
   };
 
   const handleSaveEdit = async () => {
+    if (!canEdit) {
+      setSnackbar({ open: true, message: 'You do not have permission to edit suppliers', severity: 'error' });
+      return;
+    }
     const trimmedName = (editForm.name || '').trim();
 
     if (!trimmedName) {
@@ -343,6 +361,10 @@ const SupplierMaster = () => {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!canDelete) {
+      setSnackbar({ open: true, message: 'You do not have permission to delete suppliers', severity: 'error' });
+      return;
+    }
     try {
       await deleteDoc(doc(db, 'suppliers', deleteTarget.id));
       setSnackbar({ open: true, message: 'Supplier deleted successfully', severity: 'success' });
@@ -667,30 +689,32 @@ const SupplierMaster = () => {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              <Tooltip title="Edit Supplier">
+                              <Tooltip title={canEdit ? "Edit Supplier" : "View Details"}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleEditClick(s)}
                                   sx={{
-                                    color: '#f97316',
-                                    '&:hover': { backgroundColor: '#fef3f2' }
+                                    color: canEdit ? '#f97316' : '#64748b',
+                                    '&:hover': { backgroundColor: canEdit ? '#fef3f2' : '#f1f5f9' }
                                   }}
                                 >
-                                  <EditIcon fontSize="small" />
+                                  {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Delete Supplier">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleDeleteClick(s)}
-                                  sx={{
-                                    '&:hover': { backgroundColor: '#fef2f2' }
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
+                              {canDelete && (
+                                <Tooltip title="Delete Supplier">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDeleteClick(s)}
+                                    sx={{
+                                      '&:hover': { backgroundColor: '#fef2f2' }
+                                    }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </Box>
                           </TableCell>
                         </TableRow>
@@ -719,290 +743,291 @@ const SupplierMaster = () => {
           )}
         </Paper>
 
-        {/* New Supplier Entry Section */}
-        <Paper elevation={0} sx={{
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
-          backgroundColor: 'white',
-          width: '100%'
-        }}>
-          <Box sx={{
-            p: 3,
-            borderBottom: '1px solid #e2e8f0',
-            backgroundColor: '#fef3f2'
+        {canAdd && (
+          <Paper elevation={0} sx={{
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+            backgroundColor: 'white',
+            width: '100%'
           }}>
-            <Typography variant="h6" sx={{
-              fontWeight: 600,
-              color: '#1e293b',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
+            <Box sx={{
+              p: 3,
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#fef3f2'
             }}>
-              <AddIcon sx={{ fontSize: 20, color: '#f97316' }} />
-              New Supplier Entry
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-              Fill in the details below to add a new supplier
-            </Typography>
-          </Box>
+              <Typography variant="h6" sx={{
+                fontWeight: 600,
+                color: '#1e293b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <AddIcon sx={{ fontSize: 20, color: '#f97316' }} />
+                New Supplier Entry
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+                Fill in the details below to add a new supplier
+              </Typography>
+            </Box>
 
-          <Box sx={{ p: 4 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Supplier Name"
-                  value={form.name}
-                  onChange={(e) => {
-                    setForm({ ...form, name: e.target.value });
-                    setNameError(false);
-                  }}
-                  error={nameError}
-                  helperText={nameError ? 'Supplier name is required' : ''}
-                  required
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <BusinessIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
+            <Box sx={{ p: 4 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Supplier Name"
+                    value={form.name}
+                    onChange={(e) => {
+                      setForm({ ...form, name: e.target.value });
+                      setNameError(false);
+                    }}
+                    error={nameError}
+                    helperText={nameError ? 'Supplier name is required' : ''}
+                    required
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <BusinessIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Contact Person"
+                    value={form.contactPerson}
+                    onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <PersonIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <EmailIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Phone"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <PhoneIcon sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="House No."
+                    value={form.houseNo}
+                    onChange={(e) => setForm({ ...form, houseNo: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Building"
+                    value={form.building}
+                    onChange={(e) => setForm({ ...form, building: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Street"
+                    value={form.street}
+                    onChange={(e) => setForm({ ...form, street: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Postal Code"
+                    value={form.postalCode}
+                    onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="State"
+                    select
+                    value={form.state}
+                    onChange={(e) => setForm({ ...form, state: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  >
+                    <MenuItem value="">Select State</MenuItem>
+                    {MALAYSIA_STATES.map((st) => (
+                      <MenuItem key={st} value={st}>{st}</MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Country"
+                    value={form.country}
+                    onChange={(e) => setForm({ ...form, country: e.target.value })}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Contact Person"
-                  value={form.contactPerson}
-                  onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PersonIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
+
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 2,
+                pt: 4,
+                mt: 2,
+                borderTop: '1px solid #e2e8f0'
+              }}>
+                <Button
+                  variant="contained"
+                  onClick={handleAdd}
+                  disabled={!isSupplierFormValid}
+                  startIcon={<AddIcon />}
                   sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <EmailIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Phone"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PhoneIcon sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="House No."
-                  value={form.houseNo}
-                  onChange={(e) => setForm({ ...form, houseNo: e.target.value })}
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Building"
-                  value={form.building}
-                  onChange={(e) => setForm({ ...form, building: e.target.value })}
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Street"
-                  value={form.street}
-                  onChange={(e) => setForm({ ...form, street: e.target.value })}
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Postal Code"
-                  value={form.postalCode}
-                  onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="State"
-                  select
-                  value={form.state}
-                  onChange={(e) => setForm({ ...form, state: e.target.value })}
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
+                    minWidth: 200,
+                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    boxShadow: '0 4px 14px rgba(249, 115, 22, 0.4)',
+                    '&:hover': {
+                      boxShadow: '0 6px 20px rgba(249, 115, 22, 0.6)',
+                      transform: 'translateY(-2px)'
+                    },
+                    '&:disabled': {
+                      background: '#e2e8f0',
+                      color: '#94a3b8'
                     }
                   }}
                 >
-                  <MenuItem value="">Select State</MenuItem>
-                  {MALAYSIA_STATES.map((st) => (
-                    <MenuItem key={st} value={st}>{st}</MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Country"
-                  value={form.country}
-                  onChange={(e) => setForm({ ...form, country: e.target.value })}
-                  fullWidth
+                  Add Supplier
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setForm({
+                      name: '',
+                      contactPerson: '',
+                      email: '',
+                      phone: '',
+                      houseNo: '',
+                      building: '',
+                      street: '',
+                      postalCode: '',
+                      state: '',
+                      country: 'Malaysia',
+                    });
+                    setNameError(false);
+                  }}
+                  startIcon={<ClearIcon />}
                   sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    borderColor: '#e2e8f0',
+                    color: '#64748b',
+                    '&:hover': {
+                      borderColor: '#f97316',
+                      color: '#f97316'
                     }
                   }}
-                />
-              </Grid>
-            </Grid>
-
-            <Box sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 2,
-              pt: 4,
-              mt: 2,
-              borderTop: '1px solid #e2e8f0'
-            }}>
-              <Button
-                variant="contained"
-                onClick={handleAdd}
-                disabled={!isSupplierFormValid}
-                startIcon={<AddIcon />}
-                sx={{
-                  minWidth: 200,
-                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  fontSize: '1rem',
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  boxShadow: '0 4px 14px rgba(249, 115, 22, 0.4)',
-                  '&:hover': {
-                    boxShadow: '0 6px 20px rgba(249, 115, 22, 0.6)',
-                    transform: 'translateY(-2px)'
-                  },
-                  '&:disabled': {
-                    background: '#e2e8f0',
-                    color: '#94a3b8'
-                  }
-                }}
-              >
-                Add Supplier
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setForm({
-                    name: '',
-                    contactPerson: '',
-                    email: '',
-                    phone: '',
-                    houseNo: '',
-                    building: '',
-                    street: '',
-                    postalCode: '',
-                    state: '',
-                    country: 'Malaysia',
-                  });
-                  setNameError(false);
-                }}
-                startIcon={<ClearIcon />}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  borderColor: '#e2e8f0',
-                  color: '#64748b',
-                  '&:hover': {
-                    borderColor: '#f97316',
-                    color: '#f97316'
-                  }
-                }}
-              >
-                Clear Form
-              </Button>
+                >
+                  Clear Form
+                </Button>
+              </Box>
             </Box>
-          </Box>
-        </Paper>
+          </Paper>
+        )}
       </Box>
 
       {/* Edit Supplier Dialog */}
@@ -1045,6 +1070,7 @@ const SupplierMaster = () => {
                 helperText={editNameError ? 'Supplier name is required' : ''}
                 fullWidth
                 required
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1060,6 +1086,7 @@ const SupplierMaster = () => {
                 value={editForm.contactPerson}
                 onChange={(e) => setEditForm({ ...editForm, contactPerson: e.target.value })}
                 fullWidth
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1076,6 +1103,7 @@ const SupplierMaster = () => {
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                 fullWidth
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1091,6 +1119,7 @@ const SupplierMaster = () => {
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 fullWidth
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1108,6 +1137,7 @@ const SupplierMaster = () => {
                 fullWidth
                 multiline
                 rows={3}
+                disabled={!canEdit}
                 InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -1134,20 +1164,22 @@ const SupplierMaster = () => {
               textTransform: 'none'
             }}
           >
-            Cancel
+            {canEdit ? 'Cancel' : 'Close'}
           </Button>
-          <Button
-            onClick={handleSaveEdit}
-            variant="contained"
-            sx={{
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              textTransform: 'none',
-              fontWeight: 600
-            }}
-          >
-            Save Changes
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleSaveEdit}
+              variant="contained"
+              sx={{
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Save Changes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
