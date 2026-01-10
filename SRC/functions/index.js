@@ -7,7 +7,8 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const { setGlobalOptions } = require("firebase-functions");
+const { setGlobalOptions } = require("firebase-functions/v2");
+const { onRequest } = require("firebase-functions/v2/https");
 // const {onRequest} = require("firebase-functions/https");
 // const logger = require("firebase-functions/logger");
 
@@ -30,3 +31,8 @@ setGlobalOptions({ maxInstances: 10 });
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
+
+// Minimal health check function to ensure functions deploy succeeds
+exports.health = onRequest((req, res) => {
+  res.status(200).send("OK");
+});
