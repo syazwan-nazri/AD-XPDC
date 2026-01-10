@@ -105,7 +105,8 @@ function AppShell({ toggleTheme }) {
   const location = useLocation();
   // Sidebar open/collapse (start CLOSED!)
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  // Use 'md' (900px) as breakpoint for mobile/tablet behavior
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [sidebarTempOpen, setSidebarTempOpen] = useState(false);
 
   // Redux auth
@@ -229,15 +230,13 @@ function AppShell({ toggleTheme }) {
           />
         </Box>
         {/* Sidebar Drawer */}
-        {user &&
-          (isMobile ? (
-            <Sidebar open={sideBarActualOpen} onToggle={handleSidebarClose} />
-          ) : (
-            <Sidebar
-              open={sidebarOpen}
-              onToggle={() => setSidebarOpen((v) => !v)}
-            />
-          ))}
+        {user && (
+          <Sidebar
+            open={isMobile ? sideBarActualOpen : sidebarOpen}
+            onToggle={isMobile ? handleSidebarClose : () => setSidebarOpen((v) => !v)}
+            isMobile={isMobile}
+          />
+        )}
         {/* Main content flexes to sidebar width on desktop */}
         <Box
           component="main"

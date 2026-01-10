@@ -204,7 +204,7 @@ const StockIn = () => {
     <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3,
+      p: { xs: 2, md: 3 },
       width: '100%',
       ml: 0,
       mr: 0
@@ -304,7 +304,7 @@ const StockIn = () => {
               </Typography>
             </Box>
 
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: { xs: 2, md: 4 } }}>
               {/* ITEM DETAILS SECTION */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" sx={{
@@ -319,108 +319,111 @@ const StockIn = () => {
                   Item Details
                 </Typography>
 
-                {/* Autocomplete - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <Autocomplete
-                    options={parts}
-                    getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
-                    value={selectedPart}
-                    onChange={(event, newValue) => setSelectedPart(newValue)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Search and Select Part"
-                        placeholder="Type to search parts..."
-                        size="medium"
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: '10px',
-                            backgroundColor: '#f8fafc',
-                          }
-                        }}
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props} sx={{ py: 1.5 }}>
-                        <Box sx={{ width: '100%' }}>
-                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                            {option.name}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                            <Chip
-                              label={`SAP: ${option.sapNumber || 'N/A'}`}
-                              size="small"
-                              sx={{ height: 20, fontSize: '0.75rem' }}
-                            />
-                            <Chip
-                              label={`Current Stock: ${option.currentStock || 0}`}
-                              size="small"
-                              color="info"
-                              variant="outlined"
-                              sx={{ height: 20, fontSize: '0.75rem' }}
-                            />
+                <Grid container spacing={3}>
+                  {/* Autocomplete */}
+                  <Grid item xs={12} md={8}>
+                    <Autocomplete
+                      options={parts}
+                      getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
+                      value={selectedPart}
+                      onChange={(event, newValue) => setSelectedPart(newValue)}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Search and Select Part"
+                          placeholder="Type to search parts..."
+                          size="medium"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '10px',
+                              backgroundColor: '#f8fafc',
+                            }
+                          }}
+                        />
+                      )}
+                      renderOption={(props, option) => (
+                        <Box component="li" {...props} sx={{ py: 1.5 }}>
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {option.name}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                              <Chip
+                                label={`SAP: ${option.sapNumber || 'N/A'}`}
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.75rem' }}
+                              />
+                              <Chip
+                                label={`Current Stock: ${option.currentStock || 0}`}
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                                sx={{ height: 20, fontSize: '0.75rem' }}
+                              />
+                            </Box>
                           </Box>
                         </Box>
-                      </Box>
-                    )}
-                  />
-                </Box>
+                      )}
+                    />
+                  </Grid>
 
-                {/* Quantity - Full Width */}
-                <Box sx={{ mb: 1 }}>
-                  <TextField
-                    label="Quantity"
-                    type="number"
-                    fullWidth
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    size="medium"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <TrendingUp sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
+                  {/* Quantity */}
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Quantity"
+                      type="number"
+                      fullWidth
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      size="medium"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <TrendingUp sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Selected Part Info */}
+                  <Grid item xs={12}>
+                    {selectedPart && (
+                      <Card sx={{
                         borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
-
-                {/* Selected Part Info */}
-                {selectedPart && (
-                  <Card sx={{
-                    mt: 2,
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f0f9ff'
-                  }}>
-                    <CardContent sx={{ p: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ color: '#0369a1', fontWeight: 500 }}>
-                            Selected Item
-                          </Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {selectedPart.name}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#0c4a6e' }}>
-                            SAP: {selectedPart.sapNumber || 'N/A'} • Current Stock: {selectedPart.currentStock || 0}
-                          </Typography>
-                        </Box>
-                        <Chip
-                          label={`Current: ${selectedPart.currentStock || 0}`}
-                          color="info"
-                          size="small"
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                )}
+                        border: '1px solid #e2e8f0',
+                        backgroundColor: '#f0f9ff'
+                      }}>
+                        <CardContent sx={{ p: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography variant="body2" sx={{ color: '#0369a1', fontWeight: 500 }}>
+                                Selected Item
+                              </Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                {selectedPart.name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#0c4a6e' }}>
+                                SAP: {selectedPart.sapNumber || 'N/A'} • Current Stock: {selectedPart.currentStock || 0}
+                              </Typography>
+                            </Box>
+                            <Chip
+                              label={`Current: ${selectedPart.currentStock || 0}`}
+                              color="info"
+                              size="small"
+                            />
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </Grid>
+                </Grid>
               </Box>
 
               <Divider sx={{ my: 4 }} />
@@ -439,114 +442,20 @@ const StockIn = () => {
                   Delivery Information
                 </Typography>
 
-                {/* Supplier Dropdown - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <TextField
-                    select
-                    label="Supplier Name *"
-                    fullWidth
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    helperText={suppliers.length === 0 ? "No suppliers registered. Please add suppliers in Supplier Master first." : "Select from registered suppliers"}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Person sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  >
-                    <MenuItem value="">-- Select Supplier --</MenuItem>
-                    {suppliers.map((sup) => (
-                      <MenuItem key={sup.id} value={sup.supplierName || sup.name}>
-                        {sup.supplierName || sup.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  {suppliers.length === 0 && (
-                    <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
-                      No suppliers registered. Please register suppliers in the Supplier Master before proceeding with stock-in.
-                    </Alert>
-                  )}
-                </Box>
-
-                {/* Delivery Order Number - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <TextField
-                    label="Delivery Order Number"
-                    fullWidth
-                    value={deliveryOrderNumber}
-                    onChange={(e) => setDeliveryOrderNumber(e.target.value)}
-                    placeholder="DO-XXXXX"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Receipt sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
-
-                {/* Date of Receipt - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <TextField
-                    label="Date of Receipt"
-                    type="date"
-                    fullWidth
-                    value={dateOfReceipt}
-                    onChange={(e) => setDateOfReceipt(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarToday sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
-
-                {/* Currency Selection - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <FormControl fullWidth>
+                <Grid container spacing={3}>
+                  {/* Supplier Dropdown */}
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      label="Currency"
-                      value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
                       select
-                      SelectProps={{
-                        native: false,
-                        MenuProps: {
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300,
-                            },
-                          },
-                        },
-                      }}
+                      label="Supplier Name *"
+                      fullWidth
+                      value={supplier}
+                      onChange={(e) => setSupplier(e.target.value)}
+                      helperText={suppliers.length === 0 ? "No suppliers registered. Please add suppliers in Supplier Master first." : "Select from registered suppliers"}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <CurrencyExchange sx={{ color: '#64748b' }} />
+                            <Person sx={{ color: '#64748b' }} />
                           </InputAdornment>
                         ),
                       }}
@@ -557,70 +466,167 @@ const StockIn = () => {
                         }
                       }}
                     >
-                      {currencyOptions.map((option) => (
-                        <MenuItem key={option.code} value={option.code}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography sx={{ fontWeight: 500, minWidth: 40 }}>
-                              {option.symbol}
-                            </Typography>
-                            <Typography>
-                              {option.code} - {option.name}
-                            </Typography>
-                          </Box>
+                      <MenuItem value="">-- Select Supplier --</MenuItem>
+                      {suppliers.map((sup) => (
+                        <MenuItem key={sup.id} value={sup.supplierName || sup.name}>
+                          {sup.supplierName || sup.name}
                         </MenuItem>
                       ))}
                     </TextField>
-                  </FormControl>
-                </Box>
+                    {suppliers.length === 0 && (
+                      <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
+                        No suppliers registered. Please register suppliers in the Supplier Master before proceeding with stock-in.
+                      </Alert>
+                    )}
+                  </Grid>
 
-                {/* Cost per Unit - Full Width (No $ sign) */}
-                <Box sx={{ mb: 2 }}>
-                  <TextField
-                    label="Cost per Unit"
-                    type="number"
-                    fullWidth
-                    value={costPerUnit}
-                    onChange={(e) => setCostPerUnit(e.target.value)}
-                    inputProps={{
-                      step: '0.01',
-                      min: '0'
-                    }}
-                    placeholder="0.00"
-                    helperText={`Enter amount in ${currency}`}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
+                  {/* Delivery Order Number */}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Delivery Order Number"
+                      fullWidth
+                      value={deliveryOrderNumber}
+                      onChange={(e) => setDeliveryOrderNumber(e.target.value)}
+                      placeholder="DO-XXXXX"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Receipt sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Date of Receipt */}
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Date of Receipt"
+                      type="date"
+                      fullWidth
+                      value={dateOfReceipt}
+                      onChange={(e) => setDateOfReceipt(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <CalendarToday sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Currency Selection */}
+                  <Grid item xs={12} md={4}>
+                    <FormControl fullWidth>
+                      <TextField
+                        label="Currency"
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                        select
+                        SelectProps={{
+                          native: false,
+                          MenuProps: {
+                            PaperProps: {
+                              style: {
+                                maxHeight: 300,
+                              },
+                            },
+                          },
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <CurrencyExchange sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px',
+                            backgroundColor: '#f8fafc',
+                          }
+                        }}
+                      >
+                        {currencyOptions.map((option) => (
+                          <MenuItem key={option.code} value={option.code}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography sx={{ fontWeight: 500, minWidth: 40 }}>
+                                {option.symbol}
+                              </Typography>
+                              <Typography>
+                                {option.code} - {option.name}
+                              </Typography>
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Cost per Unit */}
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Cost per Unit"
+                      type="number"
+                      fullWidth
+                      value={costPerUnit}
+                      onChange={(e) => setCostPerUnit(e.target.value)}
+                      inputProps={{
+                        step: '0.01',
+                        min: '0'
+                      }}
+                      placeholder="0.00"
+                      helperText={`Enter amount in ${currency}`}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Total Value Display */}
+                  <Grid item xs={12}>
+                    {quantity && costPerUnit && (
+                      <Card sx={{
                         borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
-
-                {/* Total Value Display */}
-                {quantity && costPerUnit && (
-                  <Card sx={{
-                    mt: 2,
-                    borderRadius: '10px',
-                    backgroundColor: '#f0f9ff',
-                    border: '1px solid #bae6fd'
-                  }}>
-                    <CardContent sx={{ p: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="body1" sx={{ color: '#0369a1', fontWeight: 500 }}>
-                            Total Value
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#0c4a6e' }}>
-                            {quantity} units × {Number(costPerUnit).toFixed(2)} {currency} each
-                          </Typography>
-                        </Box>
-                        <Typography variant="h6" sx={{ color: '#0369a1', fontWeight: 700 }}>
-                          {getCurrencySymbol()}{totalValue()} {currency}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                )}
+                        backgroundColor: '#f0f9ff',
+                        border: '1px solid #bae6fd'
+                      }}>
+                        <CardContent sx={{ p: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography variant="body1" sx={{ color: '#0369a1', fontWeight: 500 }}>
+                                Total Value
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#0c4a6e' }}>
+                                {quantity} units × {Number(costPerUnit).toFixed(2)} {currency} each
+                              </Typography>
+                            </Box>
+                            <Typography variant="h6" sx={{ color: '#0369a1', fontWeight: 700 }}>
+                              {getCurrencySymbol()}{totalValue()} {currency}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </Grid>
+                </Grid>
               </Box>
 
               <Divider sx={{ my: 4 }} />

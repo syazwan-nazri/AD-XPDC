@@ -183,7 +183,7 @@ const StockOut = () => {
     <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3,
+      p: { xs: 2, md: 3 },
       width: '100%',
       ml: 0,
       mr: 0
@@ -283,7 +283,7 @@ const StockOut = () => {
               </Typography>
             </Box>
 
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: { xs: 2, md: 4 } }}>
               {/* ITEM DETAILS SECTION */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" sx={{
@@ -298,119 +298,122 @@ const StockOut = () => {
                   Item Details
                 </Typography>
 
-                {/* Autocomplete - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <Autocomplete
-                    options={parts}
-                    getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
-                    value={selectedPart}
-                    onChange={(event, newValue) => setSelectedPart(newValue)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Search and Select Part"
-                        placeholder="Type to search parts..."
-                        size="medium"
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: '10px',
-                            backgroundColor: '#f8fafc',
-                          }
-                        }}
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props} sx={{ py: 1.5 }}>
-                        <Box sx={{ width: '100%' }}>
-                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                            {option.name}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                            <Chip
-                              label={`SAP: ${option.sapNumber || 'N/A'}`}
-                              size="small"
-                              sx={{ height: 20, fontSize: '0.75rem' }}
-                            />
-                            <Chip
-                              label={`Current: ${option.currentStock || 0}`}
-                              size="small"
-                              color={option.currentStock > 0 ? "success" : "error"}
-                              variant="outlined"
-                              sx={{ height: 20, fontSize: '0.75rem' }}
-                            />
+                <Grid container spacing={3}>
+                  {/* Autocomplete */}
+                  <Grid item xs={12} md={8}>
+                    <Autocomplete
+                      options={parts}
+                      getOptionLabel={(option) => `${option.sapNumber || 'N/A'} - ${option.name}`}
+                      value={selectedPart}
+                      onChange={(event, newValue) => setSelectedPart(newValue)}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Search and Select Part"
+                          placeholder="Type to search parts..."
+                          size="medium"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '10px',
+                              backgroundColor: '#f8fafc',
+                            }
+                          }}
+                        />
+                      )}
+                      renderOption={(props, option) => (
+                        <Box component="li" {...props} sx={{ py: 1.5 }}>
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {option.name}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                              <Chip
+                                label={`SAP: ${option.sapNumber || 'N/A'}`}
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.75rem' }}
+                              />
+                              <Chip
+                                label={`Current: ${option.currentStock || 0}`}
+                                size="small"
+                                color={option.currentStock > 0 ? "success" : "error"}
+                                variant="outlined"
+                                sx={{ height: 20, fontSize: '0.75rem' }}
+                              />
+                            </Box>
                           </Box>
                         </Box>
-                      </Box>
-                    )}
-                  />
-                </Box>
+                      )}
+                    />
+                  </Grid>
 
-                {/* Quantity - Full Width */}
-                <Box sx={{ mb: 1 }}>
-                  <TextField
-                    label="Quantity to Issue"
-                    type="number"
-                    fullWidth
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    size="medium"
-                    helperText={selectedPart && `Maximum available: ${selectedPart.currentStock || 0}`}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <TrendingDown sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
+                  {/* Quantity */}
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Quantity to Issue"
+                      type="number"
+                      fullWidth
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      size="medium"
+                      helperText={selectedPart && `Maximum available: ${selectedPart.currentStock || 0}`}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <TrendingDown sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Selected Part Info */}
+                  <Grid item xs={12}>
+                    {selectedPart && (
+                      <Card sx={{
                         borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
-
-                {/* Selected Part Info */}
-                {selectedPart && (
-                  <Card sx={{
-                    mt: 2,
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#fef2f2'
-                  }}>
-                    <CardContent sx={{ p: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ color: '#dc2626', fontWeight: 500 }}>
-                            Selected Item
-                          </Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {selectedPart.name}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#7f1d1d' }}>
-                            SAP: {selectedPart.sapNumber || 'N/A'} • Current Stock: {selectedPart.currentStock || 0}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-                          <Chip
-                            label={`Current: ${selectedPart.currentStock || 0}`}
-                            color={selectedPart.currentStock > 0 ? "info" : "error"}
-                            size="small"
-                          />
-                          {quantity && (
-                            <Chip
-                              label={`After: ${getRemainingStock()}`}
-                              color={getRemainingStock() >= 0 ? "warning" : "error"}
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                )}
+                        border: '1px solid #e2e8f0',
+                        backgroundColor: '#fef2f2'
+                      }}>
+                        <CardContent sx={{ p: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography variant="body2" sx={{ color: '#dc2626', fontWeight: 500 }}>
+                                Selected Item
+                              </Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                {selectedPart.name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#7f1d1d' }}>
+                                SAP: {selectedPart.sapNumber || 'N/A'} • Current Stock: {selectedPart.currentStock || 0}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                              <Chip
+                                label={`Current: ${selectedPart.currentStock || 0}`}
+                                color={selectedPart.currentStock > 0 ? "info" : "error"}
+                                size="small"
+                              />
+                              {quantity && (
+                                <Chip
+                                  label={`After: ${getRemainingStock()}`}
+                                  color={getRemainingStock() >= 0 ? "warning" : "error"}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </Grid>
+                </Grid>
               </Box>
 
               <Divider sx={{ my: 4 }} />
@@ -429,127 +432,131 @@ const StockOut = () => {
                   Receiver Information
                 </Typography>
 
-                {/* Receiver Name - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <TextField
-                    label="Receiver (Technician Name)"
-                    fullWidth
-                    value={receiver}
-                    onChange={(e) => setReceiver(e.target.value)}
-                    placeholder="Enter receiver name"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Badge sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
+                <Grid container spacing={3}>
+                  {/* Receiver Name */}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Receiver (Technician Name)"
+                      fullWidth
+                      value={receiver}
+                      onChange={(e) => setReceiver(e.target.value)}
+                      placeholder="Enter receiver name"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Badge sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
 
-                {/* MRF Number Dropdown - Full Width */}
-                <Box sx={{ mb: 3 }}>
-                  <TextField
-                    select
-                    label="MRF Number *"
-                    fullWidth
-                    value={mrfNumber}
-                    onChange={(e) => setMrfNumber(e.target.value)}
-                    helperText={approvedMRFs.length === 0 ? "No approved MRF available. Please create and approve MRF first." : "Select from approved MRF numbers only"}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Assignment sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  >
-                    <MenuItem value="">-- Select MRF Number --</MenuItem>
-                    {approvedMRFs.map((mrf) => (
-                      <MenuItem key={mrf.id} value={mrf.mrfNumber}>
-                        {mrf.mrfNumber} - {mrf.requestedBy || 'Unknown'} ({mrf.department || 'N/A'})
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  {approvedMRFs.length === 0 && (
-                    <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
-                      No approved MRF found. Please create and approve an MRF before proceeding with stock-out.
-                    </Alert>
-                  )}
-                </Box>
+                  {/* MRF Number */}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      select
+                      label="MRF Number *"
+                      fullWidth
+                      value={mrfNumber}
+                      onChange={(e) => setMrfNumber(e.target.value)}
+                      helperText={approvedMRFs.length === 0 ? "No approved MRF available. Please create and approve MRF first." : "Select from approved MRF numbers only"}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Assignment sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    >
+                      <MenuItem value="">-- Select MRF Number --</MenuItem>
+                      {approvedMRFs.map((mrf) => (
+                        <MenuItem key={mrf.id} value={mrf.mrfNumber}>
+                          {mrf.mrfNumber} - {mrf.requestedBy || 'Unknown'} ({mrf.department || 'N/A'})
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    {approvedMRFs.length === 0 && (
+                      <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
+                        No approved MRF found. Please create and approve an MRF before proceeding with stock-out.
+                      </Alert>
+                    )}
+                  </Grid>
 
-                {/* Date of Issue - Full Width */}
-                <Box sx={{ mb: 2 }}>
-                  <TextField
-                    label="Date of Issue"
-                    type="date"
-                    fullWidth
-                    value={dateOfIssue}
-                    onChange={(e) => setDateOfIssue(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarToday sx={{ color: '#64748b' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                      }
-                    }}
-                  />
-                </Box>
+                  {/* Date of Issue */}
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Date of Issue"
+                      type="date"
+                      fullWidth
+                      value={dateOfIssue}
+                      onChange={(e) => setDateOfIssue(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <CalendarToday sx={{ color: '#64748b' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '10px',
+                          backgroundColor: '#f8fafc',
+                        }
+                      }}
+                    />
+                  </Grid>
 
-                {/* Stock Status Display */}
-                {selectedPart && quantity && (
-                  <Card sx={{
-                    mt: 2,
-                    borderRadius: '10px',
-                    backgroundColor: getRemainingStock() >= 0 ? '#f0fdf4' : '#fef2f2',
-                    border: `1px solid ${getRemainingStock() >= 0 ? '#bbf7d0' : '#fecaca'}`
-                  }}>
-                    <CardContent sx={{ p: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="body1" sx={{
-                            color: getRemainingStock() >= 0 ? '#166534' : '#dc2626',
-                            fontWeight: 500
-                          }}>
-                            {getRemainingStock() >= 0 ? 'Stock Status: Sufficient' : 'Stock Status: Insufficient'}
-                          </Typography>
-                          <Typography variant="body2" sx={{
-                            color: getRemainingStock() >= 0 ? '#166534' : '#dc2626'
-                          }}>
-                            Current: {selectedPart.currentStock || 0} • Issue: {quantity} • Remaining: {getRemainingStock()}
-                          </Typography>
-                        </Box>
-                        {getRemainingStock() < 0 && (
-                          <Chip
-                            label="Insufficient"
-                            color="error"
-                            size="small"
-                            sx={{ fontWeight: 600 }}
-                          />
-                        )}
-                      </Box>
-                    </CardContent>
-                  </Card>
-                )}
+                  {/* Stock Status Display */}
+                  <Grid item xs={12} md={6}>
+                    {selectedPart && quantity && (
+                      <Card sx={{
+                        borderRadius: '10px',
+                        backgroundColor: getRemainingStock() >= 0 ? '#f0fdf4' : '#fef2f2',
+                        border: `1px solid ${getRemainingStock() >= 0 ? '#bbf7d0' : '#fecaca'}`,
+                        height: '100%' // Fill height to match Date field if possible
+                      }}>
+                        <CardContent sx={{ p: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography variant="body1" sx={{
+                                color: getRemainingStock() >= 0 ? '#166534' : '#dc2626',
+                                fontWeight: 500
+                              }}>
+                                {getRemainingStock() >= 0 ? 'Stock Status: Sufficient' : 'Stock Status: Insufficient'}
+                              </Typography>
+                              <Typography variant="body2" sx={{
+                                color: getRemainingStock() >= 0 ? '#166534' : '#dc2626'
+                              }}>
+                                Current: {selectedPart.currentStock || 0} • Issue: {quantity} • Remaining: {getRemainingStock()}
+                              </Typography>
+                            </Box>
+                            {getRemainingStock() < 0 && (
+                              <Chip
+                                label="Insufficient"
+                                color="error"
+                                size="small"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            )}
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </Grid>
+                </Grid>
               </Box>
 
               <Divider sx={{ my: 4 }} />

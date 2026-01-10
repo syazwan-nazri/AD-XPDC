@@ -77,14 +77,14 @@ const reportLinks = [
   { path: '/reports/low-stock', text: 'Low Stock Alert', icon: <WarningIcon />, resourceId: 'low_stock' },
 ];
 
-const Sidebar = ({ open, onToggle }) => {
+const Sidebar = ({ open, onToggle, isMobile }) => {
   const location = useLocation();
   // Single state to track which section is open. Default is empty string (all closed).
   const [openSection, setOpenSection] = useState('');
 
   const handleToggle = (section) => {
-    if (!open && onToggle) {
-      onToggle(); // Pop out the sidebar if it is closed
+    if (!open && onToggle && !isMobile) {
+      onToggle(); // Pop out the sidebar if it is closed (desktop only)
     }
     setOpenSection((prev) => (prev === section ? '' : section));
   };
@@ -119,6 +119,13 @@ const Sidebar = ({ open, onToggle }) => {
   const filteredReportLinks = useMemo(() => user ? filterNodes(reportLinks) : [], [user]);
 
   if (!user) return null;
+
+  // Helper to close sidebar on mobile when a link is clicked
+  const handleLinkClick = () => {
+    if (isMobile && onToggle) {
+      onToggle();
+    }
+  };
 
   const renderSection = (title, icon, links, sectionId, sectionColor) => {
     if (links.length === 0) return null;
@@ -183,6 +190,7 @@ const Sidebar = ({ open, onToggle }) => {
                           key={subItem.path}
                           component={NavLink}
                           to={subItem.path}
+                          onClick={handleLinkClick}
                           selected={location.pathname === subItem.path}
                           sx={{
                             pl: open ? 4 : 2,
@@ -232,6 +240,7 @@ const Sidebar = ({ open, onToggle }) => {
                     key={item.path}
                     component={NavLink}
                     to={item.path}
+                    onClick={handleLinkClick}
                     selected={location.pathname === item.path}
                     sx={{
                       pl: open ? 4 : 2,
@@ -283,13 +292,18 @@ const Sidebar = ({ open, onToggle }) => {
 
   return (
     <Drawer
-      variant="permanent"
+      variant={isMobile ? "temporary" : "permanent"}
+      open={open}
+      onClose={onToggle}
+      ModalProps={{
+        keepMounted: true, // Better open performance on mobile.
+      }}
       sx={{
-        width: open ? drawerWidth : collapsedWidth,
+        width: isMobile ? 'auto' : (open ? drawerWidth : collapsedWidth),
         flexShrink: 0,
         whiteSpace: 'nowrap',
         [`& .MuiDrawer-paper`]: {
-          width: open ? drawerWidth : collapsedWidth,
+          width: isMobile ? drawerWidth : (open ? drawerWidth : collapsedWidth),
           boxSizing: 'border-box',
           overflowX: 'hidden',
           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

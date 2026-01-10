@@ -38,8 +38,12 @@ import {
     Business as BusinessIcon,
     Visibility as VisibilityIcon
 } from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const DepartmentMaster = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -249,7 +253,7 @@ const DepartmentMaster = () => {
     const pageEnd = Math.min((pageStart + 1) * pageSize, filteredDepartments.length);
 
     return (
-        <Box sx={{ p: 4, backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+        <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: '#f8fafc', minHeight: '100vh' }}>
             {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -320,66 +324,68 @@ const DepartmentMaster = () => {
                     </IconButton>
                 </Box>
 
-                <Table sx={{ minWidth: 650 }}>
-                    <TableHead sx={{ backgroundColor: '#f8fafc' }}>
-                        <TableRow>
-                            <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Dept ID</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Code</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Department Name</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Status</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {loading ? (
+                <Box sx={{ overflowX: 'auto' }}>
+                    <Table sx={{ minWidth: 650 }}>
+                        <TableHead sx={{ backgroundColor: '#f8fafc' }}>
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
-                                    <CircularProgress size={40} sx={{ color: '#8b5cf6' }} />
-                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Dept ID</TableCell>
+                                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Code</TableCell>
+                                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Department Name</TableCell>
+                                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Status</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell>
                             </TableRow>
-                        ) : filteredDepartments.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
-                                    <Typography color="textSecondary">No departments found</Typography>
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            filteredDepartments.slice(pageStart * pageSize, (pageStart + 1) * pageSize).map((dept) => (
-                                <TableRow key={dept.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                                    <TableCell>
-                                        <Chip label={dept.departmentId} size="small" variant="outlined" sx={{ fontWeight: 600, color: '#1e293b' }} />
-                                    </TableCell>
-                                    <TableCell sx={{ fontWeight: 600 }}>{dept.departmentCode}</TableCell>
-                                    <TableCell>{dept.departmentName}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={dept.status || 'Active'}
-                                            size="small"
-                                            color={(dept.status || 'Active') === 'Active' ? 'success' : 'default'}
-                                            sx={{ fontWeight: 600, borderRadius: '6px' }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                            <Tooltip title={canEdit ? "Edit Department" : "View Details"}>
-                                                <IconButton size="small" onClick={() => handleOpenDialog(dept)} sx={{ color: canEdit ? '#8b5cf6' : '#64748b' }}>
-                                                    {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                                                </IconButton>
-                                            </Tooltip>
-                                            {canDelete && (
-                                                <Tooltip title="Delete Department">
-                                                    <IconButton size="small" onClick={() => handleOpenDeleteDialog(dept)} sx={{ color: '#ef4444' }}>
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            )}
-                                        </Box>
+                        </TableHead>
+                        <TableBody>
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
+                                        <CircularProgress size={40} sx={{ color: '#8b5cf6' }} />
                                     </TableCell>
                                 </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
+                            ) : filteredDepartments.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
+                                        <Typography color="textSecondary">No departments found</Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                filteredDepartments.slice(pageStart * pageSize, (pageStart + 1) * pageSize).map((dept) => (
+                                    <TableRow key={dept.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                                        <TableCell>
+                                            <Chip label={dept.departmentId} size="small" variant="outlined" sx={{ fontWeight: 600, color: '#1e293b' }} />
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }}>{dept.departmentCode}</TableCell>
+                                        <TableCell>{dept.departmentName}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={dept.status || 'Active'}
+                                                size="small"
+                                                color={(dept.status || 'Active') === 'Active' ? 'success' : 'default'}
+                                                sx={{ fontWeight: 600, borderRadius: '6px' }}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                                                <Tooltip title={canEdit ? "Edit Department" : "View Details"}>
+                                                    <IconButton size="small" onClick={() => handleOpenDialog(dept)} sx={{ color: canEdit ? '#8b5cf6' : '#64748b' }}>
+                                                        {canEdit ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                                {canDelete && (
+                                                    <Tooltip title="Delete Department">
+                                                        <IconButton size="small" onClick={() => handleOpenDeleteDialog(dept)} sx={{ color: '#ef4444' }}>
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </Box>
 
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
                     <Typography variant="body2" sx={{ color: '#64748b' }}>
@@ -389,7 +395,7 @@ const DepartmentMaster = () => {
             </Paper>
 
             {/* Unified Create/Edit Dialog */}
-            <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+            <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullScreen={isMobile} fullWidth>
                 <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#f3e8ff', borderBottom: '1px solid #e2e8f0' }}>
                     {isEdit ? 'Edit Department' : 'Create New Department'}
                 </DialogTitle>

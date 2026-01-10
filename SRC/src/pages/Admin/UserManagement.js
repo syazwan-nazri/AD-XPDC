@@ -66,6 +66,9 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import WarningIcon from "@mui/icons-material/Warning";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+
 const defaultForm = {
   email: "",
   username: "",
@@ -76,6 +79,8 @@ const defaultForm = {
 };
 
 const UserManagement = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const currentUser = useSelector((state) => state.auth.user);
   const isAdmin = currentUser?.groupId?.toLowerCase() === 'a' || currentUser?.groupId?.toLowerCase() === 'admin';
   const permissions = currentUser?.groupPermissions?.user_master || {};
@@ -427,7 +432,7 @@ const UserManagement = () => {
     <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3,
+      p: { xs: 2, md: 3 },
       width: '100%'
     }}>
       {/* Header Section */}
@@ -435,7 +440,7 @@ const UserManagement = () => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        mb: 4,
+        mb: { xs: 2, md: 4 },
         flexWrap: 'wrap',
         gap: 2
       }}>
@@ -797,6 +802,7 @@ const UserManagement = () => {
         open={modal.open}
         onClose={closeModal}
         maxWidth="lg"
+        fullScreen={isMobile}
         fullWidth
         PaperProps={{
           sx: {
@@ -835,7 +841,7 @@ const UserManagement = () => {
             overflowY: 'auto',
           }}>
           <Grid container spacing={3}>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Email"
                 type="email"
@@ -858,7 +864,7 @@ const UserManagement = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Username"
                 value={modal.data.username}
@@ -880,7 +886,7 @@ const UserManagement = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <FormControl fullWidth required error={departmentError}>
                 <InputLabel shrink>Department</InputLabel>
                 <Select
@@ -916,7 +922,7 @@ const UserManagement = () => {
                 )}
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <FormControl fullWidth required error={groupError}>
                 <InputLabel shrink>User Group</InputLabel>
                 <Select
@@ -948,7 +954,7 @@ const UserManagement = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <FormControl fullWidth>
                 <InputLabel shrink>Status</InputLabel>
                 <Select

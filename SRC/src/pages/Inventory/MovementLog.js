@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Table, 
-  TableHead, 
-  TableRow, 
-  TableCell, 
-  TableBody, 
-  Chip, 
-  Card, 
-  TextField, 
+import {
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Chip,
+  Card,
+  TextField,
   InputAdornment,
   MenuItem,
   Select,
@@ -27,11 +27,11 @@ import {
   TablePagination,
   Stack
 } from '@mui/material';
-import { 
-  History, 
-  Search, 
-  FilterList, 
-  Refresh, 
+import {
+  History,
+  Search,
+  FilterList,
+  Refresh,
   Download,
   ArrowUpward,
   ArrowDownward,
@@ -70,8 +70,8 @@ const MovementLog = () => {
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => {
         const logData = doc.data();
-        return { 
-          ...logData, 
+        return {
+          ...logData,
           id: doc.id,
           date: logData.date?.toDate ? logData.date.toDate() : new Date(logData.date)
         };
@@ -101,7 +101,7 @@ const MovementLog = () => {
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(log => 
+      filtered = filtered.filter(log =>
         log.partName?.toLowerCase().includes(term) ||
         log.sapNumber?.toLowerCase().includes(term) ||
         log.userName?.toLowerCase().includes(term) ||
@@ -220,8 +220,8 @@ const MovementLog = () => {
       case 'OUT':
         return log.receiver ? `Receiver: ${log.receiver}` : null;
       case 'TRANSFER':
-        return log.fromLocation && log.toLocation 
-          ? `${log.fromLocation} → ${log.toLocation}` 
+        return log.fromLocation && log.toLocation
+          ? `${log.fromLocation} → ${log.toLocation}`
           : null;
       default:
         return null;
@@ -255,31 +255,31 @@ const MovementLog = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3,
+      p: { xs: 2, md: 3 },
       width: '100%',
       ml: 0,
       mr: 0
     }}>
       {/* Main Content Container */}
-      <Box sx={{ 
+      <Box sx={{
         width: '100%',
         maxWidth: 'none',
         margin: '0 auto'
       }}>
         {/* Header Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           mb: 4,
           flexWrap: 'wrap',
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -293,8 +293,8 @@ const MovementLog = () => {
               <History sx={{ fontSize: 28 }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 700, 
+              <Typography variant="h4" sx={{
+                fontWeight: 700,
                 color: '#1e293b',
                 mb: 0.5
               }}>
@@ -308,7 +308,7 @@ const MovementLog = () => {
 
           {/* Stats Cards */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -325,7 +325,7 @@ const MovementLog = () => {
                 </Typography>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -345,7 +345,7 @@ const MovementLog = () => {
                 </Box>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -365,7 +365,7 @@ const MovementLog = () => {
                 </Box>
               </Box>
             </Card>
-            <Card sx={{ 
+            <Card sx={{
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
               backgroundColor: 'white',
@@ -389,7 +389,7 @@ const MovementLog = () => {
         </Box>
 
         {/* Search and Filter Section */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -397,12 +397,12 @@ const MovementLog = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: { xs: 2, md: 3 },
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#f0fdf4'
           }}>
-            <Typography variant="h6" sx={{ 
+            <Typography variant="h6" sx={{
               fontWeight: 600,
               color: '#1e293b',
               display: 'flex',
@@ -417,7 +417,7 @@ const MovementLog = () => {
             </Typography>
           </Box>
 
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: { xs: 2, md: 3 } }}>
             <Grid container spacing={3}>
               {/* Search Input */}
               <Grid item xs={12} md={6}>
@@ -480,7 +480,7 @@ const MovementLog = () => {
                     variant="outlined"
                     onClick={clearFilters}
                     startIcon={<Clear />}
-                    sx={{ 
+                    sx={{
                       borderRadius: '10px',
                       borderColor: '#e2e8f0',
                       color: '#64748b'
@@ -489,9 +489,9 @@ const MovementLog = () => {
                     Clear
                   </Button>
                   <Tooltip title="Refresh logs">
-                    <IconButton 
+                    <IconButton
                       onClick={fetchLogs}
-                      sx={{ 
+                      sx={{
                         backgroundColor: '#f1f5f9',
                         border: '1px solid #e2e8f0',
                         borderRadius: '10px'
@@ -501,9 +501,9 @@ const MovementLog = () => {
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Export to CSV">
-                    <IconButton 
+                    <IconButton
                       onClick={exportToCSV}
-                      sx={{ 
+                      sx={{
                         backgroundColor: '#059669',
                         color: 'white',
                         borderRadius: '10px',
@@ -525,7 +525,7 @@ const MovementLog = () => {
                   type="date"
                   fullWidth
                   value={dateRange.start}
-                  onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                   InputLabelProps={{ shrink: true }}
                   InputProps={{
                     startAdornment: (
@@ -548,7 +548,7 @@ const MovementLog = () => {
                   type="date"
                   fullWidth
                   value={dateRange.end}
-                  onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                   InputLabelProps={{ shrink: true }}
                   InputProps={{
                     startAdornment: (
@@ -575,14 +575,14 @@ const MovementLog = () => {
                 </Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
                   {searchTerm && (
-                    <Chip 
+                    <Chip
                       label={`Search: "${searchTerm}"`}
                       size="small"
                       onDelete={() => setSearchTerm('')}
                     />
                   )}
                   {filterType !== 'ALL' && (
-                    <Chip 
+                    <Chip
                       label={`Type: ${filterType}`}
                       size="small"
                       onDelete={() => setFilterType('ALL')}
@@ -590,17 +590,17 @@ const MovementLog = () => {
                     />
                   )}
                   {dateRange.start && (
-                    <Chip 
+                    <Chip
                       label={`From: ${dateRange.start}`}
                       size="small"
-                      onDelete={() => setDateRange({...dateRange, start: ''})}
+                      onDelete={() => setDateRange({ ...dateRange, start: '' })}
                     />
                   )}
                   {dateRange.end && (
-                    <Chip 
+                    <Chip
                       label={`To: ${dateRange.end}`}
                       size="small"
-                      onDelete={() => setDateRange({...dateRange, end: ''})}
+                      onDelete={() => setDateRange({ ...dateRange, end: '' })}
                     />
                   )}
                 </Stack>
@@ -615,14 +615,14 @@ const MovementLog = () => {
             Showing {filteredLogs.length} of {logs.length} logs
           </Typography>
           <Typography variant="body2" sx={{ color: '#64748b' }}>
-            {filteredLogs.length > rowsPerPage ? 
-              `Showing ${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredLogs.length)}` : 
+            {filteredLogs.length > rowsPerPage ?
+              `Showing ${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredLogs.length)}` :
               ''}
           </Typography>
         </Box>
 
         {/* Logs Table */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -634,13 +634,13 @@ const MovementLog = () => {
               <CircularProgress sx={{ color: '#059669' }} />
             </Box>
           ) : filteredLogs.length === 0 ? (
-            <Box sx={{ p: 6, textAlign: 'center' }}>
+            <Box sx={{ p: { xs: 3, md: 6 }, textAlign: 'center' }}>
               <History sx={{ fontSize: 64, color: '#94a3b8', opacity: 0.5, mb: 2 }} />
               <Typography variant="h6" sx={{ color: '#64748b', mb: 1 }}>
                 No movement logs found
               </Typography>
               <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                {logs.length === 0 ? 
+                {logs.length === 0 ?
                   "No movement logs recorded yet. Start by adding stock in, stock out, or transfer transactions." :
                   "No logs match your search criteria. Try changing your filters."}
               </Typography>
@@ -651,9 +651,9 @@ const MovementLog = () => {
                 <Table sx={{ minWidth: 1000 }}>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#f8fafc' }}>
-                      <TableCell 
-                        sx={{ 
-                          fontWeight: 600, 
+                      <TableCell
+                        sx={{
+                          fontWeight: 600,
                           cursor: 'pointer',
                           '&:hover': { backgroundColor: '#f1f5f9' }
                         }}
@@ -666,8 +666,8 @@ const MovementLog = () => {
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
+                      <TableCell
+                        sx={{
                           fontWeight: 600,
                           cursor: 'pointer',
                           '&:hover': { backgroundColor: '#f1f5f9' }
@@ -681,8 +681,8 @@ const MovementLog = () => {
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
+                      <TableCell
+                        sx={{
                           fontWeight: 600,
                           cursor: 'pointer',
                           '&:hover': { backgroundColor: '#f1f5f9' }
@@ -696,8 +696,8 @@ const MovementLog = () => {
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
+                      <TableCell
+                        sx={{
                           fontWeight: 600,
                           cursor: 'pointer',
                           '&:hover': { backgroundColor: '#f1f5f9' }
@@ -711,8 +711,8 @@ const MovementLog = () => {
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
+                      <TableCell
+                        sx={{
                           fontWeight: 600,
                           cursor: 'pointer',
                           '&:hover': { backgroundColor: '#f1f5f9' }
@@ -726,12 +726,12 @@ const MovementLog = () => {
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         sx={{ fontWeight: 600 }}
                       >
                         Details
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         sx={{ fontWeight: 600 }}
                       >
                         Remarks
@@ -742,10 +742,10 @@ const MovementLog = () => {
                     {filteredLogs
                       .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                       .map(log => (
-                        <TableRow 
+                        <TableRow
                           key={log.id}
                           hover
-                          sx={{ 
+                          sx={{
                             '&:hover': { backgroundColor: '#f8fafc' },
                             '&:last-child td, &:last-child th': { border: 0 }
                           }}
@@ -756,7 +756,7 @@ const MovementLog = () => {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Chip 
+                            <Chip
                               label={log.type}
                               color={getTypeColor(log.type)}
                               icon={getTypeIcon(log.type)}
@@ -775,9 +775,9 @@ const MovementLog = () => {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 fontWeight: 600,
                                 color: log.type === 'IN' ? '#10b981' : log.type === 'OUT' ? '#ef4444' : '#64748b'
                               }}
@@ -801,9 +801,9 @@ const MovementLog = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 color: '#475569',
                                 fontStyle: log.remarks ? 'normal' : 'italic'
                               }}
@@ -826,7 +826,7 @@ const MovementLog = () => {
                 page={page}
                 onPageChange={handleChangePage}
                 onRowsPerPageChange={handleChangeRowsPerPage}
-                sx={{ 
+                sx={{
                   borderTop: '1px solid #e2e8f0',
                   '& .MuiTablePagination-toolbar': {
                     padding: 2

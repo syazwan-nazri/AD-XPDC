@@ -74,9 +74,10 @@ const Login = () => {
   return (
     <Box
       maxWidth={360}
+      width="100%"
       mx="auto"
-      my={8}
-      p={4}
+      my={{ xs: 2, sm: 8 }}
+      p={{ xs: 2, sm: 4 }}
       borderRadius={2}
       boxShadow={2}
       bgcolor="background.paper"
