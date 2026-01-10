@@ -1,57 +1,53 @@
 import React, { useMemo, useState, useEffect } from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  useLocation,
-  useNavigate,
-  Navigate,
-} from "react-router-dom";
+// Redux & MUI
 import { Provider, useDispatch, useSelector } from "react-redux";
 import Box from "@mui/material/Box";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import CircularProgress from "@mui/material/CircularProgress";
+
+// Components
 import store from "./redux/store";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ForgotPassword from "./pages/Auth/ForgotPassword";
-import ResetPassword from "./pages/Auth/ResetPassword";
-import NotFound from "./pages/NotFound";
-import PartMaster from "./pages/Admin/PartMaster";
-import PartGroupMaster from "./pages/Admin/PartGroupMaster";
-import WarehouseMaster from "./pages/Admin/WarehouseMaster";
-import WarehouseLocations from "./pages/Admin/WarehouseLocations";
-import Login from "./pages/Auth/Login";
 
+// Lazy-loaded Pages
+const ForgotPassword = React.lazy(() => import("./pages/Auth/ForgotPassword"));
+const ResetPassword = React.lazy(() => import("./pages/Auth/ResetPassword"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const PartMaster = React.lazy(() => import("./pages/Admin/PartMaster"));
+const PartGroupMaster = React.lazy(() => import("./pages/Admin/PartGroupMaster"));
+const WarehouseMaster = React.lazy(() => import("./pages/Admin/WarehouseMaster"));
+const WarehouseLocations = React.lazy(() => import("./pages/Admin/WarehouseLocations"));
+const Login = React.lazy(() => import("./pages/Auth/Login"));
+const UserManagement = React.lazy(() => import("./pages/Admin/UserManagement"));
+const UserGroupMaster = React.lazy(() => import("./pages/Admin/UserGroupMaster"));
+const DepartmentMaster = React.lazy(() => import("./pages/Admin/DepartmentMaster"));
+const DashboardKPIs = React.lazy(() => import("./pages/Reports/DashboardKPIs"));
+const SupplierMaster = React.lazy(() => import("./pages/Admin/SupplierMaster"));
+const MachineMaster = React.lazy(() => import("./pages/Admin/MachineMaster"));
+const StockIn = React.lazy(() => import("./pages/Inventory/StockIn"));
+const StockOut = React.lazy(() => import("./pages/Inventory/StockOut"));
+const InternalTransfer = React.lazy(() => import("./pages/Inventory/InternalTransfer"));
+const MovementLog = React.lazy(() => import("./pages/Inventory/MovementLog"));
+const MRF = React.lazy(() => import("./pages/Inventory/MRF"));
+const StockTake = React.lazy(() => import("./pages/Inventory/StockTake"));
+const StockTakeProcess = React.lazy(() => import("./pages/Inventory/StockTakeProcess"));
+const PurchaseRequisition = React.lazy(() => import("./pages/Procurement/PurchaseRequisition"));
+const StockInquiryReport = React.lazy(() => import("./pages/Reports/StockInquiryReport"));
+const StockValuationReport = React.lazy(() => import("./pages/Reports/StockValuationReport"));
+const MovementHistory = React.lazy(() => import("./pages/Reports/MovementHistory"));
+const LowStockReport = React.lazy(() => import("./pages/Reports/LowStockReport"));
+const ChangePassword = React.lazy(() => import("./pages/Auth/ChangePassword"));
 
+// Firebase & Utils
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "./firebase/config";
 import { doc, getDoc } from "firebase/firestore";
 import { setUser, logout } from "./redux/authSlice";
 import { syncUserData, getUserDocByUid } from "./utils/userManagement";
-import CircularProgress from "@mui/material/CircularProgress";
-import UserManagement from "./pages/Admin/UserManagement";
-import UserGroupMaster from "./pages/Admin/UserGroupMaster";
-import DepartmentMaster from "./pages/Admin/DepartmentMaster";
-import Home from "./pages/Home";
-import DashboardKPIs from "./pages/Reports/DashboardKPIs";
-import SupplierMaster from "./pages/Admin/SupplierMaster";
-import MachineMaster from "./pages/Admin/MachineMaster";
-import StockIn from "./pages/Inventory/StockIn";
-import StockOut from "./pages/Inventory/StockOut";
-import InternalTransfer from "./pages/Inventory/InternalTransfer";
-import MovementLog from "./pages/Inventory/MovementLog";
-import MRF from "./pages/Inventory/MRF";
-import StockTake from "./pages/Inventory/StockTake";
-import StockTakeProcess from "./pages/Inventory/StockTakeProcess";
-import PurchaseRequisition from "./pages/Procurement/PurchaseRequisition";
-import StockInquiryReport from "./pages/Reports/StockInquiryReport";
-import StockValuationReport from "./pages/Reports/StockValuationReport";
-import MovementHistory from "./pages/Reports/MovementHistory";
-import LowStockReport from "./pages/Reports/LowStockReport";
-import ChangePassword from "./pages/Auth/ChangePassword";
 
 const drawerWidth = 280;
 const collapsedWidth = 80;
@@ -262,91 +258,97 @@ function AppShell({ toggleTheme }) {
           {/* Offset for fixed AppBar */}
           <Box sx={{ minHeight: 64 }} />
 
-          <Routes>
-            <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+          <React.Suspense fallback={
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+              <CircularProgress />
+            </Box>
+          }>
+            <Routes>
+              <Route path="/" element={<Navigate to="/reports/dashboard-kpis" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Reports */}
-            <Route element={<ProtectedRoute resourceId="dashboard" />}>
-              <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="stock_inquiry" />}>
-              <Route path="/reports/stock-inquiry" element={<StockInquiryReport />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="movement_history" />}>
-              <Route path="/reports/stock-movement" element={<MovementHistory />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="low_stock" />}>
-              <Route path="/reports/low-stock" element={<LowStockReport />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="stock_valuation" />}>
-              <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
-            </Route>
+              {/* Reports */}
+              <Route element={<ProtectedRoute resourceId="dashboard" />}>
+                <Route path="/reports/dashboard-kpis" element={<DashboardKPIs />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="stock_inquiry" />}>
+                <Route path="/reports/stock-inquiry" element={<StockInquiryReport />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="movement_history" />}>
+                <Route path="/reports/stock-movement" element={<MovementHistory />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="low_stock" />}>
+                <Route path="/reports/low-stock" element={<LowStockReport />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="stock_valuation" />}>
+                <Route path="/reports/stock-valuation" element={<StockValuationReport />} />
+              </Route>
 
-            <Route element={<ProtectedRoute />}>
-              <Route path="/change-password" element={<ChangePassword />} />
-            </Route>
+              <Route element={<ProtectedRoute />}>
+                <Route path="/change-password" element={<ChangePassword />} />
+              </Route>
 
-            {/* Admin Modules */}
-            <Route element={<ProtectedRoute resourceId="user_master" />}>
-              <Route path="/admin/user-master" element={<UserManagement />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="user_group_master" />}>
-              <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="department_master" />}>
-              <Route path="/admin/department-master" element={<DepartmentMaster />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="supplier_master" />}>
-              <Route path="/admin/supplier-master" element={<SupplierMaster />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="part_master" />}>
-              <Route path="/admin/part-master" element={<PartMaster />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="part_group_master" />}>
-              <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="warehouse_master" />}>
-              <Route path="/admin/warehouse-master" element={<WarehouseMaster />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="warehouse_locations" />}>
-              <Route path="/admin/warehouse-locations" element={<WarehouseLocations />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="machine_master" />}>
-              <Route path="/admin/machine-master" element={<MachineMaster />} />
-            </Route>
+              {/* Admin Modules */}
+              <Route element={<ProtectedRoute resourceId="user_master" />}>
+                <Route path="/admin/user-master" element={<UserManagement />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="user_group_master" />}>
+                <Route path="/admin/user-group-master" element={<UserGroupMaster />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="department_master" />}>
+                <Route path="/admin/department-master" element={<DepartmentMaster />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="supplier_master" />}>
+                <Route path="/admin/supplier-master" element={<SupplierMaster />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="part_master" />}>
+                <Route path="/admin/part-master" element={<PartMaster />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="part_group_master" />}>
+                <Route path="/admin/part-group-master" element={<PartGroupMaster />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="warehouse_master" />}>
+                <Route path="/admin/warehouse-master" element={<WarehouseMaster />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="warehouse_locations" />}>
+                <Route path="/admin/warehouse-locations" element={<WarehouseLocations />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="machine_master" />}>
+                <Route path="/admin/machine-master" element={<MachineMaster />} />
+              </Route>
 
-            {/* Inventory Modules */}
-            <Route element={<ProtectedRoute resourceId="stock_in" />}>
-              <Route path="/inventory/stock-in" element={<StockIn />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="stock_out" />}>
-              <Route path="/inventory/stock-out" element={<StockOut />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="internal_transfer" />}>
-              <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="movement_logs" />}>
-              <Route path="/inventory/movement-logs" element={<MovementLog />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="mrf" />}>
-              <Route path="/inventory/mrf" element={<MRF />} />
-            </Route>
-            <Route element={<ProtectedRoute resourceId="stock_take" />}>
-              <Route path="/inventory/stock-take" element={<StockTake />} />
-              <Route path="/inventory/stock-take/process" element={<StockTakeProcess />} />
-            </Route>
+              {/* Inventory Modules */}
+              <Route element={<ProtectedRoute resourceId="stock_in" />}>
+                <Route path="/inventory/stock-in" element={<StockIn />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="stock_out" />}>
+                <Route path="/inventory/stock-out" element={<StockOut />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="internal_transfer" />}>
+                <Route path="/inventory/internal-transfer" element={<InternalTransfer />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="movement_logs" />}>
+                <Route path="/inventory/movement-logs" element={<MovementLog />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="mrf" />}>
+                <Route path="/inventory/mrf" element={<MRF />} />
+              </Route>
+              <Route element={<ProtectedRoute resourceId="stock_take" />}>
+                <Route path="/inventory/stock-take" element={<StockTake />} />
+                <Route path="/inventory/stock-take/process" element={<StockTakeProcess />} />
+              </Route>
 
-            {/* Procurement */}
-            <Route element={<ProtectedRoute resourceId="purchase_requisition" />}>
-              <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
-            </Route>
+              {/* Procurement */}
+              <Route element={<ProtectedRoute resourceId="purchase_requisition" />}>
+                <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
+              </Route>
 
-            {/* Other role-protected routes here */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* Other role-protected routes here */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </React.Suspense>
         </Box>
       </Box>
     </AuthGuard >
