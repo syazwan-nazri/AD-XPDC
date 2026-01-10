@@ -2,28 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { useSelector } from 'react-redux';
-import { 
-  Button, 
-  Snackbar, 
-  TextField, 
-  Autocomplete, 
-  Paper, 
-  Box, 
-  Typography, 
-  Grid, 
-  Card, 
-  CardContent, 
-  Divider, 
+import {
+  Button,
+  Snackbar,
+  TextField,
+  Autocomplete,
+  Paper,
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Divider,
   Alert,
   InputAdornment,
   Chip,
   IconButton,
   Tooltip
 } from '@mui/material';
-import { 
-  SwapHoriz, 
-  CheckCircle, 
-  Inventory, 
+import {
+  SwapHoriz,
+  CheckCircle,
+  Inventory,
   LocationOn,
   Description,
   TrendingFlat,
@@ -74,10 +74,10 @@ const InternalTransfer = () => {
 
     // Check if the new location is different from current
     if (selectedPart.rackNumber === newRackNumber && selectedPart.rackLevel === newRackLevel) {
-      return setSnackbar({ 
-        open: true, 
-        message: 'New location must be different from current location', 
-        severity: 'error' 
+      return setSnackbar({
+        open: true,
+        message: 'New location must be different from current location',
+        severity: 'error'
       });
     }
 
@@ -90,7 +90,7 @@ const InternalTransfer = () => {
         updatedAt: new Date().toISOString()
       });
 
-      const fromLocation = selectedPart.rackNumber && selectedPart.rackLevel 
+      const fromLocation = selectedPart.rackNumber && selectedPart.rackLevel
         ? `${selectedPart.rackNumber}-${selectedPart.rackLevel}`
         : 'Not Specified';
       const toLocation = `${newRackNumber}-${newRackLevel}`;
@@ -112,22 +112,22 @@ const InternalTransfer = () => {
         newRackLevel: newRackLevel
       });
 
-      setSnackbar({ 
-        open: true, 
-        message: `Successfully transferred ${selectedPart.name} to ${toLocation}`, 
-        severity: 'success' 
+      setSnackbar({
+        open: true,
+        message: `Successfully transferred ${selectedPart.name} to ${toLocation}`,
+        severity: 'success'
       });
-      
+
       // Reset form
       setSelectedPart(null);
       setNewRackNumber('');
       setNewRackLevel('');
       setRemarks('');
-      
+
       // Refresh data
-      const updatedParts = parts.map(p => 
-        p.id === selectedPart.id 
-          ? { ...p, rackNumber: newRackNumber, rackLevel: newRackLevel } 
+      const updatedParts = parts.map(p =>
+        p.id === selectedPart.id
+          ? { ...p, rackNumber: newRackNumber, rackLevel: newRackLevel }
           : p
       );
       setParts(updatedParts);
@@ -144,8 +144,8 @@ const InternalTransfer = () => {
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -154,7 +154,7 @@ const InternalTransfer = () => {
 
   const getCurrentLocation = () => {
     if (!selectedPart) return 'Not specified';
-    return selectedPart.rackNumber && selectedPart.rackLevel 
+    return selectedPart.rackNumber && selectedPart.rackLevel
       ? `${selectedPart.rackNumber}-${selectedPart.rackLevel}`
       : 'Not specified';
   };
@@ -165,31 +165,32 @@ const InternalTransfer = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3,
+      backgroundColor: '#f8fafc',
+      p: { xs: 2, md: 3 },
       width: '100%',
       ml: 0,
       mr: 0
     }}>
       {/* Main Content Container - Full width */}
-      <Box sx={{ 
+      <Box sx={{
         width: '100%',
         maxWidth: 'none',
         margin: '0 auto'
       }}>
         {/* Header Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           mb: 4,
           flexWrap: 'wrap',
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -203,8 +204,8 @@ const InternalTransfer = () => {
               <SwapHoriz sx={{ fontSize: 28 }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 700, 
+              <Typography variant="h4" sx={{
+                fontWeight: 700,
                 color: '#1e293b',
                 mb: 0.5
               }}>
@@ -215,9 +216,9 @@ const InternalTransfer = () => {
               </Typography>
             </Box>
           </Box>
-          
+
           {/* Stats Card */}
-          <Card sx={{ 
+          <Card sx={{
             borderRadius: '12px',
             border: '1px solid #e2e8f0',
             backgroundColor: 'white',
@@ -240,7 +241,7 @@ const InternalTransfer = () => {
         </Box>
 
         {/* New Transfer Form - Stacked Layout */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -248,12 +249,12 @@ const InternalTransfer = () => {
           mb: 4,
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#f5f3ff'
           }}>
-            <Typography variant="h6" sx={{ 
+            <Typography variant="h6" sx={{
               fontWeight: 600,
               color: '#1e293b',
               display: 'flex',
@@ -268,11 +269,11 @@ const InternalTransfer = () => {
             </Typography>
           </Box>
 
-          <Box sx={{ p: 4 }}>
+          <Box sx={{ p: { xs: 2, md: 4 } }}>
             {/* ITEM DETAILS SECTION */}
             <Box sx={{ mb: 4 }}>
-              <Typography variant="subtitle1" sx={{ 
-                fontWeight: 600, 
+              <Typography variant="subtitle1" sx={{
+                fontWeight: 600,
                 color: '#334155',
                 mb: 2,
                 display: 'flex',
@@ -282,7 +283,7 @@ const InternalTransfer = () => {
                 <Inventory sx={{ fontSize: 18, color: '#7c3aed' }} />
                 Item Details
               </Typography>
-              
+
               {/* Autocomplete - Full Width */}
               <Box sx={{ mb: 3 }}>
                 <Autocomplete
@@ -291,8 +292,8 @@ const InternalTransfer = () => {
                   value={selectedPart}
                   onChange={(event, newValue) => setSelectedPart(newValue)}
                   renderInput={(params) => (
-                    <TextField 
-                      {...params} 
+                    <TextField
+                      {...params}
                       label="Search and Select Part"
                       placeholder="Type to search parts..."
                       size="medium"
@@ -311,20 +312,20 @@ const InternalTransfer = () => {
                           {option.name}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                          <Chip 
-                            label={`SAP: ${option.sapNumber || 'N/A'}`} 
-                            size="small" 
+                          <Chip
+                            label={`SAP: ${option.sapNumber || 'N/A'}`}
+                            size="small"
                             sx={{ height: 20, fontSize: '0.75rem' }}
                           />
-                          <Chip 
-                            label={`Stock: ${option.currentStock || 0}`} 
+                          <Chip
+                            label={`Stock: ${option.currentStock || 0}`}
                             size="small"
                             color="info"
                             variant="outlined"
                             sx={{ height: 20, fontSize: '0.75rem' }}
                           />
-                          <Chip 
-                            label={`Loc: ${option.rackNumber || '?'}-${option.rackLevel || '?'}`} 
+                          <Chip
+                            label={`Loc: ${option.rackNumber || '?'}-${option.rackLevel || '?'}`}
                             size="small"
                             color="default"
                             variant="outlined"
@@ -336,11 +337,11 @@ const InternalTransfer = () => {
                   )}
                 />
               </Box>
-              
+
               {/* Selected Part Info */}
               {selectedPart && (
-                <Card sx={{ 
-                  mt: 2, 
+                <Card sx={{
+                  mt: 2,
                   borderRadius: '10px',
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#f5f3ff'
@@ -366,7 +367,7 @@ const InternalTransfer = () => {
                             <Typography variant="body2" sx={{ color: '#64748b' }}>
                               Current Stock:
                             </Typography>
-                            <Chip 
+                            <Chip
                               label={selectedPart.currentStock || 0}
                               color="info"
                               size="small"
@@ -376,7 +377,7 @@ const InternalTransfer = () => {
                             <Typography variant="body2" sx={{ color: '#64748b' }}>
                               Current Location:
                             </Typography>
-                            <Chip 
+                            <Chip
                               label={getCurrentLocation()}
                               color="default"
                               size="small"
@@ -395,8 +396,8 @@ const InternalTransfer = () => {
 
             {/* TRANSFER INFORMATION SECTION */}
             <Box sx={{ mb: 4 }}>
-              <Typography variant="subtitle1" sx={{ 
-                fontWeight: 600, 
+              <Typography variant="subtitle1" sx={{
+                fontWeight: 600,
                 color: '#334155',
                 mb: 2,
                 display: 'flex',
@@ -406,62 +407,65 @@ const InternalTransfer = () => {
                 <LocationOn sx={{ fontSize: 18, color: '#7c3aed' }} />
                 Transfer Information
               </Typography>
-              
+
               <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
                 Specify the new storage location
               </Typography>
-              
+
               {/* Rack Number - Full Width */}
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  label="New Rack Number"
-                  fullWidth
-                  value={newRackNumber}
-                  onChange={(e) => setNewRackNumber(e.target.value.toUpperCase())}
-                  placeholder="e.g., A01, B12, C25"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Warehouse sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Box>
-              
-              {/* Rack Level - Full Width */}
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  label="New Rack Level"
-                  fullWidth
-                  value={newRackLevel}
-                  onChange={(e) => setNewRackLevel(e.target.value.toUpperCase())}
-                  placeholder="e.g., 01, 02, A, B"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Storage sx={{ color: '#64748b' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '10px',
-                      backgroundColor: '#f8fafc',
-                    }
-                  }}
-                />
-              </Box>
-              
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                {/* Rack Number */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="New Rack Number"
+                    fullWidth
+                    value={newRackNumber}
+                    onChange={(e) => setNewRackNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g., A01, B12, C25"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Warehouse sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+
+                {/* Rack Level */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="New Rack Level"
+                    fullWidth
+                    value={newRackLevel}
+                    onChange={(e) => setNewRackLevel(e.target.value.toUpperCase())}
+                    placeholder="e.g., 01, 02, A, B"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Storage sx={{ color: '#64748b' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '10px',
+                        backgroundColor: '#f8fafc',
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
+
               {/* Transfer Summary Display */}
               {selectedPart && newRackNumber && newRackLevel && (
-                <Card sx={{ 
+                <Card sx={{
                   mt: 2,
                   borderRadius: '10px',
                   backgroundColor: '#f5f3ff',
@@ -474,11 +478,11 @@ const InternalTransfer = () => {
                       </Typography>
                       <TrendingFlat sx={{ color: '#7c3aed' }} />
                     </Box>
-                    
+
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
-                        <Box sx={{ 
-                          p: 2, 
+                        <Box sx={{
+                          p: 2,
                           borderRadius: '8px',
                           backgroundColor: '#ede9fe',
                           border: '1px solid #ddd6fe'
@@ -495,8 +499,8 @@ const InternalTransfer = () => {
                         </Box>
                       </Grid>
                       <Grid item xs={12} sm={6}>
-                        <Box sx={{ 
-                          p: 2, 
+                        <Box sx={{
+                          p: 2,
                           borderRadius: '8px',
                           backgroundColor: '#e0e7ff',
                           border: '1px solid #c7d2fe'
@@ -513,11 +517,11 @@ const InternalTransfer = () => {
                         </Box>
                       </Grid>
                     </Grid>
-                    
+
                     {selectedPart.rackNumber === newRackNumber && selectedPart.rackLevel === newRackLevel && (
-                      <Alert 
-                        severity="warning" 
-                        sx={{ 
+                      <Alert
+                        severity="warning"
+                        sx={{
                           mt: 2,
                           borderRadius: '8px',
                           backgroundColor: '#fef3c7',
@@ -536,8 +540,8 @@ const InternalTransfer = () => {
 
             {/* ADDITIONAL NOTES SECTION */}
             <Box sx={{ mb: 4 }}>
-              <Typography variant="subtitle1" sx={{ 
-                fontWeight: 600, 
+              <Typography variant="subtitle1" sx={{
+                fontWeight: 600,
                 color: '#334155',
                 mb: 2,
                 display: 'flex',
@@ -547,7 +551,7 @@ const InternalTransfer = () => {
                 <Description sx={{ fontSize: 18, color: '#7c3aed' }} />
                 Additional Notes
               </Typography>
-              
+
               <TextField
                 label="Remarks (Optional)"
                 fullWidth
@@ -569,19 +573,19 @@ const InternalTransfer = () => {
             <Divider sx={{ my: 4 }} />
 
             {/* CONFIRM BUTTON - Centered */}
-            <Box sx={{ 
-              display: 'flex', 
+            <Box sx={{
+              display: 'flex',
               justifyContent: 'center',
               pt: 2
             }}>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 size="large"
                 onClick={handleSubmit}
-                disabled={isSubmitting || !selectedPart || !newRackNumber || !newRackLevel || 
+                disabled={isSubmitting || !selectedPart || !newRackNumber || !newRackLevel ||
                   (selectedPart.rackNumber === newRackNumber && selectedPart.rackLevel === newRackLevel)}
                 startIcon={<CheckCircle />}
-                sx={{ 
+                sx={{
                   minWidth: 300,
                   background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
                   px: 6,
@@ -610,15 +614,15 @@ const InternalTransfer = () => {
         </Paper>
 
         {/* Recent Transfers Section - Stacked Below */}
-        <Paper elevation={0} sx={{ 
+        <Paper elevation={0} sx={{
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
           backgroundColor: 'white',
           width: '100%'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#f5f3ff',
             display: 'flex',
@@ -626,7 +630,7 @@ const InternalTransfer = () => {
             alignItems: 'center'
           }}>
             <Box>
-              <Typography variant="h6" sx={{ 
+              <Typography variant="h6" sx={{
                 fontWeight: 600,
                 color: '#1e293b',
                 display: 'flex',
@@ -641,9 +645,9 @@ const InternalTransfer = () => {
               </Typography>
             </Box>
             <Tooltip title="Refresh transfers">
-              <IconButton 
-                onClick={fetchRecentTransfers} 
-                sx={{ 
+              <IconButton
+                onClick={fetchRecentTransfers}
+                sx={{
                   color: '#7c3aed',
                   backgroundColor: 'white',
                   border: '1px solid #e2e8f0',
@@ -659,8 +663,8 @@ const InternalTransfer = () => {
 
           <Box sx={{ p: 3 }}>
             {recentTransfers.length === 0 ? (
-              <Box sx={{ 
-                textAlign: 'center', 
+              <Box sx={{
+                textAlign: 'center',
                 py: 6,
                 color: '#94a3b8'
               }}>
@@ -675,10 +679,10 @@ const InternalTransfer = () => {
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {recentTransfers.map((transfer) => (
-                  <Card 
+                  <Card
                     key={transfer.id}
                     variant="outlined"
-                    sx={{ 
+                    sx={{
                       borderRadius: '10px',
                       borderColor: '#e2e8f0',
                       backgroundColor: '#f8fafc',
@@ -695,7 +699,7 @@ const InternalTransfer = () => {
                           <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
                             {transfer.partName}
                           </Typography>
-                          <Chip 
+                          <Chip
                             label="TRANSFER"
                             size="small"
                             color="secondary"
@@ -707,11 +711,11 @@ const InternalTransfer = () => {
                           SAP: {transfer.sapNumber || 'N/A'}
                         </Typography>
                       </Box>
-                      
+
                       <Grid container spacing={2} sx={{ mb: 2 }}>
                         <Grid item xs={12} sm={6}>
-                          <Box sx={{ 
-                            p: 1.5, 
+                          <Box sx={{
+                            p: 1.5,
                             borderRadius: '8px',
                             backgroundColor: '#f1f5f9',
                             border: '1px solid #e2e8f0'
@@ -728,8 +732,8 @@ const InternalTransfer = () => {
                           </Box>
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <Box sx={{ 
-                            p: 1.5, 
+                          <Box sx={{
+                            p: 1.5,
                             borderRadius: '8px',
                             backgroundColor: '#f1f5f9',
                             border: '1px solid #e2e8f0'
@@ -746,7 +750,7 @@ const InternalTransfer = () => {
                           </Box>
                         </Grid>
                       </Grid>
-                      
+
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
                           <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
@@ -765,7 +769,7 @@ const InternalTransfer = () => {
                           </Typography>
                         </Grid>
                       </Grid>
-                      
+
                       {transfer.remarks && (
                         <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed #e2e8f0' }}>
                           <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
@@ -785,16 +789,16 @@ const InternalTransfer = () => {
         </Paper>
       </Box>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ 
+          sx={{
             width: '100%',
             borderRadius: '10px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)'

@@ -471,7 +471,7 @@ const PurchaseRequisition = () => {
     <Box sx={{
       minHeight: 'calc(100vh - 64px)',
       backgroundColor: '#f8fafc',
-      p: 3,
+      p: { xs: 2, md: 3 },
       width: '100%'
     }}>
       <Box sx={{ width: '100%', maxWidth: 'none', margin: '0 auto' }}>
@@ -624,7 +624,7 @@ const PurchaseRequisition = () => {
           width: '100%'
         }}>
           <Box sx={{
-            p: 3,
+            p: { xs: 2, md: 3 },
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#fffbeb',
             display: 'flex',
@@ -667,7 +667,7 @@ const PurchaseRequisition = () => {
           </Box>
 
           {/* Search and Filter */}
-          <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+          <Box sx={{ p: { xs: 2, md: 3 }, borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
             <Grid container spacing={2} alignItems="flex-start">
               <Grid item xs={12} md={8}>
                 <TextField

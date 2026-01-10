@@ -29,20 +29,20 @@ const Navbar = ({ theme, toggleTheme, user, onLogout, onMenuClick }) => {
   };
 
   return (
-    <AppBar position="fixed" color="primary" elevation={2}>
+    <AppBar position="fixed" color="primary" elevation={2} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
       <Toolbar>
         <IconButton
           color="inherit"
           edge="start"
-          sx={{ mr: 2, display: { xs: 'inline-flex', sm: 'inline-flex' } }}
+          sx={{ mr: 2, display: { md: 'none' } }}
           aria-label="open drawer"
           onClick={onMenuClick}
         >
           <MenuIcon />
         </IconButton>
-        <Typography 
-          variant="h6" 
-          component="div" 
+        <Typography
+          variant="h6"
+          component="div"
           sx={{ flexGrow: 1, cursor: 'pointer' }}
           onClick={() => navigate('/reports/dashboard-kpis')}
         >

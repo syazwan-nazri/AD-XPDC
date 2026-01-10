@@ -5,6 +5,8 @@ import {
     Paper, Box, Typography, Button, TextField, MenuItem,
     Grid, InputAdornment, IconButton, Tooltip
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -20,6 +22,8 @@ const MovementHistory = () => {
     const [logs, setLogs] = useState([]);
     const [filteredLogs, setFilteredLogs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     // Filter States
     const [searchText, setSearchText] = useState('');
@@ -171,13 +175,13 @@ const MovementHistory = () => {
     };
 
     return (
-        <Box sx={{ height: '100%', width: '100%', p: 2 }}>
-            <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap">
+        <Box sx={{ height: '100%', width: '100%', p: { xs: 2, md: 3 } }}>
+            <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+                <Box display="flex" flexDirection={isMobile ? 'column' : 'row'} justifyContent="space-between" alignItems={isMobile ? 'flex-start' : 'center'} mb={2} gap={2}>
                     <Typography variant="h5" component="h1" fontWeight="bold" color="primary">
                         Movement History
                     </Typography>
-                    <Box>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Button
                             startIcon={<RefreshIcon />}
                             onClick={fetchLogs}
@@ -296,6 +300,11 @@ const MovementHistory = () => {
                             showQuickFilter: true,
                             quickFilterProps: { debounceMs: 500 },
                         },
+                    }}
+                    columnVisibilityModel={{
+                        userName: !isMobile,
+                        remarks: !isMobile,
+                        sapNumber: !isMobile,
                     }}
                     sx={{
                         '& .MuiDataGrid-cell:hover': {

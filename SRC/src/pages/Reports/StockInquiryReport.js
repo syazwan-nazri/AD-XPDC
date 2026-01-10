@@ -5,6 +5,8 @@ import {
     Paper, Box, Typography, Button, TextField, MenuItem,
     Grid, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -17,6 +19,8 @@ const StockInquiryReport = () => {
     const [parts, setParts] = useState([]);
     const [filteredParts, setFilteredParts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     // Advanced Filter State
     const [filterLogic, setFilterLogic] = useState('AND');
@@ -178,11 +182,11 @@ const StockInquiryReport = () => {
     };
 
     return (
-        <Box sx={{ height: '100%', width: '100%', p: 2 }}>
-            <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" mb={2}>
+        <Box sx={{ height: '100%', width: '100%', p: { xs: 2, md: 3 } }}>
+            <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+                <Box display="flex" flexDirection={isMobile ? 'column' : 'row'} justifyContent="space-between" alignItems={isMobile ? 'flex-start' : 'center'} gap={2} mb={2}>
                     <Typography variant="h5" fontWeight="bold">Stock Inquiry Report</Typography>
-                    <Box>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Button startIcon={<RefreshIcon />} onClick={fetchParts} sx={{ mr: 1 }}>
                             Refresh
                         </Button>
@@ -268,6 +272,11 @@ const StockInquiryReport = () => {
                             showQuickFilter: true,
                             quickFilterProps: { debounceMs: 500 },
                         },
+                    }}
+                    columnVisibilityModel={{
+                        internalRef: !isMobile,
+                        category: !isMobile,
+                        rackLocation: !isMobile,
                     }}
                 />
             </Paper>
