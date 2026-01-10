@@ -90,6 +90,7 @@ const PartMaster = () => {
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
+  const [scanValue, setScanValue] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterRackLevel, setFilterRackLevel] = useState('');
 
@@ -755,7 +756,60 @@ const PartMaster = () => {
     }
   };
 
-  // Barcode scan handler
+  // Delete all parts
+  const handleDeleteAllParts = async () => {
+    if (!canDelete) {
+      setSnackbar({ open: true, message: 'You do not have permission to delete parts', severity: 'error' });
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmDelete = window.confirm(
+      `Are you sure you want to DELETE ALL ${parts.length} parts? This action cannot be undone!`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setCleanupInProgress(true);
+      setCleanupProgress(0);
+
+      const totalToDelete = parts.length;
+      let deletedCount = 0;
+      const batchSize = 100;
+
+      for (let i = 0; i < parts.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchParts = parts.slice(i, Math.min(i + batchSize, parts.length));
+
+        batchParts.forEach(part => {
+          batch.delete(doc(db, 'parts', part.id));
+        });
+
+        await batch.commit();
+
+        deletedCount += batchParts.length;
+        setCleanupProgress(Math.round((deletedCount / totalToDelete) * 100));
+
+        batchParts.forEach(part => {
+          dispatch(deletePart(part.id));
+        });
+      }
+
+      setSnackbar({ open: true, message: `Successfully deleted all ${deletedCount} parts`, severity: 'success' });
+      setCleanupProgress(0);
+
+      const querySnapshot = await getDocs(collection(db, 'parts'));
+      const data = querySnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+      dispatch(setParts(data));
+      calculateStats(data);
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Error deleting all parts: ' + error.message, severity: 'error' });
+      setCleanupProgress(0);
+    } finally {
+      setCleanupInProgress(false);
+    }
+  };
+
   const handleScan = (code) => {
     setSearchQuery(code);
     setSnackbar({ open: true, message: `Scanned: ${code}`, severity: 'info' });
@@ -1027,28 +1081,60 @@ const PartMaster = () => {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
-                <Box sx={{ width: '100%' }}>
-                  <BarcodeScanner
-                    onScan={handleScan}
-                    label="Scan Barcode"
-                    autoFocus={false}
-                    size="small"
-                    fullWidth
-                  />
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <TextField
-                  label="Category"
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
                   fullWidth
-                  select
+                  label="Scan Barcode"
+                  value={scanValue}
+                  onChange={(e) => setScanValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && scanValue.trim()) {
+                      handleScan(scanValue.trim());
+                      setScanValue('');
+                    }
+                  }}
+                  placeholder="Scan or type barcode..."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <QrCodeIcon sx={{ color: '#64748b' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: scanValue && (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setScanValue('')} size="small">
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
                       backgroundColor: '#f8fafc',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Category"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  select
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  sx={{
+                    width: '100%',
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      backgroundColor: '#f8fafc',
+                      width: '100%',
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      minWidth: 0,
                     }
                   }}
                 >
@@ -1056,17 +1142,25 @@ const PartMaster = () => {
                   {categories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
                 </TextField>
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <TextField
                   label="Rack Level"
                   value={filterRackLevel}
                   onChange={(e) => setFilterRackLevel(e.target.value)}
                   fullWidth
                   select
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
                   sx={{
+                    width: '100%',
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
                       backgroundColor: '#f8fafc',
+                      width: '100%',
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      minWidth: 0,
                     }
                   }}
                 >
@@ -1074,7 +1168,7 @@ const PartMaster = () => {
                   {['A', 'B', 'C', 'D'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
                 </TextField>
               </Grid>
-              <Grid item xs={12} md={1}>
+              <Grid item xs={12} md={4}>
                 <Tooltip title="Refresh data">
                   <IconButton
                     onClick={refreshData}
@@ -1167,6 +1261,32 @@ const PartMaster = () => {
                     }}
                   >
                     Cleanup
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Delete All Parts">
+                  <Button
+                    variant="outlined"
+                    startIcon={<DeleteIcon />}
+                    onClick={handleDeleteAllParts}
+                    size="small"
+                    disabled={parts.length === 0}
+                    sx={{
+                      borderRadius: '10px',
+                      borderColor: '#ef4444',
+                      color: '#ef4444',
+                      textTransform: 'none',
+                      '&:hover': {
+                        borderColor: '#dc2626',
+                        color: '#dc2626',
+                        backgroundColor: '#fee2e2'
+                      },
+                      '&:disabled': {
+                        borderColor: '#fca5a5',
+                        color: '#fca5a5'
+                      }
+                    }}
+                  >
+                    Delete All
                   </Button>
                 </Tooltip>
               </Box>
