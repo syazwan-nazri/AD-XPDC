@@ -46,6 +46,7 @@ const StockIn = () => {
 
   const canAdd = permissions.access === 'add' || isAdmin;
   const [parts, setParts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [selectedPart, setSelectedPart] = useState(null);
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -77,7 +78,16 @@ const StockIn = () => {
       const querySnapshot = await getDocs(collection(db, 'parts'));
       setParts(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     };
+    const fetchSuppliers = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'suppliers'));
+        setSuppliers(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
     fetchParts();
+    fetchSuppliers();
     fetchRecentTransactions();
   }, []);
 
@@ -101,6 +111,9 @@ const StockIn = () => {
     }
     if (!selectedPart || !quantity || Number(quantity) <= 0) {
       return setSnackbar({ open: true, message: 'Please select a part and valid quantity', severity: 'error' });
+    }
+    if (!supplier) {
+      return setSnackbar({ open: true, message: 'Please select a supplier. If not registered, add it in Supplier Master first.', severity: 'error' });
     }
 
     setIsSubmitting(true);
@@ -426,14 +439,15 @@ const StockIn = () => {
                   Delivery Information
                 </Typography>
 
-                {/* Supplier - Full Width */}
+                {/* Supplier Dropdown - Full Width */}
                 <Box sx={{ mb: 3 }}>
                   <TextField
-                    label="Supplier Name"
+                    select
+                    label="Supplier Name *"
                     fullWidth
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
-                    placeholder="Enter supplier name"
+                    helperText={suppliers.length === 0 ? "No suppliers registered. Please add suppliers in Supplier Master first." : "Select from registered suppliers"}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -447,7 +461,19 @@ const StockIn = () => {
                         backgroundColor: '#f8fafc',
                       }
                     }}
-                  />
+                  >
+                    <MenuItem value="">-- Select Supplier --</MenuItem>
+                    {suppliers.map((sup) => (
+                      <MenuItem key={sup.id} value={sup.supplierName || sup.name}>
+                        {sup.supplierName || sup.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  {suppliers.length === 0 && (
+                    <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
+                      No suppliers registered. Please register suppliers in the Supplier Master before proceeding with stock-in.
+                    </Alert>
+                  )}
                 </Box>
 
                 {/* Delivery Order Number - Full Width */}

@@ -18,7 +18,8 @@ import {
   InputAdornment,
   Chip,
   IconButton,
-  Tooltip
+  Tooltip,
+  MenuItem
 } from '@mui/material';
 import {
   LocalShipping,
@@ -42,6 +43,7 @@ const StockOut = () => {
 
   const canAdd = permissions.access === 'add' || isAdmin;
   const [parts, setParts] = useState([]);
+  const [approvedMRFs, setApprovedMRFs] = useState([]);
   const [selectedPart, setSelectedPart] = useState(null);
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -57,7 +59,19 @@ const StockOut = () => {
       const querySnapshot = await getDocs(collection(db, 'parts'));
       setParts(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     };
+    const fetchApprovedMRFs = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'mrf'));
+        const approvedMRFData = querySnapshot.docs
+          .map(doc => ({ ...doc.data(), id: doc.id }))
+          .filter(mrf => mrf.status === 'Approved');
+        setApprovedMRFs(approvedMRFData);
+      } catch (error) {
+        console.error('Error fetching MRFs:', error);
+      }
+    };
     fetchParts();
+    fetchApprovedMRFs();
     fetchRecentTransactions();
   }, []);
 
@@ -81,6 +95,9 @@ const StockOut = () => {
     }
     if (!selectedPart || !quantity || Number(quantity) <= 0) {
       return setSnackbar({ open: true, message: 'Please select a part and valid quantity', severity: 'error' });
+    }
+    if (!mrfNumber) {
+      return setSnackbar({ open: true, message: 'Please select an approved MRF number', severity: 'error' });
     }
 
     const qty = Number(quantity);
@@ -436,14 +453,15 @@ const StockOut = () => {
                   />
                 </Box>
 
-                {/* MRF Number - Full Width */}
+                {/* MRF Number Dropdown - Full Width */}
                 <Box sx={{ mb: 3 }}>
                   <TextField
-                    label="MRF Number"
+                    select
+                    label="MRF Number *"
                     fullWidth
                     value={mrfNumber}
                     onChange={(e) => setMrfNumber(e.target.value)}
-                    placeholder="MRF-XXXXX"
+                    helperText={approvedMRFs.length === 0 ? "No approved MRF available. Please create and approve MRF first." : "Select from approved MRF numbers only"}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -457,7 +475,19 @@ const StockOut = () => {
                         backgroundColor: '#f8fafc',
                       }
                     }}
-                  />
+                  >
+                    <MenuItem value="">-- Select MRF Number --</MenuItem>
+                    {approvedMRFs.map((mrf) => (
+                      <MenuItem key={mrf.id} value={mrf.mrfNumber}>
+                        {mrf.mrfNumber} - {mrf.requestedBy || 'Unknown'} ({mrf.department || 'N/A'})
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  {approvedMRFs.length === 0 && (
+                    <Alert severity="warning" sx={{ mt: 2, borderRadius: '10px' }}>
+                      No approved MRF found. Please create and approve an MRF before proceeding with stock-out.
+                    </Alert>
+                  )}
                 </Box>
 
                 {/* Date of Issue - Full Width */}
