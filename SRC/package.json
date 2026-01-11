@@ -4,15 +4,12 @@
   "main": "App.js",
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "build": "react-scripts build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
-  "homepage": "https://ammaribrahim95.github.io/AD-XPDC",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -40,9 +37,6 @@
     "recharts": "^3.5.0",
     "redux": "^5.0.1",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "gh-pages": "^6.3.0"
   },
   "browserslist": {
     "production": [
