@@ -1,0 +1,130 @@
+@startuml SIMS_Maintenance_Class_Diagram
+!theme plain
+title <size:18><b>SIMS - Maintenance Module</b></size>
+
+skinparam {
+  ClassBackgroundColor #F8F9FA
+  ClassBorderColor #343A40
+  ClassArrowColor #495057
+  DefaultFontSize 13
+}
+
+left to right direction
+skinparam nodesep 40
+skinparam ranksep 50
+
+' ===================================
+' MAIN ENTITIES - Organized Layout
+' ===================================
+package "Core Entities" {
+  class Machine {
+    + machineId: string {PK}
+    --
+    + name: string
+    + model: string
+    + serialNumber: string {unique}
+    + department: string
+    + location: string
+    + manufacturer: string
+    + installationDate: date
+    + lastServiceDate: date
+    + status: enum(active, inactive, retired, under_maintenance)
+    + criticalSpares: array<partId>
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + scheduleMaintenance()
+    + addCriticalSpare()
+    + updateStatus()
+  }
+
+  class MachineHistory {
+    + historyId: string {PK}
+    --
+    + machineId: string {FK}
+    + maintenanceType: enum(service, repair, replacement, inspection)
+    + date: date
+    + duration: number (hours)
+    + technician: string {FK}
+    + workOrderId: string
+    + partsUsed: array<PartUsage>
+    + findings: text
+    + nextServiceDate: date
+    + downtime: number (hours)
+    + remarks: text
+    + createdAt: timestamp
+    --
+    + addPartUsed()
+    + scheduleNextService()
+  }
+
+  class PartUsage <<Value Object>> {
+    + partId: string
+    + quantity: number
+    + reason: string
+  }
+  
+  MachineHistory "1..*" --> "1" Machine : records
+  MachineHistory "1" *-- "1..*" PartUsage : includes
+}
+
+' ===================================
+' EXTERNAL ENTITIES - Grouped
+' ===================================
+package "External Modules" #F0F0F0 {
+  together {
+    class Department <<(E,#FFD9B3)>> {
+      User Management Module
+    }
+    class User <<(E,#FFD9B3)>> {
+      User Management Module
+    }
+  }
+  
+  together {
+    class Part <<(E,#FFCC99)>> {
+      Inventory Module
+    }
+    class MaterialRequestForm <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+  }
+}
+
+' ===================================
+' RELATIONSHIPS - Cleaner Lines
+' ===================================
+Machine "1..*" --> "1" Department : located in
+Machine "1..*" --> "1..*" Part : has critical spares
+Machine "1" <-- "1..*" MaterialRequestForm : for
+MachineHistory "1..*" --> "1" User : performed by
+PartUsage "1..*" --> "1" Part : uses
+
+' ===================================
+' NOTES - Sidebar Style
+' ===================================
+note as N1
+  <b>Machine Status:</b>
+  <color:green>■ active</color>: Operational
+  <color:orange>■ inactive</color>: Not in use
+  <color:purple>■ under_maintenance</color>: Being serviced
+  <color:red>■ retired</color>: Decommissioned
+  
+  <b>Critical Spares:</b>
+  Essential parts required on-site
+end note
+
+note as N2
+  <b>Maintenance Types:</b>
+  <color:blue>■ service</color>: Regular maintenance
+  <color:orange>■ repair</color>: Corrective action
+  <color:purple>■ replacement</color>: Part swap
+  <color:green>■ inspection</color>: Diagnostic
+  
+  <b>Downtime:</b> Hours machine was stopped
+end note
+
+Machine .. N1
+MachineHistory .. N2
+
+@enduml

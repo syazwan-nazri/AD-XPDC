@@ -1,0 +1,167 @@
+@startuml SIMS_Transactions_Class_Diagram
+!theme plain
+title <size:18><b>SIMS - Transactions Module</b></size>
+
+skinparam {
+  ClassBackgroundColor #F8F9FA
+  ClassBorderColor #343A40
+  ClassArrowColor #495057
+  DefaultFontSize 13
+}
+
+left to right direction
+skinparam nodesep 40
+skinparam ranksep 50
+
+' ===================================
+' MAIN ENTITIES - Organized Layout
+' ===================================
+package "Core Entities" {
+  class StockTransaction {
+    + transactionId: string {PK}
+    --
+    + type: enum(IN, OUT, TRANSFER)
+    + partId: string {FK}
+    + quantity: number
+    + fromLocation: string {FK}
+    + toLocation: string {FK}
+    + supplierId: string {FK}
+    + workOrderId: string
+    + reason: string
+    + transactionDate: timestamp
+    + createdBy: string {FK}
+    + status: enum(pending, confirmed, rejected)
+    + remarks: text
+    --
+    + confirm()
+    + reject()
+    + updateInventory()
+  }
+
+  class StockTakeCycle {
+    + cycleId: string {PK}
+    --
+    + countDate: date
+    + location: string
+    + department: string
+    + supervisor: string {FK}
+    + status: enum(scheduled, in-progress, completed, cancelled)
+    + countStart: timestamp
+    + countEnd: timestamp
+    + variancePercentage: decimal
+    + initiatedBy: string {FK}
+    + remarks: text
+    --
+    + start()
+    + addCount()
+    + complete()
+    + calculateVariance()
+  }
+
+  class StockCount <<Value Object>> {
+    + partId: string
+    + systemQty: number
+    + countedQty: number
+    + variance: number
+    + remarks: string
+    + countedBy: string
+    + countedAt: timestamp
+  }
+
+  class MaterialRequestForm {
+    + mrfId: string {PK}
+    --
+    + workOrderId: string
+    + machineId: string {FK}
+    + items: array<MRFItem>
+    + priority: enum(routine, urgent, critical)
+    + status: enum(pending, approved, fulfilled, rejected, cancelled)
+    + requestDate: timestamp
+    + requestedBy: string {FK}
+    + fulfilledBy: string {FK}
+    + fulfilledDate: timestamp
+    + remarks: text
+    --
+    + addItem()
+    + removeItem()
+    + approve()
+    + fulfill()
+    + reject()
+  }
+
+  class MRFItem <<Value Object>> {
+    + partId: string
+    + quantity: number
+    + remarks: string
+    + issued: boolean
+  }
+  
+  StockTakeCycle "1" *-- "1..*" StockCount : includes
+  MaterialRequestForm "1" *-- "1..*" MRFItem : contains
+}
+
+' ===================================
+' EXTERNAL ENTITIES - Grouped
+' ===================================
+package "External Modules" #F0F0F0 {
+  together {
+    class Part <<(E,#FFCC99)>> {
+      Inventory Module
+    }
+    class StorageLocation <<(E,#FFCC99)>> {
+      Inventory Module
+    }
+  }
+  
+  together {
+    class User <<(E,#FFD9B3)>> {
+      User Management Module
+    }
+  }
+  
+  class Machine <<(E,#FFE5CC)>> {
+    Maintenance Module
+  }
+}
+
+' ===================================
+' RELATIONSHIPS - Cleaner Lines
+' ===================================
+StockTransaction "0..*" --> "1" Part : affects
+StockTransaction "0..*" --> "1" StorageLocation : from/to
+StockTransaction "0..*" --> "1" User : created by
+StockTakeCycle "1..*" --> "1" User : supervised by
+StockTakeCycle "0..*" --> "1..*" Part : counts
+MaterialRequestForm "1..*" --> "1" Machine : for
+MaterialRequestForm "1..*" --> "1" User : requested/fulfilled by
+MaterialRequestForm "1..*" --> "1..*" Part : requests
+
+' ===================================
+' NOTES - Sidebar Style
+' ===================================
+note as N1
+  <b>Transaction Types:</b>
+  <color:blue>■ IN</color>: Receipt/Inbound
+  <color:orange>■ OUT</color>: Issue/Outbound
+  <color:purple>■ TRANSFER</color>: Internal move
+  
+  <b>Status:</b>
+  <color:gray>■ pending</color>: Awaiting confirmation
+  <color:green>■ confirmed</color>: Processed
+  <color:red>■ rejected</color>: Cancelled
+end note
+
+note as N2
+  <b>Stock Take Cycle:</b>
+  <color:orange>■ scheduled</color>: Planned
+  <color:blue>■ in-progress</color>: Active
+  <color:green>■ completed</color>: Done
+  <color:red>■ cancelled</color>: Aborted
+  
+  <b>Variance %</b> = variance/systemQty
+end note
+
+StockTransaction .. N1
+StockTakeCycle .. N2
+
+@enduml

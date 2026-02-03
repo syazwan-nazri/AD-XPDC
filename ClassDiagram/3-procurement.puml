@@ -1,0 +1,195 @@
+@startuml SIMS_Procurement_Class_Diagram
+!theme plain
+title <size:18><b>SIMS - Procurement Module</b></size>
+
+skinparam {
+  ClassBackgroundColor #F8F9FA
+  ClassBorderColor #343A40
+  ClassArrowColor #495057
+  DefaultFontSize 13
+}
+
+left to right direction
+skinparam nodesep 40
+skinparam ranksep 50
+
+' ===================================
+' MAIN ENTITIES - Organized Layout
+' ===================================
+package "Core Entities" {
+  class Supplier {
+    + supplierId: string {PK}
+    --
+    + companyName: string
+    + contactPerson: string
+    + phone: string
+    + email: string
+    + address: string
+    + city: string
+    + country: string
+    + type: enum(vendor, distributor, manufacturer)
+    + rating: decimal(1-5)
+    + status: enum(active, inactive)
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + updateRating()
+    + getSuppliedParts()
+  }
+
+  class PurchaseRequisition {
+    + requisitionId: string {PK}
+    --
+    + partId: string {FK}
+    + quantity: number
+    + unitCost: decimal
+    + totalCost: decimal
+    + supplierId: string {FK}
+    + expectedDeliveryDate: date
+    + status: enum(draft, submitted, approved, ordered, rejected)
+    + requestedBy: string {FK}
+    + approvedBy: string {FK}
+    + requestDate: timestamp
+    + remarks: text
+    --
+    + submit()
+    + approve()
+    + reject()
+    + convertToPO()
+  }
+
+  class PurchaseOrder {
+    + poId: string {PK}
+    --
+    + supplierId: string {FK}
+    + items: array<POItem>
+    + deliveryDate: date
+    + paymentTerms: string
+    + totalAmount: decimal
+    + status: enum(draft, sent, acknowledged, received, closed)
+    + createdBy: string {FK}
+    + createdAt: timestamp
+    + receivedQuantities: map
+    + remarks: text
+    --
+    + addItem()
+    + removeItem()
+    + send()
+    + receiveGoods()
+    + close()
+  }
+
+  class POItem <<Value Object>> {
+    + partId: string
+    + quantity: number
+    + unitPrice: decimal
+    + totalPrice: decimal
+    + receivedQty: number
+  }
+  
+  PurchaseRequisition "0..*" --> "1" Supplier : from
+  PurchaseOrder "1..*" --> "1" Supplier : ordered from
+  PurchaseOrder "1" *-- "1..*" POItem : contains
+}
+
+' ===================================
+' EXTERNAL ENTITIES - Grouped
+' ===================================
+package "External Modules" #F0F0F0 {
+  together {
+    class Part <<(E,#FFCC99)>> {
+      Inventory Module
+    }
+    class StockTransaction <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+  }
+  
+  together {
+    class User <<(E,#FFD9B3)>> {
+      User Management Module
+    }
+  }
+}
+
+' ===================================
+' RELATIONSHIPS - Cleaner Lines
+' ===================================
+PurchaseRequisition "0..*" --> "1" Part : requests
+PurchaseRequisition "0..*" --> "1" User : requested by
+PurchaseOrder "1..*" --> "1..*" Part : contains
+PurchaseOrder "0..*" --> "1" User : created by
+PurchaseOrder "0..*" --> "1..*" StockTransaction : generates
+
+' ===================================
+' NOTES - Sidebar Style
+' ===================================
+note as N1
+  <b>Requisition Flow:</b>
+  draft → submitted → approved → ordered
+  
+  <b>Status:</b>
+  <color:orange>■ draft</color>: Initial
+  <color:blue>■ submitted</color>: Pending approval
+  <color:green>■ approved</color>: Ready to order
+  <color:purple>■ rejected</color>: Denied
+end note
+
+note as N2
+  <b>Purchase Order:</b>
+  <color:blue>■ draft</color>: Created
+  <color:orange>■ sent</color>: To supplier
+  <color:green>■ acknowledged</color>: Supplier confirmed
+  <color:purple>■ closed</color>: Complete
+end note
+
+PurchaseRequisition .. N1
+PurchaseOrder .. N2
+
+@enduml
+PurchaseRequisition "1..*" --> "1" User : requested by
+PurchaseRequisition "1..*" --> "1" User : approved by
+
+PurchaseOrder "1..*" --> "1" User : created by
+POItem "1..*" --> "1" Part : references
+
+Supplier "1" <-- "0..*" StockTransaction : received from
+
+' ===================================
+' NOTES
+' ===================================
+note right of PurchaseRequisition
+  **Workflow:**
+  1. draft → Create requisition
+  2. submitted → Send for approval
+  3. approved → Ready to create PO
+  4. ordered → PO created
+  5. rejected → Rejected by approver
+  
+  **Auto-conversion:**
+  Can convert to PO when approved
+end note
+
+note right of PurchaseOrder
+  **Workflow:**
+  1. draft → Creating order
+  2. sent → Sent to supplier
+  3. acknowledged → Supplier confirmed
+  4. received → Goods received
+  5. closed → Fully completed
+  
+  **Partial Receipts:**
+  Track received vs ordered quantities
+end note
+
+note right of Supplier
+  **Rating System:**
+  1.0 - 5.0 stars
+  Based on:
+  - Delivery timeliness
+  - Quality of goods
+  - Pricing
+  - Service
+end note
+
+@enduml

@@ -1,0 +1,137 @@
+@startuml SIMS_User_Management_Class_Diagram
+!theme plain
+title <size:18><b>SIMS - User Management Module</b></size>
+
+skinparam {
+  ClassBackgroundColor #F8F9FA
+  ClassBorderColor #343A40
+  ClassArrowColor #495057
+  DefaultFontSize 13
+}
+
+left to right direction
+skinparam nodesep 40
+skinparam ranksep 50
+
+' ===================================
+' MAIN ENTITIES - Organized Layout
+' ===================================
+package "Core Entities" {
+  class User {
+    + uid: string {PK}
+    --
+    + email: string {unique}
+    + username: string
+    + groupId: string {FK}
+    + department: string
+    + status: enum(active, pending, inactive)
+    + mustChangePassword: boolean
+    + passwordHistory: array
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + login()
+    + logout()
+    + changePassword()
+    + resetPassword()
+  }
+  
+  UserGroup "1" <-- "0..*" User : belongs to
+  Department "1" <-- "0..*" User : works in
+  
+  class UserGroup {
+    + groupId: string {PK}
+    --
+    + name: string
+    + description: string
+    + permissions: map<resourceId, permission>
+    + memberCount: number
+    + status: enum(active, inactive)
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + addPermission()
+    + removePermission()
+    + assignUser()
+  }
+  
+  class Department {
+    + departmentId: string {PK}
+    --
+    + name: string
+    + code: string
+    + description: string
+    + status: enum(Active, Inactive)
+    + createdAt: timestamp
+    + updatedAt: timestamp
+  }
+}
+
+' ===================================
+' EXTERNAL ENTITIES - Grouped
+' ===================================
+package "External Modules" #F0F0F0 {
+  together {
+    class StockTransaction <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+    class MaterialRequestForm <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+    class StockTakeCycle <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+  }
+  
+  together {
+    class PurchaseRequisition <<(E,#FFCC99)>> {
+      Procurement Module
+    }
+    class PurchaseOrder <<(E,#FFCC99)>> {
+      Procurement Module
+    }
+  }
+  
+  class MachineHistory <<(E,#FFCC99)>> {
+    Maintenance Module
+  }
+}
+
+' ===================================
+' RELATIONSHIPS - Cleaner Lines
+' ===================================
+User "1" --> "0..*" StockTransaction : created by
+User "1" --> "0..*" PurchaseRequisition : requested/approved by
+User "1" --> "1..*" MaterialRequestForm : requested/fulfilled by
+User "1" --> "1..*" MachineHistory : performed by
+User "1" --> "1..*" StockTakeCycle : supervised by
+User "1" --> "1..*" PurchaseOrder : created by
+
+' ===================================
+' NOTES - Sidebar Style
+' ===================================
+note as N1
+  <b>User Status:</b>
+  <color:green>■ active</color>: Can log in
+  <color:orange>■ pending</color>: Awaiting approval
+  <color:red>■ inactive</color>: Suspended
+  
+  <b>Role Groups:</b>
+  • A = Admin (Full Access)
+  • S = Storekeeper
+  • P = Procurement Officer
+  • M = Maintenance Technician
+end note
+
+note as N2
+  <b>Permissions Access Levels:</b>
+  <color:red>no_access</color> < 
+  <color:blue>view</color> < 
+  <color:orange>edit</color> < 
+  <color:green>add</color>
+end note
+
+User .. N1
+UserGroup .. N2
+
+@enduml

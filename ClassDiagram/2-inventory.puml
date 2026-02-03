@@ -1,0 +1,147 @@
+@startuml SIMS_Inventory_Class_Diagram
+!theme plain
+title <size:18><b>SIMS - Inventory Module</b></size>
+
+skinparam {
+  ClassBackgroundColor #F8F9FA
+  ClassBorderColor #343A40
+  ClassArrowColor #495057
+  DefaultFontSize 13
+}
+
+left to right direction
+skinparam nodesep 40
+skinparam ranksep 50
+
+' ===================================
+' MAIN ENTITIES - Organized Layout
+' ===================================
+package "Core Entities" {
+  class Part {
+    + partId: string {PK}
+    --
+    + sapNumber: string {unique}
+    + internalRef: string
+    + name: string
+    + category: string
+    + materialGroupId: string {FK}
+    + currentStock: number
+    + safetyLevel: number
+    + reorderQuantity: number
+    + unitCost: decimal
+    + barcode: string {unique}
+    + unit: string
+    + rackNumber: string
+    + rackLevel: enum(A, B, C, D)
+    + description: text
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + updateStock(quantity)
+    + checkStockLevel()
+    + generateBarcode()
+    + isLowStock(): boolean
+  }
+  
+  MaterialGroup "1" <-- "0..*" Part : categorized by
+  StorageLocation "1" <-- "0..*" Part : stored at
+  
+  class MaterialGroup {
+    + groupId: string {PK}
+    --
+    + materialGroup: string
+    + description: string
+    + partCount: number
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + addPart()
+    + removePart()
+  }
+  
+  class StorageLocation {
+    + locationId: string {PK}
+    --
+    + binId: string(4)
+    + materialGroup: string
+    + rackNumber: string(2)
+    + rackLevel: enum(A, B, C, D)
+    + description: string
+    + capacity: number
+    + currentUsage: number
+    + createdAt: timestamp
+    + updatedAt: timestamp
+    --
+    + assignPart()
+    + removePart()
+    + checkCapacity(): boolean
+  }
+}
+
+' ===================================
+' EXTERNAL ENTITIES - Grouped
+' ===================================
+package "External Modules" #F0F0F0 {
+  together {
+    class StockTransaction <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+    class MRFItem <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+    class StockCount <<(E,#FFCC99)>> {
+      Transactions Module
+    }
+  }
+  
+  together {
+    class PurchaseRequisition <<(E,#DDA0DD)>> {
+      Procurement Module
+  
+  class Machine <<(E,#FFB366)>> {
+    Maintenance Module
+  }
+}
+
+' ===================================
+' RELATIONSHIPS - Cleaner Lines
+' ===================================
+Part "1" --> "0..*" StockTransaction : affects
+Part "1" --> "0..*" PurchaseRequisition : requests
+Part "1" --> "1..*" PurchaseOrder : ordered in
+Part "1" --> "1..*" MRFItem : used in
+Part "0..*" <--> "1..*" Machine : critical spares
+Part "1" --> "0..*" StockCount : counted in
+
+StorageLocation "1" --> "0..*" StockTransaction : from/to
+
+' ===================================
+' NOTES - Sidebar Style
+' ===================================
+note as N1
+  <b>Stock Status:</b>
+  <color:green>■ In Stock</color>: currentStock ≥ safetyLevel
+  <color:orange>■ Low Stock</color>: currentStock < safetyLevel
+  <color:red>■ Out of Stock</color>: currentStock = 0
+  
+  <b>Auto-reorder triggered</b>
+  when stock ≤ safetyLevel
+end note
+
+note as N2
+  <b>Location Format:</b>
+  BinID-RackNumber-RackLevel
+  
+  <b>Example:</b> A001-05-B
+  
+  <b>Capacity Check:</b>
+  currentUsage / capacity
+end note
+
+Part .. N1
+StorageLocation .. N2
+
+Part .. N1
+StorageLocation .. N2
+
+@enduml
