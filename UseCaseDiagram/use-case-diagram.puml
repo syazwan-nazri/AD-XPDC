@@ -1,0 +1,124 @@
+@startuml Spare_Parts_Use_Case_Diagram
+left to right direction
+
+skinparam ActorStyle awesome
+skinparam Shadowing false
+skinparam RoundCorner 15
+skinparam ArrowColor #495057
+skinparam UsecaseBackgroundColor #F8F9FA
+skinparam UsecaseBorderColor #343A40
+skinparam ActorBorderColor #343A40
+skinparam ActorFontSize 12
+skinparam UsecaseFontSize 12
+skinparam Padding 10
+skinparam PackagePadding 20
+skinparam RectanglePadding 15
+
+title <size:18><b>SIMS - Main Use Case Diagram</b></size>
+
+actor Admin as Admin_left
+actor Storekeeper as Storekeeper_left
+actor "Procurement Officer" as ProcurementOfficer_left
+
+rectangle "Store Inventory Management System (SIMS)" as SIMS {
+  package "Core Data & User Management" {
+    (Supplier Management CRUD) as UC_SupplierMgmt
+    (Asset/Machine Registry Management CRUD) as UC_AssetMachineRegistry
+    (Storage Locations Management CRUD) as UC_StorageLocations
+    (User Authentication & Authorization RBAC) as UC_RBAC
+    (Spare Part Management CRUD) as UC_SparePartMgmt
+    (Digital Document Storage) as UC_DigitalDocStorage
+  }
+
+  package "Procurement & Replenishment" {
+    (Special Purchase Requisition CRUD) as UC_SpecialPR
+    (Replenishment Quantity) as UC_ReplenishmentQty
+    (Critical Parts Dashboard) as UC_CriticalPartsDashboard
+    (Automated Low-Stock Alerts) as UC_LowStockAlerts
+    (Generate Purchase Requisition Notification) as UC_PRNotification
+  }
+
+  package "Inventory Operations & Tracking" {
+    (Manual Stock Adjustments with Approval) as UC_ManualStockAdjustments
+    (Work Order Part Issuance) as UC_WorkOrderPartIssuance
+    (Real-Time Stock Tracking) as UC_RealTimeStockTracking
+    (Cycle Counting & Physical Stock Audit) as UC_CycleCounting
+    (Purchase Order PO Receiving) as UC_POReceiving
+    (Barcodes Generation on Work Order) as UC_BarcodeGeneration
+  }
+
+  package "Reporting, Analytics & Traceability" {
+    (Dashboard KPIs) as UC_DashboardKPIs
+    (Audit Trail Log) as UC_AuditTrailLog
+    (Stock Level & Valuation Report) as UC_StockLevelValuation
+    (Low Stock & Critical Spares Report) as UC_LowStockCriticalReport
+    (Stock Movement & Usage Report) as UC_StockMovementUsage
+    (Parts & Asset Traceability Report) as UC_PartsAssetTraceability
+  }
+}
+
+actor Admin as Admin_right
+actor Storekeeper as Storekeeper_right
+actor "Procurement Officer" as ProcurementOfficer_right
+actor "Maintenance Technician" as MaintenanceTechnician_right
+
+UC_SupplierMgmt <-- Admin_right
+UC_AssetMachineRegistry <-- Admin_right
+UC_StorageLocations <-- Admin_right
+UC_RBAC <-- Admin_right
+UC_SparePartMgmt <-- Admin_right
+UC_DigitalDocStorage <-- Admin_right
+UC_SpecialPR <-- Admin_right
+UC_ReplenishmentQty <-- Admin_right
+UC_CriticalPartsDashboard <-- Admin_right
+UC_LowStockAlerts <-- Admin_right
+UC_PRNotification <-- Admin_right
+
+Admin_left ---> UC_ManualStockAdjustments
+Admin_left ---> UC_WorkOrderPartIssuance
+Admin_left ---> UC_RealTimeStockTracking
+Admin_left ---> UC_CycleCounting
+Admin_left ---> UC_POReceiving
+Admin_left ---> UC_BarcodeGeneration
+Admin_left ---> UC_DashboardKPIs
+Admin_left ---> UC_AuditTrailLog
+Admin_left ---> UC_StockLevelValuation
+Admin_left ---> UC_LowStockCriticalReport
+Admin_left ---> UC_StockMovementUsage
+Admin_left ---> UC_PartsAssetTraceability
+
+Storekeeper_left --> UC_ManualStockAdjustments
+Storekeeper_left --> UC_WorkOrderPartIssuance
+Storekeeper_left --> UC_RealTimeStockTracking
+Storekeeper_left --> UC_CycleCounting
+Storekeeper_left --> UC_POReceiving
+Storekeeper_left --> UC_BarcodeGeneration
+
+UC_DashboardKPIs <--- Storekeeper_right
+UC_AuditTrailLog <--- Storekeeper_right
+UC_StockLevelValuation <--- Storekeeper_right
+UC_LowStockCriticalReport <--- Storekeeper_right
+UC_StockMovementUsage <--- Storekeeper_right
+UC_PartsAssetTraceability <-- Storekeeper_right
+
+ProcurementOfficer_left --> UC_SupplierMgmt
+ProcurementOfficer_left --> UC_AssetMachineRegistry
+ProcurementOfficer_left --> UC_StorageLocations
+ProcurementOfficer_left --> UC_RBAC
+ProcurementOfficer_left --> UC_SparePartMgmt
+ProcurementOfficer_left --> UC_SpecialPR
+ProcurementOfficer_left --> UC_ReplenishmentQty
+ProcurementOfficer_left --> UC_CriticalPartsDashboard
+ProcurementOfficer_left --> UC_LowStockAlerts
+ProcurementOfficer_left --> UC_PRNotification
+
+UC_DashboardKPIs <-- ProcurementOfficer_right
+UC_StockLevelValuation <-- ProcurementOfficer_right
+UC_LowStockCriticalReport <-- ProcurementOfficer_right
+UC_StockMovementUsage <-- ProcurementOfficer_right
+
+UC_WorkOrderPartIssuance <-- MaintenanceTechnician_right
+UC_StockMovementUsage <-- MaintenanceTechnician_right
+UC_PartsAssetTraceability <-- MaintenanceTechnician_right
+
+@enduml

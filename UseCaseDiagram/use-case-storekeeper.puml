@@ -1,0 +1,81 @@
+@startuml SIMS_Use_Case_Storekeeper
+left to right direction
+
+skinparam ActorStyle awesome
+skinparam Shadowing false
+skinparam RoundCorner 15
+skinparam ArrowColor #495057
+skinparam UsecaseBackgroundColor #F8F9FA
+skinparam UsecaseBorderColor #343A40
+skinparam ActorBorderColor #343A40
+skinparam ActorFontSize 12
+skinparam UsecaseFontSize 12
+
+title <size:18><b>SIMS - Storekeeper Use Case Diagram</b></size>
+
+actor Storekeeper as SK
+
+rectangle "Store Inventory Management System (SIMS)" as SIMS {
+  package "Authentication" {
+    (Login) as UC_Login
+    (Forgot Password) as UC_ForgotPassword
+    (Reset Password) as UC_ResetPassword
+    (Change Password) as UC_ChangePassword
+  }
+
+  package "Inventory" {
+    (Stock In) as UC_StockIn
+    (Stock Out) as UC_StockOut
+    (Internal Transfer) as UC_InternalTransfer
+    (Movement Logs) as UC_MovementLogs
+    (Stock Take) as UC_StockTake
+    (Stock Take Process) as UC_StockTakeProcess
+    (Material Requisition MRF) as UC_MRF
+  }
+
+  package "Master Data" {
+    (Department Master) as UC_DepartmentMaster
+    (Supplier Master) as UC_SupplierMaster
+    (Part Master) as UC_PartMaster
+    (Part Group Master) as UC_PartGroupMaster
+    (Warehouse Master) as UC_WarehouseMaster
+    (Warehouse Locations) as UC_WarehouseLocations
+    (Machine Master) as UC_MachineMaster
+  }
+
+  package "Reports" {
+    (Dashboard KPIs) as UC_Dashboard
+    (Stock Inquiry Report) as UC_StockInquiry
+    (Stock Valuation Report) as UC_StockValuation
+    (Movement History Report) as UC_MovementHistory
+    (Low Stock Report) as UC_LowStock
+  }
+}
+
+SK --> UC_Login
+SK --> UC_ChangePassword
+SK --> UC_DepartmentMaster
+SK --> UC_SupplierMaster
+SK --> UC_PartMaster
+SK --> UC_PartGroupMaster
+SK --> UC_WarehouseMaster
+SK --> UC_WarehouseLocations
+SK --> UC_MachineMaster
+SK --> UC_StockIn
+SK --> UC_StockOut
+SK --> UC_InternalTransfer
+SK --> UC_MovementLogs
+SK --> UC_StockTake
+SK --> UC_StockTakeProcess
+SK --> UC_MRF
+SK --> UC_Dashboard
+SK --> UC_StockInquiry
+SK --> UC_StockValuation
+SK --> UC_MovementHistory
+SK --> UC_LowStock
+
+UC_Login .> UC_ForgotPassword : <<extend>>
+UC_Login .> UC_ResetPassword : <<extend>>
+UC_StockTake .> UC_StockTakeProcess : <<include>>
+
+@enduml
