@@ -11,9 +11,9 @@ skinparam ActorBorderColor #343A40
 skinparam ActorFontSize 12
 skinparam UsecaseFontSize 12
 
-title <size:18><b>SIMS - Maintenance Technician Use Case Diagram</b></size>
+title <size:18><b>Maintenance Technician Use Case Diagram</b></size>
 
-actor "Maintenance Technician" as MT
+actor "Maintenance Technician" as MT_left
 
 rectangle "Store Inventory Management System (SIMS)" as SIMS {
   package "Authentication" {
@@ -53,25 +53,28 @@ rectangle "Store Inventory Management System (SIMS)" as SIMS {
   }
 }
 
-MT --> UC_Login
-MT --> UC_ChangePassword
-MT --> UC_PartMaster
-MT --> UC_PartGroupMaster
-MT --> UC_SupplierMaster
-MT --> UC_WarehouseMaster
-MT --> UC_WarehouseLocations
-MT --> UC_MachineMaster
-MT --> UC_StockIn
-MT --> UC_StockOut
-MT --> UC_InternalTransfer
-MT --> UC_MovementLogs
-MT --> UC_StockTake
-MT --> UC_MRF
-MT --> UC_PurchaseRequisition
-MT --> UC_Dashboard
-MT --> UC_StockInquiry
-MT --> UC_MovementHistory
-MT --> UC_LowStock
+actor "Maintenance Technician" as MT_right
+
+MT_left --> UC_Login
+MT_left --> UC_ChangePassword
+MT_left --> UC_PartMaster
+MT_left --> UC_PartGroupMaster
+MT_left --> UC_SupplierMaster
+MT_left --> UC_WarehouseMaster
+MT_left --> UC_WarehouseLocations
+MT_left --> UC_MachineMaster
+
+UC_StockIn <-- MT_right
+UC_StockOut <-- MT_right
+UC_InternalTransfer <-- MT_right
+UC_MovementLogs <-- MT_right
+UC_StockTake <-- MT_right
+UC_MRF <-- MT_right
+UC_PurchaseRequisition <-- MT_right
+UC_Dashboard <-- MT_right
+UC_StockInquiry <-- MT_right
+UC_MovementHistory <-- MT_right
+UC_LowStock <-- MT_right
 
 UC_Login .> UC_ForgotPassword : <<extend>>
 UC_Login .> UC_ResetPassword : <<extend>>

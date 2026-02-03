@@ -11,9 +11,9 @@ skinparam ActorBorderColor #343A40
 skinparam ActorFontSize 12
 skinparam UsecaseFontSize 12
 
-title <size:18><b>SIMS - Procurement Officer Use Case Diagram</b></size>
+title <size:18><b>Procurement Officer Use Case Diagram</b></size>
 
-actor "Procurement Officer" as PO
+actor "Procurement Officer" as PO_left
 
 rectangle "Store Inventory Management System (SIMS)" as SIMS {
   package "Authentication" {
@@ -54,26 +54,30 @@ rectangle "Store Inventory Management System (SIMS)" as SIMS {
   }
 }
 
-PO --> UC_Login
-PO --> UC_ChangePassword
-PO --> UC_PartMaster
-PO --> UC_PartGroupMaster
-PO --> UC_SupplierMaster
-PO --> UC_WarehouseMaster
-PO --> UC_WarehouseLocations
-PO --> UC_MachineMaster
-PO --> UC_StockIn
-PO --> UC_StockOut
-PO --> UC_InternalTransfer
-PO --> UC_MovementLogs
-PO --> UC_StockTake
-PO --> UC_MRF
-PO --> UC_PurchaseRequisition
-PO --> UC_Dashboard
-PO --> UC_StockInquiry
-PO --> UC_StockValuation
-PO --> UC_MovementHistory
-PO --> UC_LowStock
+actor "Procurement Officer" as PO_right
+
+PO_left --> UC_Login
+PO_left --> UC_ChangePassword
+PO_left --> UC_PartMaster
+PO_left --> UC_PartGroupMaster
+PO_left --> UC_SupplierMaster
+PO_left --> UC_WarehouseMaster
+PO_left --> UC_WarehouseLocations
+PO_left --> UC_MachineMaster
+
+UC_StockIn <-- PO_right
+UC_StockOut <-- PO_right
+UC_InternalTransfer <-- PO_right
+UC_MovementLogs <-- PO_right
+UC_StockTake <-- PO_right
+UC_MRF <-- PO_right
+
+UC_PurchaseRequisition <-- PO_right
+UC_Dashboard <-- PO_right
+UC_StockInquiry <-- PO_right
+UC_StockValuation <-- PO_right
+UC_MovementHistory <-- PO_right
+UC_LowStock <-- PO_right
 
 UC_Login .> UC_ForgotPassword : <<extend>>
 UC_Login .> UC_ResetPassword : <<extend>>

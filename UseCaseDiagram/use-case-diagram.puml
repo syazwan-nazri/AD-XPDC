@@ -14,7 +14,7 @@ skinparam Padding 10
 skinparam PackagePadding 20
 skinparam RectanglePadding 15
 
-title <size:18><b>SIMS - Main Use Case Diagram</b></size>
+title <size:18><b>Main Use Case Diagram</b></size>
 
 actor Admin as Admin_left
 actor Storekeeper as Storekeeper_left
@@ -94,11 +94,11 @@ Storekeeper_left --> UC_CycleCounting
 Storekeeper_left --> UC_POReceiving
 Storekeeper_left --> UC_BarcodeGeneration
 
-UC_DashboardKPIs <--- Storekeeper_right
-UC_AuditTrailLog <--- Storekeeper_right
-UC_StockLevelValuation <--- Storekeeper_right
-UC_LowStockCriticalReport <--- Storekeeper_right
-UC_StockMovementUsage <--- Storekeeper_right
+UC_DashboardKPIs <-- Storekeeper_right
+UC_AuditTrailLog <-- Storekeeper_right
+UC_StockLevelValuation <-- Storekeeper_right
+UC_LowStockCriticalReport <-- Storekeeper_right
+UC_StockMovementUsage <-- Storekeeper_right
 UC_PartsAssetTraceability <-- Storekeeper_right
 
 ProcurementOfficer_left --> UC_SupplierMgmt
@@ -112,13 +112,13 @@ ProcurementOfficer_left --> UC_CriticalPartsDashboard
 ProcurementOfficer_left --> UC_LowStockAlerts
 ProcurementOfficer_left --> UC_PRNotification
 
-UC_DashboardKPIs <-- ProcurementOfficer_right
-UC_StockLevelValuation <-- ProcurementOfficer_right
-UC_LowStockCriticalReport <-- ProcurementOfficer_right
-UC_StockMovementUsage <-- ProcurementOfficer_right
+UC_DashboardKPIs <--- ProcurementOfficer_right
+UC_StockLevelValuation <--- ProcurementOfficer_right
+UC_LowStockCriticalReport <--- ProcurementOfficer_right
+UC_StockMovementUsage <--- ProcurementOfficer_right
 
 UC_WorkOrderPartIssuance <-- MaintenanceTechnician_right
-UC_StockMovementUsage <-- MaintenanceTechnician_right
+UC_StockMovementUsage <--- MaintenanceTechnician_right
 UC_PartsAssetTraceability <-- MaintenanceTechnician_right
 
 @enduml

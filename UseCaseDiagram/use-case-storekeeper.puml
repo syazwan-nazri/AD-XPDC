@@ -11,9 +11,9 @@ skinparam ActorBorderColor #343A40
 skinparam ActorFontSize 12
 skinparam UsecaseFontSize 12
 
-title <size:18><b>SIMS - Storekeeper Use Case Diagram</b></size>
+title <size:18><b>Storekeeper Use Case Diagram</b></size>
 
-actor Storekeeper as SK
+actor Storekeeper as SK_left
 
 rectangle "Store Inventory Management System (SIMS)" as SIMS {
   package "Authentication" {
@@ -21,16 +21,6 @@ rectangle "Store Inventory Management System (SIMS)" as SIMS {
     (Forgot Password) as UC_ForgotPassword
     (Reset Password) as UC_ResetPassword
     (Change Password) as UC_ChangePassword
-  }
-
-  package "Inventory" {
-    (Stock In) as UC_StockIn
-    (Stock Out) as UC_StockOut
-    (Internal Transfer) as UC_InternalTransfer
-    (Movement Logs) as UC_MovementLogs
-    (Stock Take) as UC_StockTake
-    (Stock Take Process) as UC_StockTakeProcess
-    (Material Requisition MRF) as UC_MRF
   }
 
   package "Master Data" {
@@ -43,6 +33,16 @@ rectangle "Store Inventory Management System (SIMS)" as SIMS {
     (Machine Master) as UC_MachineMaster
   }
 
+  package "Inventory" {
+    (Stock In) as UC_StockIn
+    (Stock Out) as UC_StockOut
+    (Internal Transfer) as UC_InternalTransfer
+    (Movement Logs) as UC_MovementLogs
+    (Stock Take) as UC_StockTake
+    (Stock Take Process) as UC_StockTakeProcess
+    (Material Requisition MRF) as UC_MRF
+  }
+
   package "Reports" {
     (Dashboard KPIs) as UC_Dashboard
     (Stock Inquiry Report) as UC_StockInquiry
@@ -52,27 +52,30 @@ rectangle "Store Inventory Management System (SIMS)" as SIMS {
   }
 }
 
-SK --> UC_Login
-SK --> UC_ChangePassword
-SK --> UC_DepartmentMaster
-SK --> UC_SupplierMaster
-SK --> UC_PartMaster
-SK --> UC_PartGroupMaster
-SK --> UC_WarehouseMaster
-SK --> UC_WarehouseLocations
-SK --> UC_MachineMaster
-SK --> UC_StockIn
-SK --> UC_StockOut
-SK --> UC_InternalTransfer
-SK --> UC_MovementLogs
-SK --> UC_StockTake
-SK --> UC_StockTakeProcess
-SK --> UC_MRF
-SK --> UC_Dashboard
-SK --> UC_StockInquiry
-SK --> UC_StockValuation
-SK --> UC_MovementHistory
-SK --> UC_LowStock
+actor Storekeeper as SK_right
+
+SK_left --> UC_Login
+SK_left --> UC_ChangePassword
+SK_left --> UC_DepartmentMaster
+SK_left --> UC_SupplierMaster
+SK_left --> UC_PartMaster
+SK_left --> UC_PartGroupMaster
+SK_left --> UC_WarehouseMaster
+SK_left --> UC_WarehouseLocations
+SK_left --> UC_MachineMaster
+
+UC_StockIn <-- SK_right
+UC_StockOut <-- SK_right
+UC_InternalTransfer <-- SK_right
+UC_MovementLogs <-- SK_right
+UC_StockTake <-- SK_right
+UC_StockTakeProcess <-- SK_right
+UC_MRF <-- SK_right
+UC_Dashboard <-- SK_right
+UC_StockInquiry <-- SK_right
+UC_StockValuation <-- SK_right
+UC_MovementHistory <-- SK_right
+UC_LowStock <-- SK_right
 
 UC_Login .> UC_ForgotPassword : <<extend>>
 UC_Login .> UC_ResetPassword : <<extend>>

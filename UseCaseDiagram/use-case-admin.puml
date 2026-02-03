@@ -11,7 +11,7 @@ skinparam ActorBorderColor #343A40
 skinparam ActorFontSize 12
 skinparam UsecaseFontSize 12
 
-title <size:18><b>SIMS - Admin Use Case Diagram</b></size>
+title <size:18><b>Admin Use Case Diagram</b></size>
 
 actor "Admin" as A_left
 
