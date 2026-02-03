@@ -1,8 +1,14 @@
 # Software Requirements Specification (SRS)
 
 **Project:** Store Inventory Management System (SIMS)  
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Date:** February 3, 2026  
+
+**Revision History**
+| Version | Date | Notes |
+|---------|------|-------|
+| 1.0 | 2026-02-03 | Initial SRS draft |
+| 1.1 | 2026-02-03 | Documentation alignment and reference updates |
 
 ---
 
@@ -23,10 +29,10 @@ SIMS provides centralized inventory management with real-time stock tracking, ba
 - **KPI**: Key Performance Indicator
 
 ### 1.4 References
-- Project overview and features: [README.md](README.md)
-- Documentation index: [SRC/DOCUMENTATION_INDEX.md](SRC/DOCUMENTATION_INDEX.md)
-- Completion summary: [SRC/COMPLETION_REPORT.md](SRC/COMPLETION_REPORT.md)
-- Quick reference: [SRC/QUICK_REFERENCE.md](SRC/QUICK_REFERENCE.md)
+- Project overview and features: [README.md](../README.md)
+- Documentation index: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+- Completion summary: [COMPLETION_REPORT.md](COMPLETION_REPORT.md)
+- Quick reference: [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
 
 ### 1.5 Overview
 This SRS defines functional and non-functional requirements, system features, user roles, interfaces, data requirements, and constraints.
@@ -63,9 +69,9 @@ SIMS is a full-stack web application built with React and Firebase. It uses Fire
 - RBAC permissions enforced in UI routing and component access
 
 ### 2.6 User Documentation
-- Developer guide: [SRC/QUICK_REFERENCE.md](SRC/QUICK_REFERENCE.md)
-- Technical design: [SRC/INTEGRATION_SUMMARY.md](SRC/INTEGRATION_SUMMARY.md)
-- Testing procedures: [SRC/TESTING_GUIDE.md](SRC/TESTING_GUIDE.md)
+- Developer guide: [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- Technical design: [INTEGRATION_SUMMARY.md](INTEGRATION_SUMMARY.md)
+- Testing procedures: [TESTING_GUIDE.md](TESTING_GUIDE.md)
 
 ### 2.7 Assumptions and Dependencies
 - Organization provides a Firebase project with required services enabled
@@ -225,6 +231,6 @@ SIMS is a full-stack web application built with React and Firebase. It uses Fire
 - **Maintenance (M):** Maintenance and asset management
 
 ### 8.2 Related Documents
-- [SRC/COMPLETION_REPORT.md](SRC/COMPLETION_REPORT.md)
-- [SRC/INTEGRATION_SUMMARY.md](SRC/INTEGRATION_SUMMARY.md)
-- [SRC/TESTING_GUIDE.md](SRC/TESTING_GUIDE.md)
+- [COMPLETION_REPORT.md](COMPLETION_REPORT.md)
+- [INTEGRATION_SUMMARY.md](INTEGRATION_SUMMARY.md)
+- [TESTING_GUIDE.md](TESTING_GUIDE.md)
