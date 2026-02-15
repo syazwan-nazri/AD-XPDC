@@ -23,12 +23,12 @@
 
 ## Document Approval
 
-| Role                  | Name               | Signature          | Date         |
-| --------------------- | ------------------ | ------------------ | ------------ |
-| Project Manager       | Ammar Ibrahim      | ********\_******** | ****\_\_**** |
-| Technical Lead        | Ammar Ibrahim      | ********\_******** | ****\_\_**** |
-| Quality Assurance     | Development Team   | ********\_******** | ****\_\_**** |
-| Client Representative | ********\_******** | ********\_******** | ****\_\_**** |
+| Role                  | Name                       | Signature                  | Date             |
+| --------------------- | -------------------------- | -------------------------- | ---------------- |
+| Project Manager       | Ammar Ibrahim              | **\*\*\*\***\_**\*\*\*\*** | \***\*\_\_\*\*** |
+| Technical Lead        | Ammar Ibrahim              | **\*\*\*\***\_**\*\*\*\*** | \***\*\_\_\*\*** |
+| Quality Assurance     | Development Team           | **\*\*\*\***\_**\*\*\*\*** | \***\*\_\_\*\*** |
+| Client Representative | **\*\*\*\***\_**\*\*\*\*** | **\*\*\*\***\_**\*\*\*\*** | \***\*\_\_\*\*** |
 
 ---
 
@@ -329,7 +329,41 @@ SIMS is designed to operate independently without dependencies on external enter
 
 ### 2.2 System Context
 
-[Insert System Context Diagram Here]
+```plantuml
+@startuml
+left to right direction
+skinparam rectangle {
+  BackgroundColor #F8F9FB
+  BorderColor #3B4B63
+}
+actor Admin
+actor Storekeeper
+actor "Procurement Officer" as PO
+actor "Maintenance Technician" as MT
+node "Web Browsers" as WB
+node "Barcode Scanners" as BS
+rectangle "SIMS\n(Store Inventory Management System)" as SIMS
+cloud "Firebase Services" as FB
+component "Firebase Auth" as FA
+database "Firestore" as FS
+component "Firebase Hosting" as FH
+rectangle "Future Integrations\n(ERP, Email)" as EXT
+
+Admin --> WB
+Storekeeper --> WB
+PO --> WB
+MT --> WB
+BS --> WB
+WB --> SIMS
+SIMS --> FA
+SIMS --> FS
+SIMS --> FH
+EXT ..> SIMS : Future
+FB .. FA
+FB .. FS
+FB .. FH
+@enduml
+```
 
 **Description**: The system context diagram should illustrate SIMS at the center, surrounded by:
 
@@ -358,7 +392,7 @@ SIMS provides seven major feature categories, each addressing specific operation
 
 **Feature Category 1: Authentication and Access Control**
 
-- User registration with email verification and admin approval workflow
+- Admin-only user account creation with system-generated passwords
 - Secure login with password recovery capabilities
 - Role-based access control (RBAC) limiting feature access by user group
 - Session management with automatic timeout for security
@@ -416,7 +450,7 @@ SIMS provides seven major feature categories, each addressing specific operation
 **Feature Category 7: User and Group Management (Admin Only)**
 
 - User CRUD Operations: Create, view, update, and delete user accounts
-- User Approval: Activate newly registered users after verification
+- User Creation: Create new user accounts with system-generated passwords
 - Group Management: Define roles and assign granular permissions
 - Permission Configuration: Set feature access rights per user group
 - User Activity Monitoring: Track login history and system usage
@@ -865,24 +899,45 @@ The authentication and authorization system provides secure user access control,
 
 **Use Cases:**
 
-**UC-3.1.1: User Registration**
+**UC-3.1.1: Admin Creates User Account**
 
-- Actor: New User
-- Precondition: User has valid email address
+- Actor: Administrator
+- Precondition: Admin is logged in with user management permissions
 - Main Flow:
-  1. User navigates to registration page
-  2. User enters email, username, password, and selects user group
-  3. System validates input data
-  4. System creates user account with "Pending" status
-  5. System sends confirmation message
-  6. Admin receives notification for approval
-- Postcondition: User account created, awaiting admin approval
+  1. Admin navigates to User Management page
+  2. Admin clicks "Create New User" button
+  3. Admin enters email, username, and selects user group
+  4. System validates input data
+  5. System generates secure random password
+  6. System creates user account with "Active" status
+  7. System displays generated password to admin
+  8. Admin can copy password or send via email to new user
+- Postcondition: User account created and ready for login
 - Alternative Flows:
   - Email already exists: System displays error message
-  - Weak password: System prompts for stronger password
   - Invalid data: System highlights validation errors
 
-[Insert Use Case Diagram for Authentication System Here]
+```plantuml
+@startuml
+left to right direction
+actor "User" as User
+actor Admin
+
+rectangle "Authentication System" {
+  usecase "Login" as UC_Login
+  usecase "Reset Password" as UC_Reset
+  usecase "Create User Account" as UC_Create
+  usecase "Manage Users" as UC_Manage
+  usecase "Generate Password" as UC_GenPass
+}
+
+User --> UC_Login
+User --> UC_Reset
+Admin --> UC_Create
+Admin --> UC_Manage
+UC_Create ..> UC_GenPass : <<include>>
+@enduml
+```
 
 **UC-3.1.2: User Login**
 
@@ -914,17 +969,20 @@ The authentication and authorization system provides secure user access control,
 
 **Functional Requirements:**
 
-**FR-3.1.1**: The system SHALL allow users to register with email, username, password, and user group selection.
+**FR-3.1.1**: The system SHALL allow only administrators to create new user accounts with system-generated passwords.
 
-- Input Validation: Email format, username 3-50 characters, password minimum 8 characters
-- Password Requirements: Minimum 8 characters, at least one uppercase, one lowercase, one number
+- Input Required: Email, username, user group selection (password auto-generated)
+- Input Validation: Email format, username 3-50 characters
+- Password Generation: System generates secure random password (12 characters, mixed case, numbers, special characters)
 - Duplicate Check: Email and username must be unique
+- Password Display: Show generated password to admin with copy-to-clipboard option
+- Email Option: Admin can send generated password to user via email
 
-**FR-3.1.2**: The system SHALL set newly registered user status to "Pending" requiring admin approval before login.
+**FR-3.1.2**: The system SHALL set newly created user status to "Active" allowing immediate login.
 
-- Status Values: Pending, Active, Inactive
-- Default Status: Pending
-- Approval Authority: Admin role only
+- Status Values: Active, Inactive
+- Default Status: Active
+- Account Creation Authority: Admin role only
 
 **FR-3.1.3**: The system SHALL provide secure login functionality with email and password authentication.
 
@@ -947,7 +1005,7 @@ The authentication and authorization system provides secure user access control,
 **FR-3.1.6**: The system SHALL allow users to change their password while logged in.
 
 - Current Password: Required for verification
-- New Password: Same complexity requirements as registration
+- New Password: Minimum 8 characters with complexity requirements
 - Confirmation: User notified of successful change
 
 **FR-3.1.7**: The system SHALL maintain user session state across page refreshes.
@@ -964,9 +1022,10 @@ The authentication and authorization system provides secure user access control,
 
 **Acceptance Criteria:**
 
-- ✓ User can register with all required fields validated
-- ✓ Newly registered user cannot login until admin approves
-- ✓ Approved user can login with correct credentials
+- ✓ Admin can create user accounts with all required fields validated
+- ✓ System generates secure random password for new accounts
+- ✓ Admin can copy generated password or send it via email
+- ✓ Newly created user can login immediately with generated password
 - ✓ Login fails with incorrect credentials showing appropriate message
 - ✓ User receives password reset email within 2 minutes
 - ✓ User can change password while logged in
@@ -997,17 +1056,43 @@ The user and group management system enables administrators to create, configure
   4. Admin can perform CRUD operations on users
   5. System updates user records and logs changes
 
-[Insert Use Case Diagram for User Management Here]
+```plantuml
+@startuml
+left to right direction
+actor Admin
 
-**UC-3.2.2: Approve Pending Users**
+rectangle "User Management" {
+  usecase "View Users" as UC_View
+  usecase "Search/Filter" as UC_Search
+  usecase "Create User" as UC_Create
+  usecase "Edit User" as UC_Edit
+  usecase "Deactivate/Reactivate" as UC_Status
+  usecase "Approve Pending" as UC_Approve
+  usecase "Manage Groups" as UC_Groups
+  usecase "Configure Permissions" as UC_Perms
+}
+
+Admin --> UC_View
+Admin --> UC_Search
+Admin --> UC_Create
+Admin --> UC_Edit
+Admin --> UC_Status
+Admin --> UC_Approve
+Admin --> UC_Groups
+Admin --> UC_Perms
+UC_Groups ..> UC_Perms : <<include>>
+@enduml
+```
+
+**UC-3.2.2: Activate/Deactivate Users**
 
 - Actor: Administrator
 - Main Flow:
-  1. Admin views pending user requests
-  2. Admin reviews user details
-  3. Admin approves or rejects registration
-  4. System updates user status
-  5. User receives notification of decision
+  1. Admin views user list
+  2. Admin selects user to activate or deactivate
+  3. Admin changes user status
+  4. System updates user status immediately
+  5. User's access is granted or revoked accordingly
 
 **UC-3.2.3: Manage User Groups**
 
@@ -1028,11 +1113,12 @@ The user and group management system enables administrators to create, configure
 - Filter Options: By status (Active/Pending/Inactive), by group
 - Pagination: 20 users per page (configurable)
 
-**FR-3.2.2**: The system SHALL allow administrators to create new user accounts manually.
+**FR-3.2.2**: The system SHALL allow administrators to create new user accounts with system-generated passwords.
 
-- Required Fields: Email, username, password, group assignment
+- Required Fields: Email, username, group assignment (password auto-generated)
 - Optional Fields: Department, phone, notes
-- Validation: Same rules as self-registration
+- Password Display: Show generated password with copy and email options
+- Validation: Email format, username uniqueness
 
 **FR-3.2.3**: The system SHALL allow administrators to edit existing user information.
 
@@ -1087,9 +1173,9 @@ The user and group management system enables administrators to create, configure
 - ✓ Admin can view paginated list of all users
 - ✓ Admin can search users by username or email
 - ✓ Admin can filter users by status and group
-- ✓ Admin can create new user accounts
+- ✓ Admin can create new user accounts with system-generated passwords
+- ✓ Admin can copy generated password or send it via email
 - ✓ Admin can edit user details except email
-- ✓ Admin can approve pending user registrations
 - ✓ Admin can deactivate/reactivate users
 - ✓ Admin can reassign users to different groups
 - ✓ Admin can create and configure user groups
@@ -1121,7 +1207,32 @@ Master data management provides centralized maintenance of reference data used t
   5. System generates unique part barcode
   6. System saves part record
 
-[Insert Use Case Diagram for Master Data Management Here]
+```plantuml
+@startuml
+left to right direction
+actor Admin
+actor "Storekeeper (Read)" as Storekeeper
+
+rectangle "Master Data Management" {
+  usecase "Manage Parts" as UC_Parts
+  usecase "Manage Suppliers" as UC_Suppliers
+  usecase "Manage Locations" as UC_Locations
+  usecase "Manage Assets" as UC_Assets
+  usecase "Manage Departments" as UC_Departments
+  usecase "Import/Export" as UC_Import
+  usecase "View Master Data" as UC_View
+}
+
+Admin --> UC_Parts
+Admin --> UC_Suppliers
+Admin --> UC_Locations
+Admin --> UC_Assets
+Admin --> UC_Departments
+Admin --> UC_Import
+Storekeeper --> UC_View
+UC_View ..> UC_Parts : <<include>>
+@enduml
+```
 
 **Functional Requirements:**
 
@@ -1226,7 +1337,26 @@ Inventory operations management handles all transactions that affect inventory q
   7. System confirms transaction
 - Postcondition: Inventory increased, audit trail created
 
-[Insert Sequence Diagram for Stock In Operation Here]
+```plantuml
+@startuml
+actor Storekeeper
+participant "Stock In Form" as Form
+participant "Redux Store" as Store
+participant "Firestore" as FS
+database "Inventory" as Inv
+database "Movement Log" as Log
+
+Storekeeper -> Form : Enter GRN, scan barcode
+Form -> Form : Validate input
+Form -> Store : Dispatch stockIn()
+Store -> FS : Run transaction
+FS -> Inv : Update quantities
+FS -> Log : Create movement entry
+FS --> Store : Success
+Store --> Form : Update UI
+Form --> Storekeeper : Confirmation
+@enduml
+```
 
 **UC-3.4.2: Stock Out Operation**
 
@@ -1403,7 +1533,23 @@ The procurement management system streamlines the purchasing process from requis
   6. System routes through approval workflow
   7. Approved PR converts to PO
 
-[Insert Workflow Diagram for Procurement Process Here]
+```plantuml
+@startuml
+start
+:Identify replenishment need;
+:Create Purchase Requisition (PR);
+:Submit PR for approval;
+if (Approved?) then (Yes)
+  :Create Purchase Order (PO);
+  :Send PO to Supplier;
+  :Receive items & record GRN;
+  :Close PO;
+else (No)
+  :Reject or return for revision;
+endif
+stop
+@enduml
+```
 
 **UC-3.5.2: Create Purchase Order**
 
@@ -1747,7 +1893,20 @@ The SIMS user interface follows modern web application design principles with re
 - **Error Messages**: Clear, specific, and actionable
 - **Color Contrast**: Meets WCAG 2.0 Level AA standards (target)
 
-[Insert UI Mockup Screens Here]
+```plantuml
+@startuml
+salt
+{
+{T SIMS UI Mockup Overview}
+{+
+  [Login Screen]
+  [Dashboard]
+  [Data Table Page]
+  [Form Entry Modal]
+}
+}
+@enduml
+```
 
 - Login screen mockup
 - Dashboard mockup
@@ -1756,7 +1915,7 @@ The SIMS user interface follows modern web application design principles with re
 
 **Key Screens:**
 
-1. **Login Screen**: Email and password fields, "Forgot Password" link, "Register" link
+1. **Login Screen**: Email and password fields, "Forgot Password" link
 2. **Dashboard**: KPI cards, recent activity widgets, quick action buttons, alerts panel
 3. **Master Data Screens**: List view with CRUD buttons, search bar, filter dropdowns
 4. **Transaction Screens**: Form with part selection, barcode scan field, quantity input, location selector
@@ -1869,7 +2028,35 @@ The SIMS user interface follows modern web application design principles with re
 
 SIMS follows a three-tier architecture with clear separation of concerns:
 
-[Insert System Architecture Diagram Here]
+```plantuml
+@startuml
+left to right direction
+skinparam componentStyle rectangle
+
+package "Presentation Tier" {
+  node "Web Browser" as Browser
+  component "React SPA" as SPA
+}
+
+package "Application Logic (Client)" {
+  component "Redux Store" as Redux
+  component "Business Logic" as Logic
+}
+
+package "Data Tier (Backend)" {
+  component "Firebase Auth" as Auth
+  database "Cloud Firestore" as DB
+  component "Firebase Hosting" as Hosting
+}
+
+Browser --> SPA
+SPA --> Redux
+SPA --> Logic
+Logic --> Auth
+Logic --> DB
+SPA --> Hosting
+@enduml
+```
 
 **Presentation Tier (Client):**
 
@@ -1953,7 +2140,53 @@ SIMS follows a three-tier architecture with clear separation of concerns:
 
 Firestore organizes data into collections and documents. Each document contains fields (key-value pairs) and may reference other documents.
 
-[Insert Entity Relationship Diagram Here]
+```plantuml
+@startuml
+hide methods
+hide stereotypes
+skinparam classAttributeIconSize 0
+
+class User {
+  userId
+  email
+  username
+  groupId
+}
+class Group {
+  groupId
+  name
+}
+class Part {
+  partId
+  partNumber
+  description
+}
+class Supplier {
+  supplierId
+  name
+}
+class Location {
+  locationId
+  name
+}
+class Inventory {
+  inventoryId
+  quantity
+}
+class Movement {
+  movementId
+  type
+  qty
+}
+
+User "1" -- "1" Group : belongs to
+Supplier "1" -- "*" Part : supplies
+Part "1" -- "*" Inventory : stored as
+Location "1" -- "*" Inventory : contains
+Part "1" -- "*" Movement : referenced
+User "1" -- "*" Movement : created by
+@enduml
+```
 
 **Key Collections:**
 
@@ -2107,7 +2340,44 @@ Rules enforce access control at database level:
 
 **Frontend Component Hierarchy:**
 
-[Insert Component Diagram Here]
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+
+component App
+component AuthProvider
+component "Redux Store Provider" as StoreProvider
+component Router
+component ProtectedRoute
+component PublicRoute
+component Navbar
+component Sidebar
+component "Dashboard" as Dashboard
+component "Master Data Pages" as MasterData
+component "Inventory Pages" as InventoryPages
+component "Procurement Pages" as ProcurementPages
+component "Maintenance Pages" as MaintenancePages
+component "Reports Pages" as ReportsPages
+component Login
+component PasswordReset
+
+App --> AuthProvider
+App --> StoreProvider
+App --> Router
+Router --> ProtectedRoute
+Router --> PublicRoute
+ProtectedRoute --> Navbar
+ProtectedRoute --> Sidebar
+ProtectedRoute --> Dashboard
+ProtectedRoute --> MasterData
+ProtectedRoute --> InventoryPages
+ProtectedRoute --> ProcurementPages
+ProtectedRoute --> MaintenancePages
+ProtectedRoute --> ReportsPages
+PublicRoute --> Login
+PublicRoute --> PasswordReset
+@enduml
+```
 
 **Top-Level Structure:**
 
@@ -2128,7 +2398,6 @@ App
     │       └── Reports Pages
     └── PublicRoute (No authentication required)
         ├── Login
-        ├── Register
         └── PasswordReset
 ```
 
@@ -2579,19 +2848,89 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ### Appendix A: Use Case Diagrams
 
-[Insert Use Case Diagram - Authentication System]
+```plantuml
+@startuml
+left to right direction
+actor "User" as User
+actor Admin
 
-**Description**: Shows actors (New User, Registered User, Admin) and use cases (Register, Login, Reset Password, Approve User, Manage Users) with relationships (includes, extends).
+rectangle "Authentication" {
+  usecase "Login" as UC_Login
+  usecase "Reset Password" as UC_Reset
+  usecase "Create User Account" as UC_Create
+  usecase "Manage Users" as UC_Manage
+  usecase "Generate Password" as UC_GenPass
+}
+
+User --> UC_Login
+User --> UC_Reset
+Admin --> UC_Create
+Admin --> UC_Manage
+UC_Create ..> UC_GenPass : <<include>>
+@enduml
+```
+
+**Description**: Shows actors (User, Admin) and use cases (Login, Reset Password, Create User Account, Manage Users, Generate Password) with relationships. Admin creates accounts with system-generated passwords.
 
 ---
 
-[Insert Use Case Diagram - Inventory Operations]
+```plantuml
+@startuml
+left to right direction
+actor Storekeeper
+
+rectangle "Inventory Operations" {
+  usecase "Stock In" as UC_In
+  usecase "Stock Out" as UC_Out
+  usecase "Internal Transfer" as UC_Transfer
+  usecase "Stock Adjustment" as UC_Adjust
+  usecase "Stock Take" as UC_Take
+  usecase "Validate Stock" as UC_Validate
+  usecase "Create Movement Log" as UC_Log
+}
+
+Storekeeper --> UC_In
+Storekeeper --> UC_Out
+Storekeeper --> UC_Transfer
+Storekeeper --> UC_Adjust
+Storekeeper --> UC_Take
+UC_In ..> UC_Validate : <<include>>
+UC_Out ..> UC_Validate : <<include>>
+UC_Transfer ..> UC_Validate : <<include>>
+UC_In ..> UC_Log : <<include>>
+UC_Out ..> UC_Log : <<include>>
+UC_Transfer ..> UC_Log : <<include>>
+UC_Adjust ..> UC_Log : <<include>>
+@enduml
+```
 
 **Description**: Shows Storekeeper actor interacting with use cases: Stock In, Stock Out, Internal Transfer, Stock Adjustment, Stock Take, with includes relationships to Validate Stock, Create Movement Log.
 
 ---
 
-[Insert Use Case Diagram - Procurement Workflow]
+```plantuml
+@startuml
+left to right direction
+actor Storekeeper
+actor "Procurement Officer" as PO
+actor Approver
+
+rectangle "Procurement Workflow" {
+  usecase "Create Requisition" as UC_PR
+  usecase "Approve Requisition" as UC_Approve
+  usecase "Create Purchase Order" as UC_PO
+  usecase "Track PO" as UC_Track
+}
+
+Storekeeper --> UC_PR
+PO --> UC_PR
+Approver --> UC_Approve
+PO --> UC_PO
+PO --> UC_Track
+UC_PR ..> UC_Approve : <<include>>
+UC_Approve ..> UC_PO : <<include>>
+@enduml
+```
 
 **Description**: Shows actors (Storekeeper, Procurement Officer, Approver) and use cases (Create Requisition, Approve Requisition, Create Purchase Order, Track PO) with workflow relationships.
 
@@ -2599,13 +2938,54 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ### Appendix B: Data Flow Diagrams
 
-[Insert Level 0 DFD - System Context]
+```plantuml
+@startuml
+left to right direction
+rectangle "Users" as Users
+rectangle "SIMS" as SIMS
+rectangle "Firebase Services" as Firebase
+
+Users --> SIMS : Login/Transactions
+SIMS --> Users : Reports/Notifications
+SIMS --> Firebase : Auth/CRUD
+Firebase --> SIMS : Tokens/Data
+@enduml
+```
 
 **Description**: External entities (Users, Firebase Services) interacting with SIMS system showing major data flows (Login Credentials, Inventory Transactions, Reports).
 
 ---
 
-[Insert Level 1 DFD - Inventory Management Process]
+```plantuml
+@startuml
+left to right direction
+rectangle "Storekeeper" as SK
+rectangle "Process: Receive Stock" as P1
+rectangle "Process: Issue Stock" as P2
+rectangle "Process: Transfer Stock" as P3
+rectangle "Process: Adjust Stock" as P4
+database "Parts Master" as D1
+database "Inventory" as D2
+database "Movement Log" as D3
+
+SK --> P1 : GRN + Items
+SK --> P2 : Issue Request
+SK --> P3 : Transfer Request
+SK --> P4 : Adjustment Request
+P1 --> D2 : Update qty
+P2 --> D2 : Update qty
+P3 --> D2 : Move qty
+P4 --> D2 : Correct qty
+P1 --> D3 : Log movement
+P2 --> D3 : Log movement
+P3 --> D3 : Log movement
+P4 --> D3 : Log movement
+P1 --> D1 : Read parts
+P2 --> D1 : Read parts
+P3 --> D1 : Read parts
+P4 --> D1 : Read parts
+@enduml
+```
 
 **Description**: Decomposition showing sub-processes (Receive Stock, Issue Stock, Transfer Stock, Adjust Stock) with data stores (Parts Master, Inventory, Movement Log) and data flows between them.
 
@@ -2613,7 +2993,28 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ### Appendix C: Entity Relationship Diagrams
 
-[Insert ER Diagram - Core Entities]
+```plantuml
+@startuml
+hide methods
+hide stereotypes
+skinparam classAttributeIconSize 0
+
+class User { userId }
+class Group { groupId }
+class Part { partId }
+class Supplier { supplierId }
+class Location { locationId }
+class Inventory { inventoryId }
+class Movement { movementId }
+
+User "1" -- "1" Group
+Supplier "1" -- "*" Part
+Part "1" -- "*" Inventory
+Location "1" -- "*" Inventory
+User "1" -- "*" Movement
+Part "1" -- "*" Movement
+@enduml
+```
 
 **Description**: Shows entities (User, Group, Part, Supplier, Storage Location, Inventory, Movement) with relationships (User belongs to Group, Part stored in Location, Movement references Part) and cardinalities.
 
@@ -2627,7 +3028,25 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ---
 
-[Insert ER Diagram - Procurement Entities]
+```plantuml
+@startuml
+hide methods
+hide stereotypes
+skinparam classAttributeIconSize 0
+
+class PurchaseRequisition { prId }
+class PurchaseOrder { poId }
+class Supplier { supplierId }
+class User { userId }
+class Part { partId }
+
+User "1" -- "*" PurchaseRequisition : creates
+PurchaseRequisition "1" -- "*" PurchaseOrder : converts to
+Supplier "1" -- "*" PurchaseOrder : receives
+PurchaseRequisition "*" -- "*" Part : line items
+PurchaseOrder "*" -- "*" Part : line items
+@enduml
+```
 
 **Description**: Shows PurchaseRequisition, PurchaseOrder, Supplier entities with relationships and attributes.
 
@@ -2635,7 +3054,22 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ### Appendix D: Sequence Diagrams
 
-[Insert Sequence Diagram - User Login Flow]
+```plantuml
+@startuml
+actor User
+participant "Login Component" as Login
+participant "Firebase Auth" as Auth
+participant "Redux Store" as Store
+participant "Dashboard" as Dash
+
+User -> Login : Enter credentials
+Login -> Auth : signInWithEmailAndPassword
+Auth --> Login : Token / Error
+Login -> Store : dispatch(authSuccess)
+Store --> Dash : auth state updated
+Dash --> User : Redirect to dashboard
+@enduml
+```
 
 **Description**: Sequence showing interactions between User, Login Component, Firebase Auth, Redux Store, and Dashboard Component during login process.
 
@@ -2650,7 +3084,26 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ---
 
-[Insert Sequence Diagram - Stock In Transaction]
+```plantuml
+@startuml
+actor Storekeeper
+participant "Stock In Form" as Form
+participant "Redux Store" as Store
+participant "Firestore" as FS
+database "Inventory" as Inv
+database "Movement Log" as Log
+
+Storekeeper -> Form : Scan barcode + qty
+Form -> Form : Validate fields
+Form -> Store : dispatch(stockIn)
+Store -> FS : transaction()
+FS -> Inv : increment qty
+FS -> Log : add movement
+FS --> Store : success
+Store --> Form : update UI
+Form --> Storekeeper : show confirmation
+@enduml
+```
 
 **Description**: Sequence showing Storekeeper, Stock In Form, Redux Store, Firestore, and Inventory Collection interactions during stock receipt.
 
@@ -2667,7 +3120,25 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ---
 
-[Insert Sequence Diagram - Purchase Requisition Approval Workflow]
+```plantuml
+@startuml
+actor Requester
+participant "Requisition Form" as Form
+participant "Approval System" as Approval
+actor Approver
+participant "Firestore" as FS
+participant "Notification Service" as Notify
+
+Requester -> Form : Submit PR
+Form -> Approval : route for approval
+Approval -> Approver : notify pending PR
+Approver -> Approval : approve/reject
+Approval -> FS : update PR status
+FS --> Approval : success
+Approval -> Notify : notify requester
+Notify --> Requester : status update
+@enduml
+```
 
 **Description**: Sequence showing Requester, Requisition Form, Approval System, Approver, Firestore, and Notification System.
 
@@ -2685,31 +3156,111 @@ The SIMS project was developed using Agile Scrum methodology over four two-week 
 
 ### Appendix E: User Interface Mockups
 
-[Insert Mockup - Login Screen]
+```plantuml
+@startuml
+salt
+{
+{T Login}
+{
+  [Logo]
+  { Email | "" }
+  { Password | "" }
+  [ ] Remember Me
+  [ Login ]
+  [Forgot Password]
+}
+}
+@enduml
+```
 
-**Description**: Login page showing email field, password field, "Remember Me" checkbox, "Login" button, "Forgot Password" link, "Register" link, and application logo.
+**Description**: Login page showing email field, password field, "Remember Me" checkbox, "Login" button, "Forgot Password" link, and application logo. No self-registration available.
 
 ---
 
-[Insert Mockup - Dashboard]
+```plantuml
+@startuml
+salt
+{
+{T Dashboard}
+{
+  [KPI: Stock Value]  [KPI: Parts Count]  [KPI: Low Stock]
+  [KPI: Today Movements]
+  --
+  { Recent Activity | }
+  [Quick Actions]  [Low Stock Alerts]
+}
+}
+@enduml
+```
 
 **Description**: Dashboard showing KPI cards (Total Stock Value, Parts Count, Low Stock Items, Today's Movements), recent activity table, quick action buttons, and low stock alerts panel.
 
 ---
 
-[Insert Mockup - Parts Master List]
+```plantuml
+@startuml
+salt
+{
+{T Parts Master}
+{
+  { Search | "" }  [Filter]
+  [Add New Part]
+  --
+  {#
+  Part No | Description | Category | Unit | Reorder | Status
+  1001 | Bearing | Mechanical | PCS | 10 | Active
+  1002 | Motor | Electrical | PCS | 5 | Active
+  }
+  [Prev] [1] [2] [Next]
+}
+}
+@enduml
+```
 
 **Description**: Data table showing columns (Part Number, Description, Category, Unit, Reorder Level, Status) with search bar, filter dropdowns, "Add New Part" button, and pagination controls.
 
 ---
 
-[Insert Mockup - Stock In Form]
+```plantuml
+@startuml
+salt
+{
+{T Stock In Form}
+{
+  { GRN No | "" }
+  { Supplier | "" }
+  { Barcode Scan | "" }
+  { Part | "" }
+  { Quantity | "" }
+  { Location | "" }
+  { Unit Cost | "" }
+  [ Save ]  [ Cancel ]
+}
+}
+@enduml
+```
 
 **Description**: Modal form showing GRN number field, supplier dropdown, barcode scan field, part selector, quantity input, storage location selector, unit cost field, "Save" and "Cancel" buttons.
 
 ---
 
-[Insert Mockup - Reports Screen]
+```plantuml
+@startuml
+salt
+{
+{T Reports}
+{
+  { Date Range | "" }  { Category | "" }  { Location | "" }
+  [Apply Filters]
+  --
+  {#
+  Report Table | Results
+  }
+  [Export CSV] [Export PDF]
+}
+}
+@enduml
+```
 
 **Description**: Report page showing filter panel (date range, part category, location), data table with results, chart visualization, and export buttons (CSV, PDF).
 
