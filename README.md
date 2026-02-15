@@ -2,6 +2,8 @@
 
 A full-stack web application for engineering spare parts and inventory operations. The system supports role-based access control, barcode-assisted stock movements, procurement workflows, maintenance requests, and operational reporting.
 
+![SIMS Dashboard Preview](img/SIMS_DASHBOARD.png)
+
 ---
 
 ## Table of Contents
